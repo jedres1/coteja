@@ -91,12 +91,129 @@ class PurchaseInvoiceMailboxImporter
         return $summary;
     }
 
+    public function inspect(?string $from = null, ?string $to = null): array
+    {
+        $config = config('services.purchase_invoice_mailbox');
+
+        if (blank($config['username']) || blank($config['password'])) {
+            throw new RuntimeException('Configure PURCHASE_INVOICE_MAIL_USERNAME y PURCHASE_INVOICE_MAIL_PASSWORD para extraer facturas.');
+        }
+
+        $details = [
+            'messages' => 0,
+            'attachments' => 0,
+            'files' => [],
+        ];
+
+        $this->connect($config);
+
+        try {
+            $this->command('LOGIN '.$this->quote($config['username']).' '.$this->quote($config['password']));
+            $this->command('SELECT '.$this->quote($config['mailbox'] ?: 'INBOX'));
+
+            $queryTokens = [];
+            if ($fromDate = $this->imapDate($from)) {
+                $queryTokens[] = 'SINCE '.$fromDate;
+            }
+
+            if ($toDate = $this->imapDate($to)) {
+                $queryTokens[] = 'BEFORE '.$this->imapDatePlusOneDay($toDate);
+            }
+
+            $search = empty($queryTokens) ? 'ALL' : implode(' ', $queryTokens);
+            $uids = $this->parseSearchUids($this->command('UID SEARCH '.$search));
+            $uids = array_slice(array_reverse($uids), 0, max(1, (int) $config['limit']));
+
+            foreach ($uids as $uid) {
+                $details['messages']++;
+
+                try {
+                    $message = $this->fetchMessage($uid);
+                    $jsonAttachments = $this->jsonAttachments($message);
+                    $details['attachments'] += count($jsonAttachments);
+
+                    foreach ($jsonAttachments as $attachment) {
+                        $this->inspectJson($attachment['content'], $attachment['filename'], $details);
+                    }
+                } catch (\Throwable $exception) {
+                    $details['files'][] = [
+                        'filename' => "Error UID {$uid}",
+                        'supplier' => 'N/A',
+                        'numeroControl' => null,
+                        'codigoGeneracion' => null,
+                        'status' => 'error',
+                        'message' => $exception->getMessage(),
+                    ];
+                }
+            }
+        } finally {
+            try {
+                $this->command('LOGOUT');
+            } catch (\Throwable) {
+                //
+            }
+
+            if (is_resource($this->socket)) {
+                fclose($this->socket);
+            }
+        }
+
+        return $details;
+    }
+
     public function hasDuplicateInvoice(int|string $supplierId, string $invoiceNumber): bool
     {
         return PurchaseInvoice::query()
             ->where('supplier_id', $supplierId)
             ->where('invoice_number', $invoiceNumber)
             ->exists();
+    }
+
+    private function inspectJson(string $content, string $filename, array &$details): void
+    {
+        try {
+            $data = json_decode($this->cleanJsonContent($content), true, flags: JSON_THROW_ON_ERROR);
+            $identification = $data['identificacion'] ?? [];
+            $issuer = $data['emisor'] ?? [];
+
+            $numeroControl = $identification['numeroControl'] ?? null;
+            $codigoGeneracion = $identification['codigoGeneracion'] ?? null;
+            $invoiceNumber = $numeroControl ?? $codigoGeneracion ?? null;
+            $supplierName = $issuer['nombre'] ?? null;
+
+            if (blank($invoiceNumber) || blank($supplierName)) {
+                $details['files'][] = [
+                    'filename' => $filename,
+                    'supplier' => $supplierName ?? 'DESCONOCIDO',
+                    'numeroControl' => $numeroControl,
+                    'codigoGeneracion' => $codigoGeneracion,
+                    'status' => 'error',
+                    'message' => 'Falta numeroControl o nombre de emisor',
+                ];
+                return;
+            }
+
+            $supplier = $this->supplierFromIssuer($issuer);
+            $isDuplicate = $this->hasDuplicateInvoice($supplier->id, $invoiceNumber);
+
+            $details['files'][] = [
+                'filename' => $filename,
+                'supplier' => $supplierName,
+                'numeroControl' => $numeroControl,
+                'codigoGeneracion' => $codigoGeneracion,
+                'status' => $isDuplicate ? 'duplicate' : 'ok',
+                'message' => $isDuplicate ? "Ya existe en sistema (proveedor: {$supplier->name})" : null,
+            ];
+        } catch (\Throwable $exception) {
+            $details['files'][] = [
+                'filename' => $filename,
+                'supplier' => 'ERROR',
+                'numeroControl' => null,
+                'codigoGeneracion' => null,
+                'status' => 'error',
+                'message' => $exception->getMessage(),
+            ];
+        }
     }
 
     private function importJson(string $content, string $filename, string $uid, array &$summary): string
