@@ -87,7 +87,7 @@ class PurchaseInvoiceMailboxImporter
 
     private function importJson(string $content, string $filename, string $uid): string
     {
-        $data = json_decode($this->cleanJsonContent($content), true, flags: JSON_THROW_ON_ERROR);
+        $data = json_decode($this->cleanJsonContent($content), true, 512, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE);
         $identification = $data['identificacion'] ?? [];
         $issuer = $data['emisor'] ?? [];
         $summary = $data['resumen'] ?? [];
@@ -237,8 +237,11 @@ class PurchaseInvoiceMailboxImporter
     {
         $response = $this->command('UID FETCH '.$uid.' (BODY.PEEK[])');
 
-        if (preg_match('/\{(\d+)\}\r\n(.*)\)\r\nA\d{4} OK/s', $response, $matches)) {
-            return $matches[2];
+        if (preg_match('/\{(\d+)\}\r\n/', $response, $matches, PREG_OFFSET_CAPTURE)) {
+            $size  = (int) $matches[1][0];
+            $start = $matches[0][1] + strlen($matches[0][0]);
+
+            return substr($response, $start, $size);
         }
 
         throw new RuntimeException('No se pudo leer el contenido del mensaje.');
@@ -354,6 +357,7 @@ class PurchaseInvoiceMailboxImporter
     {
         $content = trim($content);
         $content = preg_replace('/^\xEF\xBB\xBF/', '', $content);
+        $content = mb_convert_encoding($content, 'UTF-8', 'UTF-8');
 
         json_decode($content);
 
