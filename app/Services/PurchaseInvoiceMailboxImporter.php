@@ -13,7 +13,7 @@ class PurchaseInvoiceMailboxImporter
 
     private int $tagCounter = 1;
 
-    public function import(): array
+    public function import(?string $from = null, ?string $to = null): array
     {
         $config = config('services.purchase_invoice_mailbox');
 
@@ -27,6 +27,7 @@ class PurchaseInvoiceMailboxImporter
             'imported' => 0,
             'duplicates' => 0,
             'errors' => [],
+            'details' => [],
         ];
 
         $this->connect($config);
@@ -35,8 +36,21 @@ class PurchaseInvoiceMailboxImporter
             $this->command('LOGIN '.$this->quote($config['username']).' '.$this->quote($config['password']));
             $this->command('SELECT '.$this->quote($config['mailbox'] ?: 'INBOX'));
 
-            $search = $config['only_unseen'] ? 'UID SEARCH UNSEEN' : 'UID SEARCH ALL';
-            $uids = $this->parseSearchUids($this->command($search));
+            $queryTokens = [];
+            if ($config['only_unseen']) {
+                $queryTokens[] = 'UNSEEN';
+            }
+
+            if ($fromDate = $this->imapDate($from)) {
+                $queryTokens[] = 'SINCE '.$fromDate;
+            }
+
+            if ($toDate = $this->imapDate($to)) {
+                $queryTokens[] = 'BEFORE '.$this->imapDatePlusOneDay($toDate);
+            }
+
+            $search = empty($queryTokens) ? 'ALL' : implode(' ', $queryTokens);
+            $uids = $this->parseSearchUids($this->command('UID SEARCH '.$search));
             $uids = array_slice(array_reverse($uids), 0, max(1, (int) $config['limit']));
 
             foreach ($uids as $uid) {
@@ -50,7 +64,7 @@ class PurchaseInvoiceMailboxImporter
                     $messageImported = false;
 
                     foreach ($jsonAttachments as $attachment) {
-                        $result = $this->importJson($attachment['content'], $attachment['filename'], $uid);
+                        $result = $this->importJson($attachment['content'], $attachment['filename'], $uid, $summary);
                         $summary[$result]++;
                         $messageImported = $messageImported || $result === 'imported';
                     }
@@ -85,24 +99,34 @@ class PurchaseInvoiceMailboxImporter
             ->exists();
     }
 
-    private function importJson(string $content, string $filename, string $uid): string
+    private function importJson(string $content, string $filename, string $uid, array &$summary): string
     {
         $data = json_decode($this->cleanJsonContent($content), true, flags: JSON_THROW_ON_ERROR);
         $identification = $data['identificacion'] ?? [];
         $issuer = $data['emisor'] ?? [];
-        $summary = $data['resumen'] ?? [];
+        $summary_data = $data['resumen'] ?? [];
 
-        $invoiceNumber = $identification['numeroControl'] ?? $identification['codigoGeneracion'] ?? null;
+        $numeroControl = $identification['numeroControl'] ?? null;
+        $codigoGeneracion = $identification['codigoGeneracion'] ?? null;
+        $invoiceNumber = $numeroControl ?? $codigoGeneracion ?? null;
         $supplierName = $issuer['nombre'] ?? null;
 
         if (blank($invoiceNumber) || blank($supplierName)) {
             throw new RuntimeException("El adjunto {$filename} no contiene identificacion.numeroControl o emisor.nombre.");
         }
 
-        return DB::transaction(function () use ($data, $identification, $issuer, $summary, $invoiceNumber, $supplierName, $filename, $uid) {
+        return DB::transaction(function () use ($data, $identification, $issuer, $summary_data, $invoiceNumber, $numeroControl, $codigoGeneracion, $supplierName, $filename, $uid, &$summary) {
             $supplier = $this->supplierFromIssuer($issuer);
 
             if ($this->hasDuplicateInvoice($supplier->id, $invoiceNumber)) {
+                $summary['details'][] = [
+                    'filename' => $filename,
+                    'supplier' => $supplierName,
+                    'numeroControl' => $numeroControl,
+                    'codigoGeneracion' => $codigoGeneracion,
+                    'status' => 'DUPLICADA',
+                    'razon' => "Ya existe en el sistema (ID proveedor: {$supplier->id})"
+                ];
                 return 'duplicates';
             }
 
@@ -114,22 +138,39 @@ class PurchaseInvoiceMailboxImporter
                     'invoice_number' => $invoiceNumber,
                     'purchase_date' => $identification['fecEmi'] ?? now()->toDateString(),
                     'due_date' => null,
-                    'subtotal' => $this->money($summary['subTotal'] ?? $summary['totalGravada'] ?? 0),
-                    'iva' => $this->money($summary['totalIva'] ?? $summary['ivaPerci1'] ?? 0),
-                    'total' => $this->money($summary['montoTotalOperacion'] ?? $summary['totalPagar'] ?? 0),
-                    'payment_method' => $this->paymentMethod($summary['pagos'][0]['codigo'] ?? null),
+                    'subtotal' => $this->money($summary_data['subTotal'] ?? $summary_data['totalGravada'] ?? 0),
+                    'iva' => $this->money($summary_data['totalIva'] ?? $summary_data['ivaPerci1'] ?? 0),
+                    'total' => $this->money($summary_data['montoTotalOperacion'] ?? $summary_data['totalPagar'] ?? 0),
+                    'payment_method' => $this->paymentMethod($summary_data['pagos'][0]['codigo'] ?? null),
                     'payment_status' => 'pending',
                     'status' => 'registered',
                     'notes' => trim(sprintf(
                         "Extraida de correo %s. Archivo: %s. Codigo generacion: %s.",
                         $uid,
                         $filename,
-                        $identification['codigoGeneracion'] ?? 'N/D'
+                        $codigoGeneracion ?? 'N/D'
                     )),
                     'extracted_document_body' => json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
                 ]);
+                
+                $summary['details'][] = [
+                    'filename' => $filename,
+                    'supplier' => $supplierName,
+                    'numeroControl' => $numeroControl,
+                    'codigoGeneracion' => $codigoGeneracion,
+                    'status' => 'IMPORTADA',
+                    'razon' => null
+                ];
             } catch (\Illuminate\Database\QueryException $exception) {
                 if ($this->isDuplicateException($exception)) {
+                    $summary['details'][] = [
+                        'filename' => $filename,
+                        'supplier' => $supplierName,
+                        'numeroControl' => $numeroControl,
+                        'codigoGeneracion' => $codigoGeneracion,
+                        'status' => 'DUPLICADA',
+                        'razon' => "Violación de restricción única en BD"
+                    ];
                     return 'duplicates';
                 }
 
@@ -411,6 +452,28 @@ class PurchaseInvoiceMailboxImporter
     private function documentType(?string $value): string
     {
         return in_array($value, ['01', '03', '05', '06', '11', '14'], true) ? $value : '99';
+    }
+
+    private function imapDate(?string $value): ?string
+    {
+        if (blank($value)) {
+            return null;
+        }
+
+        try {
+            $date = new \DateTimeImmutable($value);
+        } catch (\Throwable $exception) {
+            return null;
+        }
+
+        return $date->format('j-M-Y');
+    }
+
+    private function imapDatePlusOneDay(string $dateString): string
+    {
+        $date = new \DateTimeImmutable($dateString);
+
+        return $date->modify('+1 day')->format('j-M-Y');
     }
 
     private function paymentMethod(?string $code): ?string

@@ -52,10 +52,18 @@ class PurchaseInvoiceController extends Controller
         return back()->with('status', 'Factura de compra registrada.');
     }
 
-    public function extract(PurchaseInvoiceMailboxImporter $importer)
+    public function extract(Request $request, PurchaseInvoiceMailboxImporter $importer)
     {
+        $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+        ]);
+
         try {
-            $summary = $importer->import();
+            $summary = $importer->import(
+                $request->input('from'),
+                $request->input('to'),
+            );
         } catch (RuntimeException $exception) {
             return back()->withErrors($exception->getMessage());
         }
@@ -66,6 +74,23 @@ class PurchaseInvoiceController extends Controller
             $summary['duplicates'],
             $summary['attachments']
         );
+
+        if (!empty($summary['details'])) {
+            $detailsText = "\n\nDetalles:\n";
+            foreach ($summary['details'] as $detail) {
+                $statusEmoji = $detail['status'] === 'IMPORTADA' ? '✓' : '⚠';
+                $detailsText .= sprintf(
+                    "%s %s | Proveedor: %s | NumControl: %s | CodGen: %s%s\n",
+                    $statusEmoji,
+                    $detail['status'],
+                    $detail['supplier'],
+                    $detail['numeroControl'] ?? 'N/A',
+                    $detail['codigoGeneracion'] ?? 'N/A',
+                    $detail['razon'] ? ' | Razón: '.$detail['razon'] : ''
+                );
+            }
+            $message .= $detailsText;
+        }
 
         if ($summary['errors']) {
             return back()

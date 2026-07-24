@@ -31,6 +31,8 @@
         </div>
         <form method="post" action="{{ route('admin.purchase-invoices.extract') }}" data-confirm-extract="Se leerán los correos no leídos de facturacioncoteja@gmail.com con adjuntos JSON.">
             @csrf
+            <label>Desde <input type="date" name="from" value="{{ request('from') }}"></label>
+            <label>Hasta <input type="date" name="to" value="{{ request('to') }}"></label>
             <button class="btn" type="submit">Extraer</button>
         </form>
     </div>
