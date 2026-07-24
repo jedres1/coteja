@@ -1,0 +1,440 @@
+{
+  "departamentos": [
+    { "codigo": "01", "nombre": "Ahuachapán" },
+    { "codigo": "02", "nombre": "Santa Ana" },
+    { "codigo": "03", "nombre": "Sonsonate" },
+    { "codigo": "04", "nombre": "Chalatenango" },
+    { "codigo": "05", "nombre": "La Libertad" },
+    { "codigo": "06", "nombre": "San Salvador" },
+    { "codigo": "07", "nombre": "Cuscatlán" },
+    { "codigo": "08", "nombre": "La Paz" },
+    { "codigo": "09", "nombre": "Cabañas" },
+    { "codigo": "10", "nombre": "San Vicente" },
+    { "codigo": "11", "nombre": "Usulután" },
+    { "codigo": "12", "nombre": "San Miguel" },
+    { "codigo": "13", "nombre": "Morazán" },
+    { "codigo": "14", "nombre": "La Unión" }
+  ],
+  "municipios": {
+    "01": [
+      { "codigo": "0101", "nombre": "Ahuachapán Centro" },
+      { "codigo": "0102", "nombre": "Ahuachapán Norte" },
+      { "codigo": "0103", "nombre": "Ahuachapán Sur" }
+    ],
+    "02": [
+      { "codigo": "0201", "nombre": "Santa Ana Centro" },
+      { "codigo": "0202", "nombre": "Santa Ana Este" },
+      { "codigo": "0203", "nombre": "Santa Ana Norte" },
+      { "codigo": "0204", "nombre": "Santa Ana Oeste" }
+    ],
+    "03": [
+      { "codigo": "0301", "nombre": "Sonsonate Centro" },
+      { "codigo": "0302", "nombre": "Sonsonate Este" },
+      { "codigo": "0303", "nombre": "Sonsonate Norte" },
+      { "codigo": "0304", "nombre": "Sonsonate Oeste" }
+    ],
+    "04": [
+      { "codigo": "0401", "nombre": "Chalatenango Centro" },
+      { "codigo": "0402", "nombre": "Chalatenango Norte" },
+      { "codigo": "0403", "nombre": "Chalatenango Sur" }
+    ],
+    "05": [
+      { "codigo": "0501", "nombre": "La Libertad Centro" },
+      { "codigo": "0502", "nombre": "La Libertad Costa" },
+      { "codigo": "0503", "nombre": "La Libertad Este" },
+      { "codigo": "0504", "nombre": "La Libertad Norte" },
+      { "codigo": "0505", "nombre": "La Libertad Oeste" },
+      { "codigo": "0506", "nombre": "La Libertad Sur" }
+    ],
+    "06": [
+      { "codigo": "0601", "nombre": "San Salvador Centro" },
+      { "codigo": "0602", "nombre": "San Salvador Este" },
+      { "codigo": "0603", "nombre": "San Salvador Norte" },
+      { "codigo": "0604", "nombre": "San Salvador Noroeste" },
+      { "codigo": "0605", "nombre": "San Salvador Sur" }
+    ],
+    "07": [
+      { "codigo": "0701", "nombre": "Cuscatlán Norte" },
+      { "codigo": "0702", "nombre": "Cuscatlán Sur" }
+    ],
+    "08": [
+      { "codigo": "0801", "nombre": "La Paz Centro" },
+      { "codigo": "0802", "nombre": "La Paz Este" },
+      { "codigo": "0803", "nombre": "La Paz Oeste" }
+    ],
+    "09": [
+      { "codigo": "0901", "nombre": "Cabañas Este" },
+      { "codigo": "0902", "nombre": "Cabañas Oeste" }
+    ],
+    "10": [
+      { "codigo": "1001", "nombre": "San Vicente Norte" },
+      { "codigo": "1002", "nombre": "San Vicente Sur" }
+    ],
+    "11": [
+      { "codigo": "1101", "nombre": "Usulután Este" },
+      { "codigo": "1102", "nombre": "Usulután Norte" },
+      { "codigo": "1103", "nombre": "Usulután Oeste" }
+    ],
+    "12": [
+      { "codigo": "1201", "nombre": "San Miguel Centro" },
+      { "codigo": "1202", "nombre": "San Miguel Norte" },
+      { "codigo": "1203", "nombre": "San Miguel Oeste" }
+    ],
+    "13": [
+      { "codigo": "1301", "nombre": "Morazán Norte" },
+      { "codigo": "1302", "nombre": "Morazán Sur" }
+    ],
+    "14": [
+      { "codigo": "1401", "nombre": "La Unión Norte" },
+      { "codigo": "1402", "nombre": "La Unión Sur" }
+    ]
+  },
+  "distritos": {
+    "0101": [
+      { "codigo": "010101", "nombre": "Ahuachapán" },
+      { "codigo": "010102", "nombre": "Apaneca" },
+      { "codigo": "010104", "nombre": "Concepción de Ataco" },
+      { "codigo": "010111", "nombre": "Tacuba" }
+    ],
+    "0102": [
+      { "codigo": "010203", "nombre": "Atiquizaya" },
+      { "codigo": "010205", "nombre": "El Refugio" },
+      { "codigo": "010209", "nombre": "San Lorenzo" },
+      { "codigo": "010212", "nombre": "Turín" }
+    ],
+    "0103": [
+      { "codigo": "010306", "nombre": "Guaymango" },
+      { "codigo": "010307", "nombre": "Jujutla" },
+      { "codigo": "010308", "nombre": "San Francisco Menéndez" },
+      { "codigo": "010310", "nombre": "San Pedro Puxtla" }
+    ],
+    "0201": [{ "codigo": "020110", "nombre": "Santa Ana" }],
+    "0202": [
+      { "codigo": "020202", "nombre": "Coatepeque" },
+      { "codigo": "020204", "nombre": "El Congo" }
+    ],
+    "0203": [
+      { "codigo": "020306", "nombre": "Masahuat" },
+      { "codigo": "020307", "nombre": "Metapán" },
+      { "codigo": "020311", "nombre": "Santa Rosa Guachipilín" },
+      { "codigo": "020313", "nombre": "Texistepeque" }
+    ],
+    "0204": [
+      { "codigo": "020401", "nombre": "Candelaria de la Frontera" },
+      { "codigo": "020403", "nombre": "Chalchuapa" },
+      { "codigo": "020405", "nombre": "El Porvenir" },
+      { "codigo": "020408", "nombre": "San Antonio Pajonal" },
+      { "codigo": "020409", "nombre": "San Sebastián Salitrillo" },
+      { "codigo": "020412", "nombre": "Santiago de la Frontera" }
+    ],
+    "0301": [
+      { "codigo": "030109", "nombre": "Nahulingo" },
+      { "codigo": "030111", "nombre": "San Antonio del Monte" },
+      { "codigo": "030114", "nombre": "Santo Domingo de Guzmán" },
+      { "codigo": "030115", "nombre": "Sonsonate" },
+      { "codigo": "030116", "nombre": "Sonzacate" }
+    ],
+    "0302": [
+      { "codigo": "030202", "nombre": "Armenia" },
+      { "codigo": "030203", "nombre": "Caluco" },
+      { "codigo": "030204", "nombre": "Cuisnahuat" },
+      { "codigo": "030205", "nombre": "Santa Isabel Ishuatán" },
+      { "codigo": "030206", "nombre": "Izalco" },
+      { "codigo": "030212", "nombre": "San Julián" }
+    ],
+    "0303": [
+      { "codigo": "030307", "nombre": "Juayúa" },
+      { "codigo": "030308", "nombre": "Nahuizalco" },
+      { "codigo": "030310", "nombre": "Salcoatitán" },
+      { "codigo": "030313", "nombre": "Santa Catarina Masahuat" }
+    ],
+    "0304": [{ "codigo": "030401", "nombre": "Acajutla" }],
+    "0401": [
+      { "codigo": "040101", "nombre": "Agua Caliente" },
+      { "codigo": "040108", "nombre": "Dulce Nombre de María" },
+      { "codigo": "040110", "nombre": "El Paraíso" },
+      { "codigo": "040113", "nombre": "La Reina" },
+      { "codigo": "040116", "nombre": "Nueva Concepción" },
+      { "codigo": "040122", "nombre": "San Fernando" },
+      { "codigo": "040124", "nombre": "San Francisco Morazán" },
+      { "codigo": "040131", "nombre": "San Rafael" },
+      { "codigo": "040132", "nombre": "Santa Rita" },
+      { "codigo": "040133", "nombre": "Tejutla" }
+    ],
+    "0402": [
+      { "codigo": "040204", "nombre": "Citalá" },
+      { "codigo": "040212", "nombre": "La Palma" },
+      { "codigo": "040225", "nombre": "San Ignacio" }
+    ],
+    "0403": [
+      { "codigo": "040302", "nombre": "Arcatao" },
+      { "codigo": "040303", "nombre": "Azacualpa" },
+      { "codigo": "040305", "nombre": "Comalapa" },
+      { "codigo": "040306", "nombre": "Concepción Quezaltepeque" },
+      { "codigo": "040307", "nombre": "Chalatenango" },
+      { "codigo": "040309", "nombre": "El Carrizal" },
+      { "codigo": "040311", "nombre": "La Laguna" },
+      { "codigo": "040314", "nombre": "Las Vueltas" },
+      { "codigo": "040315", "nombre": "Nombre de Jesús" },
+      { "codigo": "040317", "nombre": "Nueva Trinidad" },
+      { "codigo": "040318", "nombre": "Ojos de Agua" },
+      { "codigo": "040319", "nombre": "Potonico" },
+      { "codigo": "040320", "nombre": "San Antonio de la Cruz" },
+      { "codigo": "040321", "nombre": "San Antonio Los Ranchos" },
+      { "codigo": "040323", "nombre": "San Francisco Lempa" },
+      { "codigo": "040326", "nombre": "San Isidro Labrador" },
+      { "codigo": "040327", "nombre": "San José Cancasque" },
+      { "codigo": "040328", "nombre": "San José Las Flores" },
+      { "codigo": "040329", "nombre": "San Luis del Carmen" },
+      { "codigo": "040330", "nombre": "San Miguel de Mercedes" }
+    ],
+    "0501": [
+      { "codigo": "050102", "nombre": "Ciudad Arce" },
+      { "codigo": "050115", "nombre": "San Juan Opico" }
+    ],
+    "0502": [
+      { "codigo": "050205", "nombre": "Chiltiupán" },
+      { "codigo": "050208", "nombre": "Jicalapa" },
+      { "codigo": "050209", "nombre": "La Libertad" },
+      { "codigo": "050218", "nombre": "Tamanique" },
+      { "codigo": "050220", "nombre": "Teotepeque" }
+    ],
+    "0503": [
+      { "codigo": "050301", "nombre": "Antiguo Cuscatlán" },
+      { "codigo": "050306", "nombre": "Huizúcar" },
+      { "codigo": "050310", "nombre": "Nuevo Cuscatlán" },
+      { "codigo": "050314", "nombre": "San José Villanueva" },
+      { "codigo": "050322", "nombre": "Zaragoza" }
+    ],
+    "0504": [
+      { "codigo": "050412", "nombre": "Quezaltepeque" },
+      { "codigo": "050416", "nombre": "San Matías" },
+      { "codigo": "050417", "nombre": "San Pablo Tacachico" }
+    ],
+    "0505": [
+      { "codigo": "050503", "nombre": "Colón" },
+      { "codigo": "050507", "nombre": "Jayaque" },
+      { "codigo": "050513", "nombre": "Sacacoyo" },
+      { "codigo": "050519", "nombre": "Talnique" },
+      { "codigo": "050521", "nombre": "Tepecoyo" }
+    ],
+    "0506": [
+      { "codigo": "050604", "nombre": "Comasagua" },
+      { "codigo": "050611", "nombre": "Santa Tecla" }
+    ],
+    "0601": [
+      { "codigo": "060103", "nombre": "Ayutuxtepeque" },
+      { "codigo": "060104", "nombre": "Cuscatancingo" },
+      { "codigo": "060108", "nombre": "Mejicanos" },
+      { "codigo": "060114", "nombre": "San Salvador" },
+      { "codigo": "060119", "nombre": "Delgado" }
+    ],
+    "0602": [
+      { "codigo": "060207", "nombre": "Ilopango" },
+      { "codigo": "060213", "nombre": "San Martín" },
+      { "codigo": "060217", "nombre": "Soyapango" },
+      { "codigo": "060218", "nombre": "Tonacatepeque" }
+    ],
+    "0603": [
+      { "codigo": "060301", "nombre": "Aguilares" },
+      { "codigo": "060305", "nombre": "El Paisnal" },
+      { "codigo": "060306", "nombre": "Guazapa" }
+    ],
+    "0604": [
+      { "codigo": "060402", "nombre": "Apopa" },
+      { "codigo": "060409", "nombre": "Nejapa" }
+    ],
+    "0605": [
+      { "codigo": "060510", "nombre": "Panchimalco" },
+      { "codigo": "060511", "nombre": "Rosario de Mora" },
+      { "codigo": "060512", "nombre": "San Marcos" },
+      { "codigo": "060515", "nombre": "Santiago Texacuangos" },
+      { "codigo": "060516", "nombre": "Santo Tomás" }
+    ],
+    "0701": [
+      { "codigo": "070106", "nombre": "Oratorio de Concepción" },
+      { "codigo": "070107", "nombre": "San Bartolomé Perulapía" },
+      { "codigo": "070109", "nombre": "San José Guayabal" },
+      { "codigo": "070110", "nombre": "San Pedro Perulapán" },
+      { "codigo": "070115", "nombre": "Suchitoto" }
+    ],
+    "0702": [
+      { "codigo": "070201", "nombre": "Candelaria" },
+      { "codigo": "070202", "nombre": "Cojutepeque" },
+      { "codigo": "070203", "nombre": "El Carmen" },
+      { "codigo": "070204", "nombre": "El Rosario" },
+      { "codigo": "070205", "nombre": "Monte San Juan" },
+      { "codigo": "070208", "nombre": "San Cristóbal" },
+      { "codigo": "070211", "nombre": "San Rafael Cedros" },
+      { "codigo": "070212", "nombre": "San Ramón" },
+      { "codigo": "070213", "nombre": "Santa Cruz Analquito" },
+      { "codigo": "070214", "nombre": "Santa Cruz Michapa" },
+      { "codigo": "070216", "nombre": "Tenancingo" }
+    ],
+    "0801": [
+      { "codigo": "080102", "nombre": "El Rosario" },
+      { "codigo": "080103", "nombre": "Jerusalén" },
+      { "codigo": "080104", "nombre": "Mercedes La Ceiba" },
+      { "codigo": "080106", "nombre": "Paraíso de Osorio" },
+      { "codigo": "080107", "nombre": "San Antonio Masahuat" },
+      { "codigo": "080108", "nombre": "San Emigdio" },
+      { "codigo": "080112", "nombre": "San Juan Tepezontes" },
+      { "codigo": "080114", "nombre": "San Miguel Tepezontes" },
+      { "codigo": "080116", "nombre": "San Pedro Nonualco" },
+      { "codigo": "080118", "nombre": "Santa María Ostuma" },
+      { "codigo": "080119", "nombre": "Santiago Nonualco" },
+      { "codigo": "080122", "nombre": "San Luis La Herradura" }
+    ],
+    "0802": [
+      { "codigo": "080210", "nombre": "San Juan Nonualco" },
+      { "codigo": "080217", "nombre": "San Rafael Obrajuelo" },
+      { "codigo": "080221", "nombre": "Zacatecoluca" }
+    ],
+    "0803": [
+      { "codigo": "080301", "nombre": "Cuyultitán" },
+      { "codigo": "080305", "nombre": "Olocuilta" },
+      { "codigo": "080309", "nombre": "San Francisco Chinameca" },
+      { "codigo": "080311", "nombre": "San Juan Talpa" },
+      { "codigo": "080313", "nombre": "San Luis Talpa" },
+      { "codigo": "080315", "nombre": "San Pedro Masahuat" },
+      { "codigo": "080320", "nombre": "Tapalhuaca" }
+    ],
+    "0901": [
+      { "codigo": "090102", "nombre": "Guacotecti" },
+      { "codigo": "090105", "nombre": "San Isidro" },
+      { "codigo": "090106", "nombre": "Sensuntepeque" },
+      { "codigo": "090108", "nombre": "Victoria" },
+      { "codigo": "090109", "nombre": "Dolores" }
+    ],
+    "0902": [
+      { "codigo": "090201", "nombre": "Cinquera" },
+      { "codigo": "090203", "nombre": "Ilobasco" },
+      { "codigo": "090204", "nombre": "Jutiapa" },
+      { "codigo": "090207", "nombre": "Tejutepeque" }
+    ],
+    "1001": [
+      { "codigo": "100101", "nombre": "Apastepeque" },
+      { "codigo": "100104", "nombre": "Santa Clara" },
+      { "codigo": "100105", "nombre": "Santo Domingo" },
+      { "codigo": "100106", "nombre": "San Esteban Catarina" },
+      { "codigo": "100107", "nombre": "San Ildefonso" },
+      { "codigo": "100108", "nombre": "San Lorenzo" },
+      { "codigo": "100109", "nombre": "San Sebastián" }
+    ],
+    "1002": [
+      { "codigo": "100202", "nombre": "Guadalupe" },
+      { "codigo": "100203", "nombre": "San Cayetano Istepeque" },
+      { "codigo": "100210", "nombre": "San Vicente" },
+      { "codigo": "100211", "nombre": "Tecoluca" },
+      { "codigo": "100212", "nombre": "Tepetitán" },
+      { "codigo": "100213", "nombre": "Verapaz" }
+    ],
+    "1101": [
+      { "codigo": "110103", "nombre": "California" },
+      { "codigo": "110104", "nombre": "Concepción Batres" },
+      { "codigo": "110106", "nombre": "Ereguayquín" },
+      { "codigo": "110110", "nombre": "Jucuarán" },
+      { "codigo": "110113", "nombre": "Ozatlán" },
+      { "codigo": "110117", "nombre": "San Dionisio" },
+      { "codigo": "110118", "nombre": "Santa Elena" },
+      { "codigo": "110120", "nombre": "Santa María" },
+      { "codigo": "110122", "nombre": "Tecapán" },
+      { "codigo": "110123", "nombre": "Usulután" }
+    ],
+    "1102": [
+      { "codigo": "110201", "nombre": "Alegría" },
+      { "codigo": "110202", "nombre": "Berlín" },
+      { "codigo": "110205", "nombre": "El Triunfo" },
+      { "codigo": "110207", "nombre": "Estanzuelas" },
+      { "codigo": "110209", "nombre": "Jucuapa" },
+      { "codigo": "110211", "nombre": "Mercedes Umaña" },
+      { "codigo": "110212", "nombre": "Nueva Granada" },
+      { "codigo": "110216", "nombre": "San Buenaventura" },
+      { "codigo": "110221", "nombre": "Santiago de María" }
+    ],
+    "1103": [
+      { "codigo": "110308", "nombre": "Jiquilisco" },
+      { "codigo": "110314", "nombre": "Puerto El Triunfo" },
+      { "codigo": "110315", "nombre": "San Agustín" },
+      { "codigo": "110319", "nombre": "San Francisco Javier" }
+    ],
+    "1201": [
+      { "codigo": "120103", "nombre": "Comacarán" },
+      { "codigo": "120106", "nombre": "Chirilagua" },
+      { "codigo": "120109", "nombre": "Moncagua" },
+      { "codigo": "120112", "nombre": "Quelepa" },
+      { "codigo": "120117", "nombre": "San Miguel" },
+      { "codigo": "120120", "nombre": "Uluazapa" }
+    ],
+    "1202": [
+      { "codigo": "120201", "nombre": "Carolina" },
+      { "codigo": "120202", "nombre": "Ciudad Barrios" },
+      { "codigo": "120204", "nombre": "Chapeltique" },
+      { "codigo": "120211", "nombre": "Nuevo Edén de San Juan" },
+      { "codigo": "120213", "nombre": "San Antonio del Mosco" },
+      { "codigo": "120214", "nombre": "San Gerardo" },
+      { "codigo": "120216", "nombre": "San Luis de La Reina" },
+      { "codigo": "120219", "nombre": "Sesori" }
+    ],
+    "1203": [
+      { "codigo": "120305", "nombre": "Chinameca" },
+      { "codigo": "120307", "nombre": "El Tránsito" },
+      { "codigo": "120308", "nombre": "Lolotique" },
+      { "codigo": "120310", "nombre": "Nueva Guadalupe" },
+      { "codigo": "120315", "nombre": "San Jorge" },
+      { "codigo": "120318", "nombre": "San Rafael Oriente" }
+    ],
+    "1301": [
+      { "codigo": "130101", "nombre": "Arambala" },
+      { "codigo": "130102", "nombre": "Cacaopera" },
+      { "codigo": "130103", "nombre": "Corinto" },
+      { "codigo": "130107", "nombre": "El Rosario" },
+      { "codigo": "130110", "nombre": "Joateca" },
+      { "codigo": "130111", "nombre": "Jocoaitique" },
+      { "codigo": "130114", "nombre": "Meanguera" },
+      { "codigo": "130116", "nombre": "Perquín" },
+      { "codigo": "130118", "nombre": "San Fernando" },
+      { "codigo": "130120", "nombre": "San Isidro" },
+      { "codigo": "130124", "nombre": "Torola" }
+    ],
+    "1302": [
+      { "codigo": "130204", "nombre": "Chilanga" },
+      { "codigo": "130205", "nombre": "Delicias de Concepción" },
+      { "codigo": "130206", "nombre": "El Divisadero" },
+      { "codigo": "130208", "nombre": "Gualococti" },
+      { "codigo": "130209", "nombre": "Guatajiagua" },
+      { "codigo": "130212", "nombre": "Jocoro" },
+      { "codigo": "130213", "nombre": "Lolotiquillo" },
+      { "codigo": "130215", "nombre": "Osicala" },
+      { "codigo": "130217", "nombre": "San Carlos" },
+      { "codigo": "130219", "nombre": "San Francisco Gotera" },
+      { "codigo": "130221", "nombre": "San Simón" },
+      { "codigo": "130222", "nombre": "Sensembra" },
+      { "codigo": "130223", "nombre": "Sociedad" },
+      { "codigo": "130225", "nombre": "Yamabal" },
+      { "codigo": "130226", "nombre": "Yoloaiquín" }
+    ],
+    "1401": [
+      { "codigo": "140101", "nombre": "Anamorós" },
+      { "codigo": "140102", "nombre": "Bolívar" },
+      { "codigo": "140103", "nombre": "Concepción de Oriente" },
+      { "codigo": "140106", "nombre": "El Sauce" },
+      { "codigo": "140109", "nombre": "Lislique" },
+      { "codigo": "140111", "nombre": "Nueva Esparta" },
+      { "codigo": "140112", "nombre": "Pasaquina" },
+      { "codigo": "140113", "nombre": "Polorós" },
+      { "codigo": "140115", "nombre": "San José La Fuente" },
+      { "codigo": "140116", "nombre": "Santa Rosa de Lima" }
+    ],
+    "1402": [
+      { "codigo": "140204", "nombre": "Conchagua" },
+      { "codigo": "140205", "nombre": "El Carmen" },
+      { "codigo": "140207", "nombre": "Intipucá" },
+      { "codigo": "140208", "nombre": "La Unión" },
+      { "codigo": "140210", "nombre": "Meanguera del Golfo" },
+      { "codigo": "140214", "nombre": "San Alejo" },
+      { "codigo": "140217", "nombre": "Yayantique" },
+      { "codigo": "140218", "nombre": "Yucuaiquín" }
+    ]
+  }
+}

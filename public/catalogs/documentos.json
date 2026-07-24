@@ -1,0 +1,24 @@
+{
+  "dte": [
+    { "codigo": "01", "nombre": "Factura" },
+    { "codigo": "03", "nombre": "Comprobante de Credito Fiscal" },
+    { "codigo": "05", "nombre": "Nota de Credito" },
+    { "codigo": "06", "nombre": "Nota de Debito" },
+    { "codigo": "07", "nombre": "Comprobante de Retencion" },
+    { "codigo": "11", "nombre": "Factura de Exportacion" },
+    { "codigo": "14", "nombre": "Factura de Sujeto Excluido" }
+  ],
+  "receptor": [
+    { "codigo": "36", "nombre": "NIT" },
+    { "codigo": "13", "nombre": "DUI" },
+    { "codigo": "37", "nombre": "Pasaporte" },
+    { "codigo": "03", "nombre": "Carnet de Residente" },
+    { "codigo": "02", "nombre": "Otro" }
+  ],
+  "relacionado": [
+    { "codigo": "03", "nombre": "Comprobante de Credito Fiscal" },
+    { "codigo": "01", "nombre": "Factura" },
+    { "codigo": "07", "nombre": "Comprobante de Retencion" },
+    { "codigo": "14", "nombre": "Sujeto Excluido" }
+  ]
+}
