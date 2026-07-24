@@ -154,10 +154,13 @@ class PurchaseInvoiceMailboxImporter
     {
         $documentNumber = $issuer['nit'] ?? $issuer['numDocumento'] ?? $issuer['nrc'] ?? null;
 
-        $supplier = Supplier::query()
-            ->when($documentNumber, fn ($query) => $query->where('document_number', $documentNumber))
-            ->when(! $documentNumber && ! blank($issuer['correo'] ?? null), fn ($query) => $query->where('email', $issuer['correo']))
-            ->first();
+        $supplier = null;
+
+        if (! blank($documentNumber)) {
+            $supplier = Supplier::where('document_number', $documentNumber)->first();
+        } elseif (! blank($issuer['correo'] ?? null)) {
+            $supplier = Supplier::where('email', $issuer['correo'])->first();
+        }
 
         $address = $issuer['direccion'] ?? [];
 
@@ -410,7 +413,13 @@ class PurchaseInvoiceMailboxImporter
 
     private function documentType(?string $value): string
     {
-        return in_array($value, ['01', '03', '05', '06', '11', '14'], true) ? $value : '99';
+        if (in_array($value, ['01', '03', '05', '06', '11', '14'], true)) {
+            return $value;
+        }
+
+        \Illuminate\Support\Facades\Log::warning("PurchaseInvoiceMailboxImporter: tipoDte desconocido '{$value}', se almacena como '99'.");
+
+        return '99';
     }
 
     private function paymentMethod(?string $code): ?string
