@@ -39,11 +39,11 @@
     <section v-if="activeView === 'dashboard'" class="card">
       <h3>Dashboard</h3>
       <div class="stats-grid">
-        <div class="stat"><span>Facturas Hoy</span><strong>{{ dashboardStats.todayCount }}</strong></div>
-        <div class="stat"><span>Total Enviado Hoy</span><strong>{{ money(dashboardStats.todaySentTotal) }}</strong></div>
-        <div class="stat"><span>Enviadas a Hacienda</span><strong>{{ dashboardStats.sentCount }}</strong></div>
-        <div class="stat"><span>Pendientes</span><strong>{{ dashboardStats.pendingCount }}</strong></div>
-        <div class="stat"><span>Anuladas</span><strong>{{ dashboardStats.voidedCount }}</strong></div>
+        <div class="stat"><span class="stat-icon">📄</span><div class="stat-info"><span>Facturas Hoy</span><strong>{{ dashboardStats.todayCount }}</strong></div></div>
+        <div class="stat"><span class="stat-icon">💰</span><div class="stat-info"><span>Total Enviado Hoy</span><strong>{{ money(dashboardStats.todaySentTotal) }}</strong></div></div>
+        <div class="stat"><span class="stat-icon">✅</span><div class="stat-info"><span>Enviadas a Hacienda</span><strong>{{ dashboardStats.sentCount }}</strong></div></div>
+        <div class="stat"><span class="stat-icon">⏳</span><div class="stat-info"><span>Pendientes</span><strong>{{ dashboardStats.pendingCount }}</strong></div></div>
+        <div class="stat"><span class="stat-icon">↩</span><div class="stat-info"><span>Anuladas</span><strong>{{ dashboardStats.voidedCount }}</strong></div></div>
       </div>
       <table>
         <thead><tr><th>Fecha</th><th>No. Control</th><th>Cliente</th><th>Total</th><th>Estado</th></tr></thead>
@@ -1584,9 +1584,25 @@ function incotermDescription(code) {
   }[String(code || '01')] || 'EXW';
 }
 
+function cleanFiscalDocument(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
 function validateInvoice() {
   if (!selectedCustomerId.value) return 'Seleccione un cliente para continuar.';
   if (tipo.value !== '07' && items.value.length === 0) return 'Agregue al menos un producto o servicio.';
+
+  if (['03', '05', '06'].includes(tipo.value)) {
+    const nitReceptor = cleanFiscalDocument(cliente.numero_documento);
+    if (!nitReceptor || nitReceptor.length !== 14) {
+      return 'Para CCF/Notas el receptor debe tener NIT válido de 14 dígitos.';
+    }
+    const nitEmisor = cleanFiscalDocument(emisor.nit);
+    if (nitEmisor && nitReceptor === nitEmisor) {
+      return 'Para CCF/Notas el receptor no puede ser el mismo NIT del emisor. Seleccione un cliente/contribuyente distinto.';
+    }
+  }
+
   if (usesMultipleRelatedDocuments.value && documentosRelacionados.value.length === 0) {
     return `Agregue al menos un CCF relacionado para la ${documentTypeName(tipo.value)}.`;
   }
@@ -2694,8 +2710,9 @@ textarea {
 }
 
 .stat {
-  display: grid;
-  gap: 8px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
   padding: 14px;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
@@ -2707,16 +2724,27 @@ textarea {
   background: #0f172a;
 }
 
-.stat span {
+.stat-icon {
+  font-size: 2rem;
+  flex: 0 0 auto;
+  line-height: 1;
+}
+
+.stat-info {
+  display: grid;
+  gap: 4px;
+}
+
+.stat-info span {
   color: #6b7280;
   font-size: 13px;
 }
 
-:global(body.dark-mode) .stat span {
+:global(body.dark-mode) .stat-info span {
   color: #9ca3af;
 }
 
-.stat strong {
+.stat-info strong {
   font-size: 24px;
 }
 
@@ -2749,5 +2777,32 @@ summary {
   cursor: pointer;
   font-weight: 700;
   margin: 8px 0 12px;
+}
+
+/* Invoice / document status badge colors (includes normalized states from Hacienda) */
+.pendiente   { background: #fef3c7; color: #92400e; }
+.firmado     { background: #dbeafe; color: #1e40af; }
+.enviado     { background: #dbeafe; color: #1e40af; }
+.procesado   { background: #dbeafe; color: #1e40af; }
+.recibido    { background: #dbeafe; color: #1e40af; }
+.aceptado    { background: #d1fae5; color: #065f46; }
+.rechazado   { background: #fee2e2; color: #991b1b; }
+.anulado     { background: #f1f5f9; color: #475569; }
+.invalidado  { background: #f1f5f9; color: #475569; }
+.contingencia { background: #fff7ed; color: #9a3412; }
+
+:global(body.dark-mode) .pendiente    { background: #451a03; color: #fde68a; }
+:global(body.dark-mode) .firmado      { background: #1e3a5f; color: #bfdbfe; }
+:global(body.dark-mode) .enviado      { background: #1e3a5f; color: #bfdbfe; }
+:global(body.dark-mode) .procesado    { background: #1e3a5f; color: #bfdbfe; }
+:global(body.dark-mode) .recibido     { background: #1e3a5f; color: #bfdbfe; }
+:global(body.dark-mode) .aceptado     { background: #052e16; color: #86efac; }
+:global(body.dark-mode) .rechazado    { background: #450a0a; color: #fecaca; }
+:global(body.dark-mode) .anulado      { background: #1e293b; color: #94a3b8; }
+:global(body.dark-mode) .invalidado   { background: #1e293b; color: #94a3b8; }
+:global(body.dark-mode) .contingencia { background: #431407; color: #fed7aa; }
+
+:global(body.dark-mode) .resumen-row {
+  border-bottom-color: #263244;
 }
 </style>

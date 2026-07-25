@@ -218,7 +218,7 @@ class PurchaseInvoiceMailboxImporter
 
     private function importJson(string $content, string $filename, string $uid, array &$summary): string
     {
-        $data = json_decode($this->cleanJsonContent($content), true, flags: JSON_THROW_ON_ERROR);
+        $data = json_decode($this->cleanJsonContent($content), true, 512, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE);
         $identification = $data['identificacion'] ?? [];
         $issuer = $data['emisor'] ?? [];
         $summary_data = $data['resumen'] ?? [];
@@ -312,10 +312,13 @@ class PurchaseInvoiceMailboxImporter
     {
         $documentNumber = $issuer['nit'] ?? $issuer['numDocumento'] ?? $issuer['nrc'] ?? null;
 
-        $supplier = Supplier::query()
-            ->when($documentNumber, fn ($query) => $query->where('document_number', $documentNumber))
-            ->when(! $documentNumber && ! blank($issuer['correo'] ?? null), fn ($query) => $query->where('email', $issuer['correo']))
-            ->first();
+        $supplier = null;
+
+        if (! blank($documentNumber)) {
+            $supplier = Supplier::where('document_number', $documentNumber)->first();
+        } elseif (! blank($issuer['correo'] ?? null)) {
+            $supplier = Supplier::where('email', $issuer['correo'])->first();
+        }
 
         $address = $issuer['direccion'] ?? [];
 
@@ -392,8 +395,11 @@ class PurchaseInvoiceMailboxImporter
     {
         $response = $this->command('UID FETCH '.$uid.' (BODY.PEEK[])');
 
-        if (preg_match('/\{(\d+)\}\r\n(.*)\)\r\nA\d{4} OK/s', $response, $matches)) {
-            return $matches[2];
+        if (preg_match('/\{(\d+)\}\r\n/', $response, $matches, PREG_OFFSET_CAPTURE)) {
+            $size  = (int) $matches[1][0];
+            $start = $matches[0][1] + strlen($matches[0][0]);
+
+            return substr($response, $start, $size);
         }
 
         throw new RuntimeException('No se pudo leer el contenido del mensaje.');
@@ -509,6 +515,7 @@ class PurchaseInvoiceMailboxImporter
     {
         $content = trim($content);
         $content = preg_replace('/^\xEF\xBB\xBF/', '', $content);
+        $content = mb_convert_encoding($content, 'UTF-8', 'UTF-8');
 
         json_decode($content);
 
@@ -568,7 +575,13 @@ class PurchaseInvoiceMailboxImporter
 
     private function documentType(?string $value): string
     {
-        return in_array($value, ['01', '03', '05', '06', '11', '14'], true) ? $value : '99';
+        if (in_array($value, ['01', '03', '05', '06', '11', '14'], true)) {
+            return $value;
+        }
+
+        \Illuminate\Support\Facades\Log::warning("PurchaseInvoiceMailboxImporter: tipoDte desconocido '{$value}', se almacena como '99'.");
+
+        return '99';
     }
 
     private function imapDate(?string $value): ?string
