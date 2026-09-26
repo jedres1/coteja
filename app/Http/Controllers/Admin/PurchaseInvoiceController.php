@@ -58,11 +58,20 @@ class PurchaseInvoiceController extends Controller
 
     public function accountsPayable(Request $request)
     {
-        $supplierId = $request->query('supplier_id');
+        $search = trim((string) $request->query('search', ''));
 
         $baseQuery = fn () => PurchaseInvoice::whereIn('payment_status', ['pending', 'partial'])
             ->whereNotIn('status', ['extracted', 'rejected'])
-            ->when($supplierId, fn ($q) => $q->where('supplier_id', $supplierId));
+            ->when($search !== '', function ($q) use ($search) {
+                $q->where(function ($q) use ($search) {
+                    $q->where('total', 'like', "%{$search}%")
+                      ->orWhereHas('supplier', fn ($q) => $q
+                          ->where('name', 'like', "%{$search}%")
+                          ->orWhere('document_number', 'like', "%{$search}%")
+                          ->orWhere('nrc', 'like', "%{$search}%")
+                      );
+                });
+            });
 
         $totals = [
             'total'     => (clone $baseQuery())->sum('total'),
@@ -76,11 +85,7 @@ class PurchaseInvoiceController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        $grouped = $invoices->getCollection()->groupBy('supplier_id');
-
-        $suppliers = Supplier::orderBy('name')->get(['id', 'name']);
-
-        return view('admin.purchase-invoices.accounts-payable', compact('invoices', 'grouped', 'totals', 'suppliers', 'supplierId'));
+        return view('admin.purchase-invoices.accounts-payable', compact('invoices', 'totals', 'search'));
     }
 
     public function markPaid(Request $request, PurchaseInvoice $purchaseInvoice)
