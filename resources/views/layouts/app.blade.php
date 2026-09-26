@@ -128,6 +128,7 @@
                             <div class="nav-sub">
                                 <a class="{{ request()->routeIs('admin.purchase-invoices.index') ? 'active-link' : '' }}" href="{{ route('admin.purchase-invoices.index') }}">Facturas de compra</a>
                                 <a class="{{ request()->routeIs('admin.suppliers.*') ? 'active-link' : '' }}" href="{{ route('admin.suppliers.index') }}">Proveedores</a>
+                                <a class="{{ request()->routeIs('admin.purchase-invoices.settings') ? 'active-link' : '' }}" href="{{ route('admin.purchase-invoices.settings') }}">Configuración</a>
                             </div>
                         </div>
                     @endif
@@ -142,6 +143,7 @@
                                 <a class="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'nueva-factura' ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'nueva-factura']) }}">Nueva Factura</a>
                                 <a class="{{ request()->routeIs('admin.factura-sv.facturas') ? 'active-link' : '' }}" href="{{ route('admin.factura-sv.facturas') }}">Facturas</a>
                                 <a class="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'productos' ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'productos']) }}">Productos</a>
+                                <a class="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'configuracion' ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'configuracion']) }}">Configuración</a>
                             </div>
                         </div>
                     @endif

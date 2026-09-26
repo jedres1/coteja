@@ -42,10 +42,6 @@ Route::middleware(['auth', 'role:admin,consultant'])->prefix('admin')->name('adm
         Route::resource('releases', AppReleaseController::class)->only(['index', 'store']);
         Route::get('backups', [BackupController::class, 'index'])->name('backups.index');
         Route::get('backups/{backup}/download', [BackupController::class, 'download'])->name('backups.download');
-        // Configuración y extracción de correo: solo admin
-        Route::get('purchase-invoices/settings', [PurchaseInvoiceController::class, 'settingsIndex'])->name('purchase-invoices.settings');
-        Route::post('purchase-invoices/settings', [PurchaseInvoiceController::class, 'settingsUpdate'])->name('purchase-invoices.settings.update');
-        Route::post('purchase-invoices/extract', [PurchaseInvoiceController::class, 'extract'])->name('purchase-invoices.extract');
     });
 });
 
@@ -53,6 +49,9 @@ Route::middleware(['auth', 'role:admin,consultant'])->prefix('admin')->name('adm
 Route::middleware(['auth', 'role:admin,consultant,customer', 'module:purchases'])->prefix('admin')->name('admin.')->group(function () {
     Route::resource('suppliers', SupplierController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('purchase-invoices', PurchaseInvoiceController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::get('purchase-invoices/settings', [PurchaseInvoiceController::class, 'settingsIndex'])->name('purchase-invoices.settings');
+    Route::post('purchase-invoices/settings', [PurchaseInvoiceController::class, 'settingsUpdate'])->name('purchase-invoices.settings.update');
+    Route::post('purchase-invoices/extract', [PurchaseInvoiceController::class, 'extract'])->name('purchase-invoices.extract');
 });
 
 // Módulo Facturación: admin, consultant o customer con acceso a billing
