@@ -119,11 +119,31 @@
                     @endif
                 @else
                     <a class="{{ request()->routeIs('client.dashboard') ? 'active-link' : '' }}" href="{{ route('client.dashboard') }}">Mi cuenta</a>
-                    @if(auth()->user()->hasModuleAccess('billing'))
-                        <a class="{{ request()->routeIs('client.billing') ? 'active-link' : '' }}" href="{{ route('client.billing') }}">Facturación</a>
-                    @endif
                     @if(auth()->user()->hasModuleAccess('purchases'))
-                        <a class="{{ request()->routeIs('client.purchases') ? 'active-link' : '' }}" href="{{ route('client.purchases') }}">Compras</a>
+                        <div class="nav-group {{ request()->routeIs('admin.purchase-invoices.*', 'admin.suppliers.*') ? 'open' : '' }}">
+                            <button class="nav-toggle" type="button" aria-expanded="{{ request()->routeIs('admin.purchase-invoices.*', 'admin.suppliers.*') ? 'true' : 'false' }}">
+                                <span class="nav-label">Compras</span>
+                                <span class="nav-caret">›</span>
+                            </button>
+                            <div class="nav-sub">
+                                <a class="{{ request()->routeIs('admin.purchase-invoices.index') ? 'active-link' : '' }}" href="{{ route('admin.purchase-invoices.index') }}">Facturas de compra</a>
+                                <a class="{{ request()->routeIs('admin.suppliers.*') ? 'active-link' : '' }}" href="{{ route('admin.suppliers.index') }}">Proveedores</a>
+                            </div>
+                        </div>
+                    @endif
+                    @if(auth()->user()->hasModuleAccess('billing'))
+                        <div class="nav-group {{ request()->routeIs('admin.factura-sv', 'admin.factura-sv.*') ? 'open' : '' }}">
+                            <button class="nav-toggle" type="button" aria-expanded="{{ request()->routeIs('admin.factura-sv', 'admin.factura-sv.*') ? 'true' : 'false' }}">
+                                <span class="nav-label">Facturación</span>
+                                <span class="nav-caret">›</span>
+                            </button>
+                            <div class="nav-sub">
+                                <a class="{{ request()->routeIs('admin.factura-sv') && (!$facturaView || $facturaView === 'dashboard') ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'dashboard']) }}">Dashboard</a>
+                                <a class="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'nueva-factura' ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'nueva-factura']) }}">Nueva Factura</a>
+                                <a class="{{ request()->routeIs('admin.factura-sv.facturas') ? 'active-link' : '' }}" href="{{ route('admin.factura-sv.facturas') }}">Facturas</a>
+                                <a class="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'productos' ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'productos']) }}">Productos</a>
+                            </div>
+                        </div>
                     @endif
                 @endif
                 <form method="post" action="{{ route('logout') }}" id="logout-form">@csrf<button class="logout-btn">Salir</button></form>

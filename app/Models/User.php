@@ -85,7 +85,7 @@ class User extends Authenticatable
 
     public function hasModuleAccess(string $module): bool
     {
-        if ($this->isAdmin()) {
+        if ($this->canAccessAdmin()) {
             return true;
         }
 
