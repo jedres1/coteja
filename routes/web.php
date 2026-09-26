@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\LicenseController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\PlanController;
+use App\Http\Controllers\Admin\BankTransactionController;
 use App\Http\Controllers\Admin\PurchaseInvoiceController;
 use App\Http\Controllers\Admin\SupplierController;
 use App\Http\Controllers\Admin\UserController;
@@ -51,8 +52,13 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:purchases']
     Route::get('purchase-invoices/settings', [PurchaseInvoiceController::class, 'settingsIndex'])->name('purchase-invoices.settings');
     Route::post('purchase-invoices/settings', [PurchaseInvoiceController::class, 'settingsUpdate'])->name('purchase-invoices.settings.update');
     Route::post('purchase-invoices/extract', [PurchaseInvoiceController::class, 'extract'])->name('purchase-invoices.extract');
+    Route::get('extraccion-pendiente', [PurchaseInvoiceController::class, 'pendingApproval'])->name('purchase-invoices.pending-approval');
+    Route::post('purchase-invoices/{purchaseInvoice}/aprobar', [PurchaseInvoiceController::class, 'approve'])->name('purchase-invoices.approve');
+    Route::post('purchase-invoices/{purchaseInvoice}/rechazar', [PurchaseInvoiceController::class, 'reject'])->name('purchase-invoices.reject');
     Route::get('cuentas-por-pagar', [PurchaseInvoiceController::class, 'accountsPayable'])->name('purchase-invoices.accounts-payable');
     Route::post('purchase-invoices/{purchaseInvoice}/pay', [PurchaseInvoiceController::class, 'markPaid'])->name('purchase-invoices.pay');
+    Route::get('control-bancario', [BankTransactionController::class, 'index'])->name('bank-transactions.index');
+    Route::post('control-bancario', [BankTransactionController::class, 'store'])->name('bank-transactions.store');
     Route::resource('purchase-invoices', PurchaseInvoiceController::class)->only(['index', 'store', 'update', 'destroy']);
 });
 

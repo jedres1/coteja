@@ -184,6 +184,19 @@
                                                     Método de pago
                                                     <input type="text" name="payment_method" value="{{ $invoice->payment_method }}" placeholder="Efectivo, Transferencia, Tarjeta…" maxlength="100">
                                                 </label>
+                                                <p style="font-size:12px;color:var(--muted);margin:4px 0">Opcional: crea registro en Control bancario si se especifica fecha.</p>
+                                                <label>
+                                                    Fecha de pago
+                                                    <input type="date" name="transaction_date" value="{{ now()->toDateString() }}">
+                                                </label>
+                                                <label>
+                                                    Banco / Cuenta
+                                                    <input type="text" name="bank_account" placeholder="Banco Agrícola / Cta 1234…" maxlength="200">
+                                                </label>
+                                                <label>
+                                                    Referencia bancaria
+                                                    <input type="text" name="reference" placeholder="N° cheque, transferencia…" maxlength="200">
+                                                </label>
                                                 <div class="actions">
                                                     <button class="btn" type="submit">Guardar</button>
                                                     <button class="btn secondary" type="button" onclick="this.closest('details').removeAttribute('open')">Cancelar</button>

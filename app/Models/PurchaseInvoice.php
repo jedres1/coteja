@@ -40,4 +40,11 @@ class PurchaseInvoice extends Model
     {
         return $this->belongsTo(Customer::class);
     }
+
+    public function bankTransactions()
+    {
+        return $this->belongsToMany(BankTransaction::class, 'bank_transaction_purchase_invoice')
+            ->withPivot('amount_applied')
+            ->withTimestamps();
+    }
 }

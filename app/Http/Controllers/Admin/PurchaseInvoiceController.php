@@ -61,6 +61,7 @@ class PurchaseInvoiceController extends Controller
         $supplierId = $request->query('supplier_id');
 
         $baseQuery = fn () => PurchaseInvoice::whereIn('payment_status', ['pending', 'partial'])
+            ->whereNotIn('status', ['extracted', 'rejected'])
             ->when($supplierId, fn ($q) => $q->where('supplier_id', $supplierId));
 
         $totals = [
@@ -85,13 +86,56 @@ class PurchaseInvoiceController extends Controller
     public function markPaid(Request $request, PurchaseInvoice $purchaseInvoice)
     {
         $data = $request->validate([
-            'payment_status' => ['required', 'in:paid,partial,pending'],
-            'payment_method' => ['nullable', 'string', 'max:100'],
+            'payment_status'   => ['required', 'in:paid,partial,pending'],
+            'payment_method'   => ['nullable', 'string', 'max:100'],
+            'transaction_date' => ['nullable', 'date'],
+            'bank_account'     => ['nullable', 'string', 'max:200'],
+            'reference'        => ['nullable', 'string', 'max:200'],
         ]);
 
-        $purchaseInvoice->update($data);
+        $purchaseInvoice->update([
+            'payment_status' => $data['payment_status'],
+            'payment_method' => $data['payment_method'] ?? $purchaseInvoice->payment_method,
+        ]);
+
+        if ($data['payment_status'] === 'paid' && !empty($data['transaction_date'])) {
+            $transaction = \App\Models\BankTransaction::create([
+                'transaction_date' => $data['transaction_date'],
+                'bank_account'     => $data['bank_account'] ?? null,
+                'amount'           => $purchaseInvoice->total,
+                'reference'        => $data['reference'] ?? null,
+            ]);
+            $transaction->purchaseInvoices()->attach($purchaseInvoice->id, [
+                'amount_applied' => $purchaseInvoice->total,
+            ]);
+        }
 
         return back()->with('status', 'Estado de pago actualizado.');
+    }
+
+    public function pendingApproval()
+    {
+        $invoices = PurchaseInvoice::with('supplier')
+            ->where('status', 'extracted')
+            ->latest()
+            ->paginate(25)
+            ->withQueryString();
+
+        $total = PurchaseInvoice::where('status', 'extracted')->count();
+
+        return view('admin.purchase-invoices.pending-approval', compact('invoices', 'total'));
+    }
+
+    public function approve(PurchaseInvoice $purchaseInvoice)
+    {
+        $purchaseInvoice->update(['status' => 'approved']);
+        return back()->with('status', 'Factura aprobada y enviada a Cuentas por pagar.');
+    }
+
+    public function reject(PurchaseInvoice $purchaseInvoice)
+    {
+        $purchaseInvoice->update(['status' => 'rejected']);
+        return back()->with('status', 'Factura rechazada.');
     }
 
     public function index(Request $request)

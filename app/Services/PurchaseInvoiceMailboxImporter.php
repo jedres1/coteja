@@ -277,7 +277,7 @@ class PurchaseInvoiceMailboxImporter
                     'total' => $this->money($summary_data['montoTotalOperacion'] ?? $summary_data['totalPagar'] ?? 0),
                     'payment_method' => $this->paymentMethod($summary_data['pagos'][0]['codigo'] ?? null),
                     'payment_status' => 'pending',
-                    'status' => 'registered',
+                    'status' => 'extracted',
                     'notes' => trim(sprintf(
                         "Extraida de correo %s. Archivo: %s. Codigo generacion: %s.",
                         $uid,
