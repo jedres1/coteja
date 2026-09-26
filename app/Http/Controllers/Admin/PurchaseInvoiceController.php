@@ -20,13 +20,13 @@ class PurchaseInvoiceController extends Controller
         $env = config('services.purchase_invoice_mailbox');
 
         return view('admin.purchase-invoices.settings', [
-            'host'        => $settings['mailbox_host']        ?? $env['host'],
-            'port'        => $settings['mailbox_port']        ?? $env['port'],
-            'username'    => $settings['mailbox_username']    ?? $env['username'],
-            'hasPassword' => !blank($settings['mailbox_password'] ?? $env['password']),
-            'mailbox'     => $settings['mailbox_mailbox']     ?? $env['mailbox'],
-            'onlyUnseen'  => $settings['mailbox_only_unseen'] ?? $env['only_unseen'],
-            'limit'       => $settings['mailbox_limit']       ?? $env['limit'],
+            'host'       => $settings['mailbox_host']        ?? $env['host'],
+            'port'       => $settings['mailbox_port']        ?? $env['port'],
+            'username'   => $settings['mailbox_username']    ?? $env['username'],
+            'password'   => $settings['mailbox_password']    ?? $env['password'] ?? '',
+            'mailbox'    => $settings['mailbox_mailbox']     ?? $env['mailbox'],
+            'onlyUnseen' => $settings['mailbox_only_unseen'] ?? $env['only_unseen'],
+            'limit'      => $settings['mailbox_limit']       ?? $env['limit'],
         ]);
     }
 
