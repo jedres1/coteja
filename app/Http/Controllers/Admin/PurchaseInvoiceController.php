@@ -56,27 +56,30 @@ class PurchaseInvoiceController extends Controller
         return back()->with('status', 'Configuración de correo actualizada.');
     }
 
-    public function accountsPayable()
+    public function accountsPayable(Request $request)
     {
-        $suppliers = Supplier::whereHas('purchaseInvoices', function ($q) {
-            $q->whereIn('payment_status', ['pending', 'partial']);
-        })
-        ->with(['purchaseInvoices' => function ($q) {
-            $q->whereIn('payment_status', ['pending', 'partial'])
-              ->orderByRaw("CASE payment_status WHEN 'partial' THEN 0 ELSE 1 END")
-              ->orderBy('due_date')
-              ->latest('purchase_date');
-        }])
-        ->orderBy('name')
-        ->get();
+        $supplierId = $request->query('supplier_id');
+
+        $baseQuery = fn () => PurchaseInvoice::whereIn('payment_status', ['pending', 'partial'])
+            ->when($supplierId, fn ($q) => $q->where('supplier_id', $supplierId));
 
         $totals = [
-            'total'     => $suppliers->sum(fn ($s) => $s->purchaseInvoices->sum('total')),
-            'invoices'  => $suppliers->sum(fn ($s) => $s->purchaseInvoices->count()),
-            'suppliers' => $suppliers->count(),
+            'total'     => (clone $baseQuery())->sum('total'),
+            'invoices'  => (clone $baseQuery())->count(),
+            'suppliers' => (clone $baseQuery())->distinct('supplier_id')->count('supplier_id'),
         ];
 
-        return view('admin.purchase-invoices.accounts-payable', compact('suppliers', 'totals'));
+        $invoices = $baseQuery()
+            ->with('supplier')
+            ->latest()
+            ->paginate(25)
+            ->withQueryString();
+
+        $grouped = $invoices->getCollection()->groupBy('supplier_id');
+
+        $suppliers = Supplier::orderBy('name')->get(['id', 'name']);
+
+        return view('admin.purchase-invoices.accounts-payable', compact('invoices', 'grouped', 'totals', 'suppliers', 'supplierId'));
     }
 
     public function markPaid(Request $request, PurchaseInvoice $purchaseInvoice)
