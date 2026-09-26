@@ -83,8 +83,9 @@
                                 <span class="nav-caret">›</span>
                             </button>
                             <div class="nav-sub">
-                                <a class="{{ request()->routeIs('admin.purchase-invoices.*') ? 'active-link' : '' }}" href="{{ route('admin.purchase-invoices.index') }}">Facturas de compra</a>
+                                <a class="{{ request()->routeIs('admin.purchase-invoices.index') ? 'active-link' : '' }}" href="{{ route('admin.purchase-invoices.index') }}">Facturas de compra</a>
                                 <a class="{{ request()->routeIs('admin.suppliers.*') ? 'active-link' : '' }}" href="{{ route('admin.suppliers.index') }}">Proveedores</a>
+                                <a class="{{ request()->routeIs('admin.purchase-invoices.settings') ? 'active-link' : '' }}" href="{{ route('admin.purchase-invoices.settings') }}">Configuración</a>
                             </div>
                         </div>
                         <div class="nav-group {{ request()->routeIs('admin.companies.*', 'admin.plans.*', 'admin.licenses.*', 'admin.payments.*', 'admin.releases.*', 'admin.backups.*') ? 'open' : '' }}">

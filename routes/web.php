@@ -39,6 +39,8 @@ Route::middleware(['auth', 'role:admin,consultant'])->prefix('admin')->name('adm
         Route::resource('licenses', LicenseController::class)->only(['index', 'store', 'update']);
         Route::resource('payments', PaymentController::class)->only(['index', 'store', 'update']);
         Route::resource('suppliers', SupplierController::class)->only(['index', 'store', 'update', 'destroy']);
+        Route::get('purchase-invoices/settings', [PurchaseInvoiceController::class, 'settingsIndex'])->name('purchase-invoices.settings');
+        Route::post('purchase-invoices/settings', [PurchaseInvoiceController::class, 'settingsUpdate'])->name('purchase-invoices.settings.update');
         Route::post('purchase-invoices/extract', [PurchaseInvoiceController::class, 'extract'])->name('purchase-invoices.extract');
         Route::resource('purchase-invoices', PurchaseInvoiceController::class)->only(['index', 'store', 'update', 'destroy']);
         Route::resource('releases', AppReleaseController::class)->only(['index', 'store']);

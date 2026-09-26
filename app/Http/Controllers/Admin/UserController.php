@@ -113,7 +113,7 @@ class UserController extends Controller
             $data['module_accesses'] = [];
             $data['company_ids'] = [];
         } else {
-            $data['module_accesses'] = array_values($data['module_accesses'] ?? []);
+            $data['module_accesses'] = array_values($data['module_accesses'] ?? ['billing', 'purchases']);
             $data['company_ids'] = array_values($data['company_ids'] ?? []);
         }
 

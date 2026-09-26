@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\BillingSetting;
 use App\Models\Customer;
 use App\Models\PurchaseInvoice;
 use App\Models\Supplier;
@@ -13,6 +14,48 @@ use RuntimeException;
 
 class PurchaseInvoiceController extends Controller
 {
+    public function settingsIndex()
+    {
+        $settings = BillingSetting::allAsArray();
+        $env = config('services.purchase_invoice_mailbox');
+
+        return view('admin.purchase-invoices.settings', [
+            'host'        => $settings['mailbox_host']        ?? $env['host'],
+            'port'        => $settings['mailbox_port']        ?? $env['port'],
+            'username'    => $settings['mailbox_username']    ?? $env['username'],
+            'hasPassword' => !blank($settings['mailbox_password'] ?? $env['password']),
+            'mailbox'     => $settings['mailbox_mailbox']     ?? $env['mailbox'],
+            'onlyUnseen'  => $settings['mailbox_only_unseen'] ?? $env['only_unseen'],
+            'limit'       => $settings['mailbox_limit']       ?? $env['limit'],
+        ]);
+    }
+
+    public function settingsUpdate(Request $request)
+    {
+        $data = $request->validate([
+            'mailbox_host'        => ['required', 'string', 'max:255'],
+            'mailbox_port'        => ['required', 'integer', 'min:1', 'max:65535'],
+            'mailbox_username'    => ['required', 'string', 'max:255'],
+            'mailbox_password'    => ['nullable', 'string', 'max:255'],
+            'mailbox_mailbox'     => ['required', 'string', 'max:100'],
+            'mailbox_only_unseen' => ['nullable', 'boolean'],
+            'mailbox_limit'       => ['required', 'integer', 'min:1', 'max:100'],
+        ]);
+
+        foreach ($data as $key => $value) {
+            if ($key === 'mailbox_password' && blank($value)) {
+                continue;
+            }
+            BillingSetting::put($key, $value ?? false);
+        }
+
+        if (!array_key_exists('mailbox_only_unseen', $data)) {
+            BillingSetting::put('mailbox_only_unseen', false);
+        }
+
+        return back()->with('status', 'Configuración de correo actualizada.');
+    }
+
     public function index(Request $request)
     {
         $search = trim((string) $request->query('search', ''));

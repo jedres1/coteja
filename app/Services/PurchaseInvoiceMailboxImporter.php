@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\BillingSetting;
 use App\Models\PurchaseInvoice;
 use App\Models\Supplier;
 use Illuminate\Support\Facades\DB;
@@ -13,9 +14,25 @@ class PurchaseInvoiceMailboxImporter
 
     private int $tagCounter = 1;
 
+    private function resolveConfig(): array
+    {
+        $env = config('services.purchase_invoice_mailbox');
+        $db  = BillingSetting::allAsArray();
+
+        return [
+            'host'        => $db['mailbox_host']        ?? $env['host'],
+            'port'        => (int) ($db['mailbox_port'] ?? $env['port']),
+            'username'    => $db['mailbox_username']    ?? $env['username'],
+            'password'    => $db['mailbox_password']    ?? $env['password'],
+            'mailbox'     => $db['mailbox_mailbox']     ?? $env['mailbox'],
+            'only_unseen' => isset($db['mailbox_only_unseen']) ? (bool) $db['mailbox_only_unseen'] : $env['only_unseen'],
+            'limit'       => (int) ($db['mailbox_limit'] ?? $env['limit']),
+        ];
+    }
+
     public function import(?string $from = null, ?string $to = null): array
     {
-        $config = config('services.purchase_invoice_mailbox');
+        $config = $this->resolveConfig();
 
         if (blank($config['username']) || blank($config['password'])) {
             throw new RuntimeException('Configure PURCHASE_INVOICE_MAIL_USERNAME y PURCHASE_INVOICE_MAIL_PASSWORD para extraer facturas.');
@@ -93,7 +110,7 @@ class PurchaseInvoiceMailboxImporter
 
     public function inspect(?string $from = null, ?string $to = null): array
     {
-        $config = config('services.purchase_invoice_mailbox');
+        $config = $this->resolveConfig();
 
         if (blank($config['username']) || blank($config['password'])) {
             throw new RuntimeException('Configure PURCHASE_INVOICE_MAIL_USERNAME y PURCHASE_INVOICE_MAIL_PASSWORD para extraer facturas.');
