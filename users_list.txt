@@ -1,0 +1,4 @@
+id	name	email	password
+1	Administrador	jandres.gerardo@outlook.com	$2y$12$U/Kia/M81JOG7EFUd7h4ueARDWhDP42fdmFxDQAOywocnqpFPODIq
+2	Cliente Demo	cliente@demo.com	$2y$12$VD9JTdAV54GA.I4CRiu4TebdSnwyRlY5nx2qrr6zMOil/AJuXNcpq
+3	José Gerardo Jandres Argueta	jjandres09cost5@gmail.com	$2y$12$flCVkdkRYXukRGnR.QPaWev9dpQkKHNHGGGAU.HZxWG9H9wBgkUym
