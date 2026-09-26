@@ -48,10 +48,12 @@ Route::middleware(['auth', 'role:admin,consultant'])->prefix('admin')->name('adm
 // Módulo Compras: admin, consultant o customer con acceso a purchases
 Route::middleware(['auth', 'role:admin,consultant,customer', 'module:purchases'])->prefix('admin')->name('admin.')->group(function () {
     Route::resource('suppliers', SupplierController::class)->only(['index', 'store', 'update', 'destroy']);
-    Route::resource('purchase-invoices', PurchaseInvoiceController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::get('purchase-invoices/settings', [PurchaseInvoiceController::class, 'settingsIndex'])->name('purchase-invoices.settings');
     Route::post('purchase-invoices/settings', [PurchaseInvoiceController::class, 'settingsUpdate'])->name('purchase-invoices.settings.update');
     Route::post('purchase-invoices/extract', [PurchaseInvoiceController::class, 'extract'])->name('purchase-invoices.extract');
+    Route::get('cuentas-por-pagar', [PurchaseInvoiceController::class, 'accountsPayable'])->name('purchase-invoices.accounts-payable');
+    Route::post('purchase-invoices/{purchaseInvoice}/pay', [PurchaseInvoiceController::class, 'markPaid'])->name('purchase-invoices.pay');
+    Route::resource('purchase-invoices', PurchaseInvoiceController::class)->only(['index', 'store', 'update', 'destroy']);
 });
 
 // Módulo Facturación: admin, consultant o customer con acceso a billing

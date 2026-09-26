@@ -56,6 +56,41 @@ class PurchaseInvoiceController extends Controller
         return back()->with('status', 'Configuración de correo actualizada.');
     }
 
+    public function accountsPayable()
+    {
+        $suppliers = Supplier::whereHas('purchaseInvoices', function ($q) {
+            $q->whereIn('payment_status', ['pending', 'partial']);
+        })
+        ->with(['purchaseInvoices' => function ($q) {
+            $q->whereIn('payment_status', ['pending', 'partial'])
+              ->orderByRaw("CASE payment_status WHEN 'partial' THEN 0 ELSE 1 END")
+              ->orderBy('due_date')
+              ->latest('purchase_date');
+        }])
+        ->orderBy('name')
+        ->get();
+
+        $totals = [
+            'total'     => $suppliers->sum(fn ($s) => $s->purchaseInvoices->sum('total')),
+            'invoices'  => $suppliers->sum(fn ($s) => $s->purchaseInvoices->count()),
+            'suppliers' => $suppliers->count(),
+        ];
+
+        return view('admin.purchase-invoices.accounts-payable', compact('suppliers', 'totals'));
+    }
+
+    public function markPaid(Request $request, PurchaseInvoice $purchaseInvoice)
+    {
+        $data = $request->validate([
+            'payment_status' => ['required', 'in:paid,partial,pending'],
+            'payment_method' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $purchaseInvoice->update($data);
+
+        return back()->with('status', 'Estado de pago actualizado.');
+    }
+
     public function index(Request $request)
     {
         $search = trim((string) $request->query('search', ''));
