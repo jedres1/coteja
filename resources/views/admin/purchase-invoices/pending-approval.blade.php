@@ -1,4 +1,4 @@
-<x-layouts.app title="Extracción pendiente | Coteja">
+<x-layouts.app title="Extraer facturas | Coteja">
     @php
         $documentTypes = [
             '01' => 'Factura', '03' => 'CCF', '05' => 'Nota crédito',
@@ -62,10 +62,18 @@
 
     <div class="pa-header">
         <div>
-            <h1 style="margin:0;font-size:26px">Extracción pendiente</h1>
+            <h1 style="margin:0;font-size:26px">Extraer facturas</h1>
             <p class="muted" style="margin:4px 0 0">Facturas extraídas del correo que requieren aprobación antes de pasar a Cuentas por pagar.</p>
         </div>
-        <a class="btn secondary" href="{{ route('admin.purchase-invoices.index') }}">Ver todas las facturas</a>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <form method="post" action="{{ route('admin.purchase-invoices.extract') }}" data-confirm-extract="Se leerán los correos no leídos de facturacioncoteja@gmail.com con adjuntos JSON." style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                @csrf
+                <label style="font-size:13px">Desde <input type="date" name="from"></label>
+                <label style="font-size:13px">Hasta <input type="date" name="to"></label>
+                <button class="btn" type="submit">Extraer</button>
+            </form>
+            <a class="btn secondary" href="{{ route('admin.purchase-invoices.index') }}">Ver todas las facturas</a>
+        </div>
     </div>
 
     <div class="pa-summary-card">
@@ -211,6 +219,13 @@
         document.querySelectorAll('[data-confirm-delete]').forEach((form) => {
             form.addEventListener('submit', (event) => {
                 if (!confirm(`${form.dataset.confirmDelete}. ¿Desea continuar?`)) {
+                    event.preventDefault();
+                }
+            });
+        });
+        document.querySelectorAll('[data-confirm-extract]').forEach((form) => {
+            form.addEventListener('submit', (event) => {
+                if (!confirm(`${form.dataset.confirmExtract} ¿Desea continuar?`)) {
                     event.preventDefault();
                 }
             });

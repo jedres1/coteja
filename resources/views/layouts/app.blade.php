@@ -76,33 +76,60 @@
                 @if(auth()->user()->canAccessAdmin())
                     <a class="{{ request()->routeIs('admin.dashboard') ? 'active-link' : '' }}" href="{{ route('admin.dashboard') }}">Dashboard</a>
                     @if(auth()->user()->isAdmin())
-                        <a class="{{ request()->routeIs('admin.users.*') ? 'active-link' : '' }}" href="{{ route('admin.users.index') }}">Usuarios y acceso</a>
-                        <div class="nav-group {{ request()->routeIs('admin.purchase-invoices.*', 'admin.suppliers.*', 'admin.bank-transactions.*') ? 'open' : '' }}">
-                            <button class="nav-toggle" type="button" aria-expanded="{{ request()->routeIs('admin.purchase-invoices.*', 'admin.suppliers.*', 'admin.bank-transactions.*') ? 'true' : 'false' }}">
-                                <span class="nav-label">Compras</span>
-                                <span class="nav-caret">›</span>
-                            </button>
-                            <div class="nav-sub">
-                                <a class="{{ request()->routeIs('admin.purchase-invoices.pending-approval') ? 'active-link' : '' }}" href="{{ route('admin.purchase-invoices.pending-approval') }}">Extracción pendiente</a>
-                                <a class="{{ request()->routeIs('admin.purchase-invoices.index') ? 'active-link' : '' }}" href="{{ route('admin.purchase-invoices.index') }}">Facturas de compra</a>
-                                <a class="{{ request()->routeIs('admin.purchase-invoices.accounts-payable') ? 'active-link' : '' }}" href="{{ route('admin.purchase-invoices.accounts-payable') }}">Cuentas por pagar</a>
-                                <a class="{{ request()->routeIs('admin.bank-transactions.*') ? 'active-link' : '' }}" href="{{ route('admin.bank-transactions.index') }}">Control bancario</a>
-                                <a class="{{ request()->routeIs('admin.suppliers.*') ? 'active-link' : '' }}" href="{{ route('admin.suppliers.index') }}">Proveedores</a>
-                                <a class="{{ request()->routeIs('admin.purchase-invoices.settings') ? 'active-link' : '' }}" href="{{ route('admin.purchase-invoices.settings') }}">Configuración</a>
-                            </div>
-                        </div>
-                        <div class="nav-group {{ request()->routeIs('admin.companies.*', 'admin.plans.*', 'admin.licenses.*', 'admin.payments.*', 'admin.releases.*', 'admin.backups.*') ? 'open' : '' }}">
-                            <button class="nav-toggle" type="button" aria-expanded="{{ request()->routeIs('admin.companies.*', 'admin.plans.*', 'admin.licenses.*', 'admin.payments.*', 'admin.releases.*', 'admin.backups.*') ? 'true' : 'false' }}">
+                        <div class="nav-group {{ request()->routeIs('admin.users.*', 'admin.companies.*', 'admin.plans.*', 'admin.licenses.*', 'admin.payments.*', 'admin.releases.*', 'admin.backups.*') ? 'open' : '' }}">
+                            <button class="nav-toggle" type="button" aria-expanded="{{ request()->routeIs('admin.users.*', 'admin.companies.*', 'admin.plans.*', 'admin.licenses.*', 'admin.payments.*', 'admin.releases.*', 'admin.backups.*') ? 'true' : 'false' }}">
                                 <span class="nav-label">Administración de negocio</span>
                                 <span class="nav-caret">›</span>
                             </button>
                             <div class="nav-sub">
+                                <a class="{{ request()->routeIs('admin.users.*') ? 'active-link' : '' }}" href="{{ route('admin.users.index') }}">Usuarios y acceso</a>
                                 <a class="{{ request()->routeIs('admin.companies.*') ? 'active-link' : '' }}" href="{{ route('admin.companies.index') }}">Empresas</a>
                                 <a class="{{ request()->routeIs('admin.plans.*') ? 'active-link' : '' }}" href="{{ route('admin.plans.index') }}">Planes</a>
                                 <a class="{{ request()->routeIs('admin.licenses.*') ? 'active-link' : '' }}" href="{{ route('admin.licenses.index') }}">Licencias</a>
                                 <a class="{{ request()->routeIs('admin.payments.*') ? 'active-link' : '' }}" href="{{ route('admin.payments.index') }}">Cobros</a>
                                 <a class="{{ request()->routeIs('admin.releases.*') ? 'active-link' : '' }}" href="{{ route('admin.releases.index') }}">Descargas</a>
                                 <a class="{{ request()->routeIs('admin.backups.*') ? 'active-link' : '' }}" href="{{ route('admin.backups.index') }}">Backups</a>
+                            </div>
+                        </div>
+                        <div class="nav-group {{ request()->routeIs('admin.purchase-invoices.*', 'admin.suppliers.*') ? 'open' : '' }}">
+                            <button class="nav-toggle" type="button" aria-expanded="{{ request()->routeIs('admin.purchase-invoices.*', 'admin.suppliers.*') ? 'true' : 'false' }}">
+                                <span class="nav-label">Compras</span>
+                                <span class="nav-caret">›</span>
+                            </button>
+                            <div class="nav-sub">
+                                <a class="{{ request()->routeIs('admin.purchase-invoices.pending-approval') ? 'active-link' : '' }}" href="{{ route('admin.purchase-invoices.pending-approval') }}">Extraer facturas</a>
+                                <a class="{{ request()->routeIs('admin.purchase-invoices.index') ? 'active-link' : '' }}" href="{{ route('admin.purchase-invoices.index') }}">Facturas de compra</a>
+                                <a class="{{ request()->routeIs('admin.purchase-invoices.accounts-payable') ? 'active-link' : '' }}" href="{{ route('admin.purchase-invoices.accounts-payable') }}">Cuentas por pagar</a>
+                                <a class="{{ request()->routeIs('admin.suppliers.*') ? 'active-link' : '' }}" href="{{ route('admin.suppliers.index') }}">Proveedores</a>
+                                <a class="{{ request()->routeIs('admin.purchase-invoices.settings') ? 'active-link' : '' }}" href="{{ route('admin.purchase-invoices.settings') }}">Configuración</a>
+                            </div>
+                        </div>
+                        <div class="nav-group {{ request()->routeIs('admin.bank-transactions.*') ? 'open' : '' }}">
+                            <button class="nav-toggle" type="button" aria-expanded="{{ request()->routeIs('admin.bank-transactions.*') ? 'true' : 'false' }}">
+                                <span class="nav-label">Control de bancos</span>
+                                <span class="nav-caret">›</span>
+                            </button>
+                            <div class="nav-sub">
+                                <a class="{{ request()->routeIs('admin.bank-transactions.*') ? 'active-link' : '' }}" href="{{ route('admin.bank-transactions.index') }}">Control bancario</a>
+                            </div>
+                        </div>
+                        <div class="nav-group">
+                            <button class="nav-toggle" type="button" aria-expanded="false">
+                                <span class="nav-label">Contabilidad</span>
+                                <span class="nav-caret">›</span>
+                            </button>
+                            <div class="nav-sub">
+                                <a href="#">Diario contable</a>
+                                <a href="#">Catálogo de cuentas</a>
+                            </div>
+                        </div>
+                        <div class="nav-group {{ request()->routeIs('admin.factura-sv') && $facturaView === 'productos' ? 'open' : '' }}">
+                            <button class="nav-toggle" type="button" aria-expanded="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'productos' ? 'true' : 'false' }}">
+                                <span class="nav-label">Inventarios</span>
+                                <span class="nav-caret">›</span>
+                            </button>
+                            <div class="nav-sub">
+                                <a class="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'productos' ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'productos']) }}">Productos</a>
                             </div>
                         </div>
                         <div class="nav-group {{ request()->routeIs('admin.factura-sv', 'admin.customers.*') ? 'open' : '' }}">
@@ -115,7 +142,6 @@
                                 <a class="{{ request()->routeIs('admin.customers.*') ? 'active-link' : '' }}" href="{{ route('admin.customers.index') }}">Clientes</a>
                                 <a class="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'nueva-factura' ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'nueva-factura']) }}">Nueva Factura</a>
                                 <a class="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'facturas' ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'facturas']) }}">Facturas</a>
-                                <a class="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'productos' ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'productos']) }}">Productos</a>
                                 <a class="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'configuracion' ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'configuracion']) }}">Configuración</a>
                             </div>
                         </div>
@@ -123,22 +149,39 @@
                 @else
                     <a class="{{ request()->routeIs('client.dashboard') ? 'active-link' : '' }}" href="{{ route('client.dashboard') }}">Mi cuenta</a>
                     @if(auth()->user()->hasModuleAccess('purchases'))
-                        <div class="nav-group {{ request()->routeIs('admin.purchase-invoices.*', 'admin.suppliers.*', 'admin.bank-transactions.*') ? 'open' : '' }}">
-                            <button class="nav-toggle" type="button" aria-expanded="{{ request()->routeIs('admin.purchase-invoices.*', 'admin.suppliers.*', 'admin.bank-transactions.*') ? 'true' : 'false' }}">
+                        <div class="nav-group {{ request()->routeIs('admin.purchase-invoices.*', 'admin.suppliers.*') ? 'open' : '' }}">
+                            <button class="nav-toggle" type="button" aria-expanded="{{ request()->routeIs('admin.purchase-invoices.*', 'admin.suppliers.*') ? 'true' : 'false' }}">
                                 <span class="nav-label">Compras</span>
                                 <span class="nav-caret">›</span>
                             </button>
                             <div class="nav-sub">
-                                <a class="{{ request()->routeIs('admin.purchase-invoices.pending-approval') ? 'active-link' : '' }}" href="{{ route('admin.purchase-invoices.pending-approval') }}">Extracción pendiente</a>
+                                <a class="{{ request()->routeIs('admin.purchase-invoices.pending-approval') ? 'active-link' : '' }}" href="{{ route('admin.purchase-invoices.pending-approval') }}">Extraer facturas</a>
                                 <a class="{{ request()->routeIs('admin.purchase-invoices.index') ? 'active-link' : '' }}" href="{{ route('admin.purchase-invoices.index') }}">Facturas de compra</a>
                                 <a class="{{ request()->routeIs('admin.purchase-invoices.accounts-payable') ? 'active-link' : '' }}" href="{{ route('admin.purchase-invoices.accounts-payable') }}">Cuentas por pagar</a>
-                                <a class="{{ request()->routeIs('admin.bank-transactions.*') ? 'active-link' : '' }}" href="{{ route('admin.bank-transactions.index') }}">Control bancario</a>
                                 <a class="{{ request()->routeIs('admin.suppliers.*') ? 'active-link' : '' }}" href="{{ route('admin.suppliers.index') }}">Proveedores</a>
                                 <a class="{{ request()->routeIs('admin.purchase-invoices.settings') ? 'active-link' : '' }}" href="{{ route('admin.purchase-invoices.settings') }}">Configuración</a>
                             </div>
                         </div>
+                        <div class="nav-group {{ request()->routeIs('admin.bank-transactions.*') ? 'open' : '' }}">
+                            <button class="nav-toggle" type="button" aria-expanded="{{ request()->routeIs('admin.bank-transactions.*') ? 'true' : 'false' }}">
+                                <span class="nav-label">Control de bancos</span>
+                                <span class="nav-caret">›</span>
+                            </button>
+                            <div class="nav-sub">
+                                <a class="{{ request()->routeIs('admin.bank-transactions.*') ? 'active-link' : '' }}" href="{{ route('admin.bank-transactions.index') }}">Control bancario</a>
+                            </div>
+                        </div>
                     @endif
                     @if(auth()->user()->hasModuleAccess('billing'))
+                        <div class="nav-group {{ request()->routeIs('admin.factura-sv') && $facturaView === 'productos' ? 'open' : '' }}">
+                            <button class="nav-toggle" type="button" aria-expanded="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'productos' ? 'true' : 'false' }}">
+                                <span class="nav-label">Inventarios</span>
+                                <span class="nav-caret">›</span>
+                            </button>
+                            <div class="nav-sub">
+                                <a class="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'productos' ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'productos']) }}">Productos</a>
+                            </div>
+                        </div>
                         <div class="nav-group {{ request()->routeIs('admin.factura-sv', 'admin.factura-sv.*') ? 'open' : '' }}">
                             <button class="nav-toggle" type="button" aria-expanded="{{ request()->routeIs('admin.factura-sv', 'admin.factura-sv.*') ? 'true' : 'false' }}">
                                 <span class="nav-label">Facturación</span>
@@ -148,7 +191,6 @@
                                 <a class="{{ request()->routeIs('admin.factura-sv') && (!$facturaView || $facturaView === 'dashboard') ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'dashboard']) }}">Dashboard</a>
                                 <a class="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'nueva-factura' ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'nueva-factura']) }}">Nueva Factura</a>
                                 <a class="{{ request()->routeIs('admin.factura-sv.facturas') ? 'active-link' : '' }}" href="{{ route('admin.factura-sv.facturas') }}">Facturas</a>
-                                <a class="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'productos' ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'productos']) }}">Productos</a>
                                 <a class="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'configuracion' ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'configuracion']) }}">Configuración</a>
                             </div>
                         </div>

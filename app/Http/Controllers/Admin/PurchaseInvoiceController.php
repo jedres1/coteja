@@ -150,6 +150,7 @@ class PurchaseInvoiceController extends Controller
 
         return view('admin.purchase-invoices.index', [
             'invoices' => PurchaseInvoice::with(['supplier', 'customer'])
+                ->whereNotIn('status', ['extracted', 'rejected'])
                 ->when($supplierId, fn ($query) => $query->where('supplier_id', $supplierId))
                 ->when($search !== '', function ($query) use ($search) {
                     $query->where(function ($query) use ($search) {

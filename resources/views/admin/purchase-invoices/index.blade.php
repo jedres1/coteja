@@ -29,12 +29,6 @@
             <h1>Compras</h1>
             <span class="muted">Registro y control de facturas de compras realizadas</span>
         </div>
-        <form method="post" action="{{ route('admin.purchase-invoices.extract') }}" data-confirm-extract="Se leerán los correos no leídos de facturacioncoteja@gmail.com con adjuntos JSON.">
-            @csrf
-            <label>Desde <input type="date" name="from" value="{{ request('from') }}"></label>
-            <label>Hasta <input type="date" name="to" value="{{ request('to') }}"></label>
-            <button class="btn" type="submit">Extraer</button>
-        </form>
     </div>
 
     <div class="card">
@@ -296,14 +290,6 @@
         document.querySelectorAll('[data-confirm-delete]').forEach((form) => {
             form.addEventListener('submit', (event) => {
                 if (!confirm(`${form.dataset.confirmDelete}. ¿Desea continuar?`)) {
-                    event.preventDefault();
-                }
-            });
-        });
-
-        document.querySelectorAll('[data-confirm-extract]').forEach((form) => {
-            form.addEventListener('submit', (event) => {
-                if (!confirm(`${form.dataset.confirmExtract} ¿Desea continuar?`)) {
                     event.preventDefault();
                 }
             });
