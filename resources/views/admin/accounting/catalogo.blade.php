@@ -1,8 +1,4 @@
-@extends('layouts.app')
-
-@section('title', 'Catálogo de Cuentas')
-
-@section('content')
+<x-layouts.app title="Catálogo de Cuentas | Coteja">
 <div class="page-header">
     <h1 class="page-title">Catálogo de Cuentas</h1>
     <div class="page-actions">
@@ -282,4 +278,4 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 </script>
-@endsection
+</x-layouts.app>

@@ -1,8 +1,4 @@
-@extends('layouts.app')
-
-@section('title', 'Asiento '.$entry->entry_number)
-
-@section('content')
+<x-layouts.app :title="'Asiento '.$entry->entry_number.' | Coteja'">
 @php
     $statusColors = [
         'borrador' => ['bg'=>'#fef3c7','color'=>'#92400e','label'=>'Borrador'],
@@ -237,4 +233,4 @@ function showToast(msg, ok) {
     t._timer = setTimeout(() => t.style.display = 'none', 4000);
 }
 </script>
-@endsection
+</x-layouts.app>

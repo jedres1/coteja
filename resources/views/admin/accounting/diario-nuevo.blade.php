@@ -1,8 +1,4 @@
-@extends('layouts.app')
-
-@section('title', $entry ? 'Editar asiento' : 'Nuevo asiento')
-
-@section('content')
+<x-layouts.app :title="($entry ? 'Editar asiento '.$entry->entry_number : 'Nuevo asiento').' | Coteja'">
 @php
     $typeGroups = [
         'activo'     => ['label'=>'Activos (1)',     'color'=>'#3b82f6'],
@@ -347,4 +343,4 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 </script>
-@endsection
+</x-layouts.app>

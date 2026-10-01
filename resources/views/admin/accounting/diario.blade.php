@@ -1,8 +1,4 @@
-@extends('layouts.app')
-
-@section('title', 'Diario Contable')
-
-@section('content')
+<x-layouts.app title="Diario Contable | Coteja">
 @php
     $statusColors = [
         'borrador' => ['bg'=>'#fef3c7','color'=>'#92400e','label'=>'Borrador'],
@@ -212,4 +208,4 @@ function showToast(msg, ok) {
     t._timer = setTimeout(() => t.style.display = 'none', 3500);
 }
 </script>
-@endsection
+</x-layouts.app>
