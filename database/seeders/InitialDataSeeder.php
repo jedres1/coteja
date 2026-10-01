@@ -71,7 +71,7 @@ class InitialDataSeeder extends Seeder
                 'name'              => 'Administrador',
                 'email'             => 'jandres.gerardo@outlook.com',
                 // contraseña original (bcrypt hash — no es texto plano)
-                'password'          => '$2y$12$5P2aQOZxIjRJfRnOTZv4YO5t/m9uel3xkwfh6Amv4TqkPNM.epnVW',
+                'password'          => '$2y$12$TB1OEpPWj93tyJ7iZlpWR.d09Dx5Gc9DtJHJ0JDqh5pmnhFCnJ.v2', // 12345678
                 'role'              => 'customer',
                 'is_active'         => 1,
                 'module_accesses'   => json_encode(['billing', 'purchases']),
@@ -84,7 +84,7 @@ class InitialDataSeeder extends Seeder
                 'customer_id'       => 1,
                 'name'              => 'Cliente Demo',
                 'email'             => 'cliente@demo.com',
-                'password'          => '$2y$12$VD9JTdAV54GA.I4CRiu4TebdSnwyRlY5nx2qrr6zMOil/AJuXNcpq',
+                'password'          => '$2y$12$TB1OEpPWj93tyJ7iZlpWR.d09Dx5Gc9DtJHJ0JDqh5pmnhFCnJ.v2', // 12345678
                 'role'              => 'customer',
                 'is_active'         => 1,
                 'module_accesses'   => json_encode(['billing']),
@@ -97,7 +97,7 @@ class InitialDataSeeder extends Seeder
                 'customer_id'       => null,
                 'name'              => 'admin',
                 'email'             => 'admin@coteja.com',
-                'password'          => '$2y$12$LWnmSJl7oU6YZ6DvOT/zh.rthgwuSr9DWgl6KYTwDQCj.OfMHDojK',
+                'password'          => '$2y$12$TB1OEpPWj93tyJ7iZlpWR.d09Dx5Gc9DtJHJ0JDqh5pmnhFCnJ.v2', // 12345678
                 'role'              => 'admin',
                 'is_active'         => 1,
                 'module_accesses'   => json_encode([]),
