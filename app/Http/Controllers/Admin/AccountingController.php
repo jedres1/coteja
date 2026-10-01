@@ -309,4 +309,128 @@ class AccountingController extends Controller
             'period', 'year', 'month', 'accountId', 'acumulado', 'allPeriods'
         ));
     }
+
+    // ── Balance General ─────────────────────────────────────────────────────
+
+    public function balanceGeneral(Request $request)
+    {
+        $year  = (int) $request->query('year',  now()->year);
+        $month = (int) $request->query('month', now()->month);
+
+        // Secciones de nivel 2 para agrupar cuentas
+        $sections = AccountingAccount::whereIn('type', ['activo', 'pasivo', 'patrimonio'])
+            ->where('level', 2)
+            ->orderBy('code')
+            ->get(['id', 'code', 'name', 'type']);
+
+        // Balances acumulados desde el 01-01 hasta fin del mes seleccionado
+        $rows = DB::table('journal_entry_lines as jel')
+            ->join('journal_entries as je', 'je.id', '=', 'jel.journal_entry_id')
+            ->join('accounting_accounts as aa', 'aa.id', '=', 'jel.account_id')
+            ->join('accounting_accounts as par', 'par.id', '=', 'aa.parent_id')
+            ->where('je.status', 'aprobado')
+            ->whereIn('aa.type', ['activo', 'pasivo', 'patrimonio'])
+            ->where('aa.level', 3)
+            ->whereYear('je.entry_date', $year)
+            ->whereRaw('MONTH(je.entry_date) <= ?', [$month])
+            ->groupBy('aa.id', 'aa.code', 'aa.name', 'aa.type', 'aa.nature', 'aa.parent_id', 'par.code', 'par.name')
+            ->select([
+                'aa.id', 'aa.code', 'aa.name', 'aa.type', 'aa.nature', 'aa.parent_id',
+                'par.code as section_code', 'par.name as section_name',
+                DB::raw('SUM(jel.debit)  as total_debit'),
+                DB::raw('SUM(jel.credit) as total_credit'),
+            ])
+            ->orderBy('aa.code')
+            ->get()
+            ->map(function ($r) {
+                $debe  = (float) $r->total_debit;
+                $haber = (float) $r->total_credit;
+                $saldo = $r->nature === 'deudora' ? $debe - $haber : $haber - $debe;
+                return (object) array_merge((array) $r, [
+                    'total_debit'  => $debe,
+                    'total_credit' => $haber,
+                    'saldo'        => $saldo,
+                ]);
+            });
+
+        // Agrupar por sección (nivel 2) y luego por tipo
+        $bySection = $rows->groupBy('section_code');
+
+        $period = AccountingPeriod::where('year', $year)->where('month', $month)->first();
+
+        $availableYears = AccountingPeriod::distinct()->orderByDesc('year')->pluck('year')->toArray();
+        if (!in_array(now()->year, $availableYears)) {
+            $availableYears[] = now()->year;
+            rsort($availableYears);
+        }
+
+        return view('admin.accounting.balance-general', compact(
+            'rows', 'bySection', 'sections', 'period', 'year', 'month', 'availableYears'
+        ));
+    }
+
+    // ── Estado de Resultados ────────────────────────────────────────────────
+
+    public function estadoResultados(Request $request)
+    {
+        $year      = (int) $request->query('year',  now()->year);
+        $month     = (int) $request->query('month', now()->month);
+        $acumulado = $request->boolean('acumulado', false);
+
+        // Secciones de nivel 2 para ingresos y gastos
+        $sections = AccountingAccount::whereIn('type', ['ingreso', 'gasto'])
+            ->where('level', 2)
+            ->orderBy('code')
+            ->get(['id', 'code', 'name', 'type']);
+
+        $rows = DB::table('journal_entry_lines as jel')
+            ->join('journal_entries as je', 'je.id', '=', 'jel.journal_entry_id')
+            ->join('accounting_accounts as aa', 'aa.id', '=', 'jel.account_id')
+            ->join('accounting_accounts as par', 'par.id', '=', 'aa.parent_id')
+            ->where('je.status', 'aprobado')
+            ->whereIn('aa.type', ['ingreso', 'gasto'])
+            ->where('aa.level', 3)
+            ->whereYear('je.entry_date', $year)
+            ->when($acumulado,
+                fn ($q) => $q->whereRaw('MONTH(je.entry_date) <= ?', [$month]),
+                fn ($q) => $q->whereMonth('je.entry_date', $month)
+            )
+            ->groupBy('aa.id', 'aa.code', 'aa.name', 'aa.type', 'aa.nature', 'aa.parent_id', 'par.code', 'par.name')
+            ->select([
+                'aa.id', 'aa.code', 'aa.name', 'aa.type', 'aa.nature', 'aa.parent_id',
+                'par.code as section_code', 'par.name as section_name',
+                DB::raw('SUM(jel.debit)  as total_debit'),
+                DB::raw('SUM(jel.credit) as total_credit'),
+            ])
+            ->orderBy('aa.code')
+            ->get()
+            ->map(function ($r) {
+                $debe  = (float) $r->total_debit;
+                $haber = (float) $r->total_credit;
+                $saldo = $r->nature === 'deudora' ? $debe - $haber : $haber - $debe;
+                return (object) array_merge((array) $r, [
+                    'total_debit'  => $debe,
+                    'total_credit' => $haber,
+                    'saldo'        => $saldo,
+                ]);
+            });
+
+        $bySection    = $rows->groupBy('section_code');
+        $totalIngresos = $rows->where('type', 'ingreso')->sum('saldo');
+        $totalGastos   = $rows->where('type', 'gasto')->sum('saldo');
+        $utilidad      = $totalIngresos - $totalGastos;
+
+        $period = AccountingPeriod::where('year', $year)->where('month', $month)->first();
+
+        $availableYears = AccountingPeriod::distinct()->orderByDesc('year')->pluck('year')->toArray();
+        if (!in_array(now()->year, $availableYears)) {
+            $availableYears[] = now()->year;
+            rsort($availableYears);
+        }
+
+        return view('admin.accounting.estado-resultados', compact(
+            'rows', 'bySection', 'sections', 'period', 'year', 'month',
+            'acumulado', 'totalIngresos', 'totalGastos', 'utilidad', 'availableYears'
+        ));
+    }
 }
