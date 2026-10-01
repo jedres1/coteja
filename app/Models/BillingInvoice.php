@@ -59,6 +59,12 @@ class BillingInvoice extends Model
         return $this->hasMany(BillingInvoicePayment::class);
     }
 
+    public function journalEntry()
+    {
+        return $this->hasOne(JournalEntry::class, 'source_id')
+            ->where('source_type', 'billing');
+    }
+
     public function getBalanceAttribute(): float
     {
         return max(0, (float) $this->total - (float) $this->amount_paid);

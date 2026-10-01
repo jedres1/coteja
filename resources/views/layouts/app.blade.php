@@ -123,6 +123,9 @@
                             <div class="nav-sub">
                                 <a class="{{ request()->routeIs('admin.accounting.diario.*') ? 'active-link' : '' }}" href="{{ route('admin.accounting.diario.index') }}">Diario contable</a>
                                 <a class="{{ request()->routeIs('admin.accounting.catalogo') ? 'active-link' : '' }}" href="{{ route('admin.accounting.catalogo') }}">Catálogo de cuentas</a>
+                                <a class="{{ request()->routeIs('admin.accounting.saldos') ? 'active-link' : '' }}" href="{{ route('admin.accounting.saldos') }}">Saldos por período</a>
+                                <a class="{{ request()->routeIs('admin.accounting.periodos') ? 'active-link' : '' }}" href="{{ route('admin.accounting.periodos') }}">Períodos contables</a>
+                                <a class="{{ request()->routeIs('admin.accounting.configuracion') ? 'active-link' : '' }}" href="{{ route('admin.accounting.configuracion') }}">Configuración</a>
                             </div>
                         </div>
                         <div class="nav-group {{ request()->routeIs('admin.inventory.*') || (request()->routeIs('admin.factura-sv') && $facturaView === 'productos') ? 'open' : '' }}">

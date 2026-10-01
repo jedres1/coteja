@@ -32,6 +32,17 @@
     </div>
 </div>
 
+@if($cgPackage)
+<div style="display:flex;align-items:center;gap:.75rem;background:#f0f9ff;border:1px solid #bae6fd;border-radius:.5rem;padding:.65rem 1rem;margin-bottom:1.25rem">
+    <span style="font-size:.8125rem;color:#0369a1">
+        Este asiento se registrará en el paquete
+        <strong style="font-family:monospace;background:#dbeafe;color:#1d4ed8;padding:.1rem .4rem;border-radius:.25rem">{{ $cgPackage->code }}</strong>
+        — {{ $cgPackage->name }}.
+        El número de asiento se genera automáticamente al guardar.
+    </span>
+</div>
+@endif
+
 <div class="journal-form-layout">
     {{-- Header fields --}}
     <div class="card" style="padding:1.25rem;margin-bottom:1.25rem">

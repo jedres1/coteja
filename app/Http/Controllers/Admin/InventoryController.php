@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exceptions\AccountingPeriodException;
 use App\Http\Controllers\Controller;
 use App\Models\BillingProduct;
 use App\Models\BillingSetting;
@@ -9,6 +10,8 @@ use App\Models\InventoryMovement;
 use App\Models\ProductType;
 use App\Models\PurchaseInvoice;
 use App\Models\Warehouse;
+use App\Services\Accounting\AccountingEntryService;
+use App\Services\Accounting\AccountingPeriodService;
 use Illuminate\Http\Request;
 
 class InventoryController extends Controller
@@ -148,6 +151,12 @@ class InventoryController extends Controller
             return back()->withErrors('Este producto no controla existencias.');
         }
 
+        try {
+            app(AccountingPeriodService::class)->validateDateOrFail(now());
+        } catch (AccountingPeriodException $e) {
+            return back()->withErrors($e->getMessage());
+        }
+
         $purchaseInvoiceId = null;
         $docNumber = $data['document_number'] ?? null;
 
@@ -176,6 +185,13 @@ class InventoryController extends Controller
         ]);
 
         $this->syncWarehouseStock($product, (int) $data['warehouse_id'], $data['quantity'], $data['type']);
+
+        // Partida contable de inventario (solo movimientos manuales)
+        try {
+            app(AccountingEntryService::class)->createFromInventory($movement->load('product'), $request->user()?->id);
+        } catch (\Throwable) {
+            // No interrumpir el registro si falla la contabilidad
+        }
 
         return back()->with('status', 'Movimiento de inventario registrado.');
     }

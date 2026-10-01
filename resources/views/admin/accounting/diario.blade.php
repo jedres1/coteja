@@ -5,12 +5,17 @@
         'aprobado' => ['bg'=>'#dcfce7','color'=>'#166534','label'=>'Aprobado'],
         'anulado'  => ['bg'=>'#fee2e2','color'=>'#991b1b','label'=>'Anulado'],
     ];
+    $pkgColors = [
+        'FA' => '#1d4ed8', 'CP' => '#b45309', 'IN' => '#166534',
+        'CB' => '#7c3aed', 'CG' => '#374151',
+    ];
     $money = fn($v) => '$'.number_format((float)$v, 2);
 @endphp
 
 <div class="page-header">
     <h1 class="page-title">Diario Contable</h1>
     <div class="page-actions">
+        <a href="{{ route('admin.accounting.configuracion') }}" class="btn btn-ghost btn-sm">⚙ Configuración</a>
         <a href="{{ route('admin.accounting.diario.create') }}" class="btn btn-primary">+ Nuevo asiento</a>
     </div>
 </div>
@@ -56,7 +61,7 @@
     </div>
     <div class="filter-group" style="flex:1;min-width:180px">
         <label class="filter-label">Buscar</label>
-        <input type="search" name="search" value="{{ $search }}" placeholder="N.° asiento, descripción…" class="input input-sm">
+        <input type="search" name="search" value="{{ $search }}" placeholder="N.° asiento, descripción, documento…" class="input input-sm">
     </div>
     <button type="submit" class="btn btn-ghost btn-sm">Filtrar</button>
     <a href="{{ route('admin.accounting.diario.index') }}" class="btn btn-ghost btn-sm">Limpiar</a>
@@ -67,20 +72,34 @@
     <table class="table">
         <thead>
             <tr>
-                <th style="width:130px">N.° Asiento</th>
+                <th style="width:50px">Paq.</th>
+                <th style="width:140px">N.° Asiento</th>
                 <th style="width:100px">Fecha</th>
                 <th>Descripción</th>
-                <th style="width:120px">Referencia</th>
+                <th style="width:130px">Documento</th>
                 <th style="width:90px;text-align:right">Total</th>
-                <th style="width:60px;text-align:center">Líneas</th>
+                <th style="width:60px;text-align:center">Lín.</th>
                 <th style="width:95px">Estado</th>
                 <th style="width:90px">Acciones</th>
             </tr>
         </thead>
         <tbody>
             @forelse($entries as $entry)
-            @php $sc = $statusColors[$entry->status] ?? $statusColors['borrador']; @endphp
+            @php
+                $sc   = $statusColors[$entry->status] ?? $statusColors['borrador'];
+                $pkg  = $entry->accountingPackage;
+                $pkgC = $pkgColors[$pkg?->code] ?? '#6b7280';
+            @endphp
             <tr>
+                <td>
+                    @if($pkg)
+                        <span style="display:inline-block;background:{{ $pkgC }}18;color:{{ $pkgC }};border:1px solid {{ $pkgC }}40;
+                                     padding:.15rem .45rem;border-radius:.25rem;font-size:.75rem;font-weight:700;font-family:monospace;white-space:nowrap"
+                              title="{{ $pkg->name }}">{{ $pkg->code }}</span>
+                    @else
+                        <span style="color:#d1d5db;font-size:.75rem">—</span>
+                    @endif
+                </td>
                 <td>
                     <a href="{{ route('admin.accounting.diario.show', $entry) }}" class="link-code">
                         {{ $entry->entry_number }}
@@ -89,13 +108,18 @@
                 <td class="text-muted">{{ $entry->entry_date->format('d/m/Y') }}</td>
                 <td>
                     <span title="{{ $entry->description }}">
-                        {{ Str::limit($entry->description, 60) }}
+                        {{ Str::limit($entry->description, 55) }}
                     </span>
-                    @if($entry->notes)
-                        <span class="text-muted" style="font-size:.75rem;display:block">{{ Str::limit($entry->notes, 40) }}</span>
+                </td>
+                <td class="text-muted text-sm">
+                    @if($entry->source_document)
+                        <code style="font-size:.75rem;color:#374151">{{ Str::limit($entry->source_document, 22) }}</code>
+                    @elseif($entry->reference)
+                        <span style="font-size:.75rem">{{ Str::limit($entry->reference, 22) }}</span>
+                    @else
+                        <span style="color:#d1d5db">—</span>
                     @endif
                 </td>
-                <td class="text-muted text-sm">{{ $entry->reference ?? '—' }}</td>
                 <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600">
                     {{ $money($entry->lines->sum('debit')) }}
                 </td>
@@ -118,7 +142,7 @@
             </tr>
             @empty
             <tr>
-                <td colspan="8" class="text-center text-muted" style="padding:2.5rem">
+                <td colspan="9" class="text-center text-muted" style="padding:2.5rem">
                     No hay asientos contables en el período seleccionado.
                     <br><a href="{{ route('admin.accounting.diario.create') }}" class="btn btn-primary" style="margin-top:.75rem;display:inline-block">Crear primer asiento</a>
                 </td>
@@ -166,7 +190,7 @@
 .stat-card{display:flex;flex-direction:column;align-items:center;padding:.5rem 1.25rem;border-radius:.5rem;border:1px solid #e5e7eb}
 .stat-label{font-size:.75rem;color:#6b7280}
 .stat-value{font-size:1.35rem;font-weight:700}
-.link-code{color:#2563eb;font-weight:600;text-decoration:none;font-family:monospace}
+.link-code{color:#2563eb;font-weight:600;text-decoration:none;font-family:monospace;font-size:.875rem}
 .link-code:hover{text-decoration:underline}
 .text-sm{font-size:.8rem}
 .row-actions{display:flex;gap:.25rem}

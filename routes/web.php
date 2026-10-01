@@ -88,12 +88,24 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:purchases']
 
 // Módulo Contabilidad: admin, consultant o customer con acceso a purchases
 Route::middleware(['auth', 'role:admin,consultant,customer', 'module:purchases'])->prefix('admin')->name('admin.')->group(function () {
-    // Catálogo
+    // Catálogo y Configuración
     Route::prefix('contabilidad')->name('accounting.')->controller(AccountingController::class)->group(function () {
         Route::get('catalogo', 'catalogo')->name('catalogo');
         Route::post('catalogo', 'store')->name('catalogo.store');
         Route::put('catalogo/{account}', 'update')->name('catalogo.update');
         Route::delete('catalogo/{account}', 'destroy')->name('catalogo.destroy');
+
+        Route::get('configuracion', 'configuracion')->name('configuracion');
+        Route::post('paquetes', 'storePackage')->name('paquetes.store');
+        Route::put('paquetes/{package}', 'updatePackage')->name('paquetes.update');
+        Route::delete('paquetes/{package}', 'destroyPackage')->name('paquetes.destroy');
+
+        Route::get('periodos', 'periodos')->name('periodos');
+        Route::post('periodos/generar', 'generarPeriodos')->name('periodos.generar');
+        Route::post('periodos/{period}/abrir', 'abrirPeriodo')->name('periodos.abrir');
+        Route::post('periodos/{period}/cerrar', 'cerrarPeriodo')->name('periodos.cerrar');
+
+        Route::get('saldos', 'saldos')->name('saldos');
     });
 
     // Diario

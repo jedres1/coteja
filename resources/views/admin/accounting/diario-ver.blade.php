@@ -46,7 +46,7 @@
 
 {{-- Description --}}
 <div class="card" style="padding:1.25rem;margin-bottom:1.25rem">
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem">
         <div>
             <div style="font-size:.75rem;color:#6b7280;text-transform:uppercase;font-weight:600;letter-spacing:.04em">Descripción</div>
             <div style="margin-top:.25rem;font-weight:500">{{ $entry->description }}</div>
@@ -63,6 +63,39 @@
             </div>
         </div>
         @endif
+
+        {{-- Paquete contable --}}
+        <div>
+            <div style="font-size:.75rem;color:#6b7280;text-transform:uppercase;font-weight:600;letter-spacing:.04em">Paquete</div>
+            <div style="margin-top:.35rem">
+                @if($entry->accountingPackage)
+                    <span style="font-family:monospace;background:#dbeafe;color:#1d4ed8;padding:.2rem .6rem;border-radius:.25rem;font-weight:700;font-size:.875rem">
+                        {{ $entry->accountingPackage->code }}
+                    </span>
+                    <span style="margin-left:.5rem;font-size:.875rem;color:#374151">{{ $entry->accountingPackage->name }}</span>
+                @else
+                    <span style="color:#9ca3af">— Sin paquete —</span>
+                @endif
+            </div>
+        </div>
+
+        {{-- Documento origen --}}
+        <div>
+            <div style="font-size:.75rem;color:#6b7280;text-transform:uppercase;font-weight:600;letter-spacing:.04em">Documento origen</div>
+            <div style="margin-top:.35rem;font-size:.875rem">
+                @if($entry->source_document)
+                    <code style="background:#f3f4f6;padding:.2rem .5rem;border-radius:.25rem;font-size:.8125rem;color:#374151">{{ $entry->source_document }}</code>
+                    @if($entry->source_type)
+                        <span style="margin-left:.4rem;font-size:.75rem;color:#6b7280">({{ $entry->source_type }})</span>
+                    @endif
+                @elseif($entry->reference)
+                    <span style="color:#374151">{{ $entry->reference }}</span>
+                @else
+                    <span style="color:#9ca3af">—</span>
+                @endif
+            </div>
+        </div>
+
         @if($entry->notes)
         <div style="grid-column:1/-1">
             <div style="font-size:.75rem;color:#6b7280;text-transform:uppercase;font-weight:600;letter-spacing:.04em">Notas</div>

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\AccountingPeriodException;
 use App\Http\Controllers\Admin\InventoryController;
 use App\Models\BillingDteCorrelative;
 use App\Models\BillingInvoice;
@@ -10,6 +11,8 @@ use App\Models\BillingProduct;
 use App\Models\BillingSetting;
 use App\Models\InventoryMovement;
 use App\Models\ProductType;
+use App\Services\Accounting\AccountingEntryService;
+use App\Services\Accounting\AccountingPeriodService;
 use App\Services\Billing\CorrelativeService;
 use App\Services\Billing\InvoiceVoidService;
 use App\Services\DteEngine;
@@ -424,6 +427,13 @@ class FacturaElectronicaSVController extends Controller
         $steps = [];
         $tipo = $data['tipo'] ?? '01';
 
+        // Validar período contable antes de iniciar el proceso DTE
+        try {
+            app(AccountingPeriodService::class)->validateDateOrFail(now());
+        } catch (AccountingPeriodException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+
         [$invoice, $dte, $generated] = DB::transaction(function () use ($data, $tipo) {
             $correlative = $this->correlatives->reserve($tipo, $data['config']);
             $options = $data['opciones'] ?? [];
@@ -482,6 +492,13 @@ class FacturaElectronicaSVController extends Controller
 
         // Registrar salidas de inventario si el usuario tiene acceso al módulo
         $this->registrarSalidasInventario($request, $data['items'], $invoice);
+
+        // Partida contable de ingreso (FA)
+        try {
+            app(AccountingEntryService::class)->createFromBilling($invoice->fresh(), $request->user()?->id);
+        } catch (\Throwable) {
+            // No interrumpir el flujo de facturación si falla la contabilidad
+        }
 
         $firma = $this->normalizarFirma($data['firma'] ?? []);
         $signedDte = null;

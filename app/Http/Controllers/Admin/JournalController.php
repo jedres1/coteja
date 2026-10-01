@@ -2,15 +2,20 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exceptions\AccountingPeriodException;
 use App\Http\Controllers\Controller;
 use App\Models\AccountingAccount;
+use App\Models\AccountingPackage;
 use App\Models\JournalEntry;
 use App\Models\JournalEntryLine;
+use App\Services\Accounting\AccountingPeriodService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class JournalController extends Controller
 {
+    public function __construct(private readonly AccountingPeriodService $periods) {}
+
     public function index(Request $request)
     {
         $search = trim((string) $request->query('search', ''));
@@ -18,14 +23,15 @@ class JournalController extends Controller
         $from   = $request->query('from', now()->startOfMonth()->toDateString());
         $to     = $request->query('to', now()->toDateString());
 
-        $query = JournalEntry::with('lines')
+        $query = JournalEntry::with(['lines', 'accountingPackage'])
             ->when($from,   fn ($q) => $q->whereDate('entry_date', '>=', $from))
             ->when($to,     fn ($q) => $q->whereDate('entry_date', '<=', $to))
             ->when($status, fn ($q) => $q->where('status', $status))
             ->when($search, fn ($q) => $q->where(function ($q) use ($search) {
                 $q->where('entry_number', 'like', "%{$search}%")
                   ->orWhere('description', 'like', "%{$search}%")
-                  ->orWhere('reference',   'like', "%{$search}%");
+                  ->orWhere('reference',   'like', "%{$search}%")
+                  ->orWhere('source_document', 'like', "%{$search}%");
             }))
             ->orderBy('entry_date', 'desc')
             ->orderBy('id', 'desc');
@@ -48,22 +54,25 @@ class JournalController extends Controller
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'type', 'nature']);
 
+        $cgPackage = AccountingPackage::where('code', 'CG')->first();
+
         return view('admin.accounting.diario-nuevo', [
-            'accounts' => $accounts,
-            'entry'    => null,
-            'today'    => now()->toDateString(),
+            'accounts'  => $accounts,
+            'entry'     => null,
+            'today'     => now()->toDateString(),
+            'cgPackage' => $cgPackage,
         ]);
     }
 
     public function store(Request $request)
     {
         $data = $request->validate([
-            'entry_date'        => 'required|date',
-            'description'       => 'required|string|max:300',
-            'reference'         => 'nullable|string|max:100',
-            'notes'             => 'nullable|string|max:2000',
-            'action'            => 'required|in:borrador,aprobado',
-            'lines'             => 'required|array|min:2',
+            'entry_date'          => 'required|date',
+            'description'         => 'required|string|max:300',
+            'reference'           => 'nullable|string|max:100',
+            'notes'               => 'nullable|string|max:2000',
+            'action'              => 'required|in:borrador,aprobado',
+            'lines'               => 'required|array|min:2',
             'lines.*.account_id'  => 'required|exists:accounting_accounts,id',
             'lines.*.description' => 'nullable|string|max:255',
             'lines.*.debit'       => 'required|numeric|min:0',
@@ -72,17 +81,31 @@ class JournalController extends Controller
 
         $this->validateBalance($data['lines']);
 
-        $entry = DB::transaction(function () use ($data, $request) {
+        try {
+            $this->periods->validateDateOrFail($data['entry_date']);
+        } catch (AccountingPeriodException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+
+        $cgPackage = AccountingPackage::where('code', 'CG')->where('is_active', true)->first();
+
+        $entry = DB::transaction(function () use ($data, $request, $cgPackage) {
+            $number = JournalEntry::nextNumber($cgPackage);
+
             $entry = JournalEntry::create([
-                'entry_number' => JournalEntry::nextNumber(),
-                'entry_date'   => $data['entry_date'],
-                'description'  => $data['description'],
-                'reference'    => $data['reference'] ?? null,
-                'notes'        => $data['notes'] ?? null,
-                'status'       => $data['action'],
-                'created_by'   => $request->user()?->id,
-                'approved_by'  => $data['action'] === 'aprobado' ? $request->user()?->id : null,
-                'approved_at'  => $data['action'] === 'aprobado' ? now() : null,
+                'entry_number'          => $number,
+                'entry_date'            => $data['entry_date'],
+                'description'           => $data['description'],
+                'reference'             => $data['reference'] ?? null,
+                'notes'                 => $data['notes'] ?? null,
+                'status'                => $data['action'],
+                'created_by'            => $request->user()?->id,
+                'approved_by'           => $data['action'] === 'aprobado' ? $request->user()?->id : null,
+                'approved_at'           => $data['action'] === 'aprobado' ? now() : null,
+                'accounting_package_id' => $cgPackage?->id,
+                'source_type'           => null,
+                'source_id'             => null,
+                'source_document'       => $data['reference'] ?? null,
             ]);
 
             foreach ($data['lines'] as $i => $line) {
@@ -100,15 +123,15 @@ class JournalController extends Controller
         });
 
         return response()->json([
-            'success' => true,
-            'message' => $data['action'] === 'aprobado' ? 'Asiento aprobado.' : 'Borrador guardado.',
+            'success'  => true,
+            'message'  => $data['action'] === 'aprobado' ? 'Asiento aprobado.' : 'Borrador guardado.',
             'redirect' => route('admin.accounting.diario.show', $entry),
         ]);
     }
 
     public function show(JournalEntry $entry)
     {
-        $entry->load(['lines.account', 'creator', 'approver']);
+        $entry->load(['lines.account', 'creator', 'approver', 'accountingPackage']);
         return view('admin.accounting.diario-ver', compact('entry'));
     }
 
@@ -119,16 +142,15 @@ class JournalController extends Controller
                 ->with('error', 'Solo se pueden editar asientos en borrador.');
         }
 
-        $accounts = AccountingAccount::where('is_active', true)
-            ->orderBy('code')
-            ->get(['id', 'code', 'name', 'type', 'nature']);
-
+        $accounts  = AccountingAccount::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name', 'type', 'nature']);
+        $cgPackage = AccountingPackage::where('code', 'CG')->first();
         $entry->load('lines');
 
         return view('admin.accounting.diario-nuevo', [
-            'accounts' => $accounts,
-            'entry'    => $entry,
-            'today'    => $entry->entry_date->toDateString(),
+            'accounts'  => $accounts,
+            'entry'     => $entry,
+            'today'     => $entry->entry_date->toDateString(),
+            'cgPackage' => $cgPackage,
         ]);
     }
 
@@ -139,12 +161,12 @@ class JournalController extends Controller
         }
 
         $data = $request->validate([
-            'entry_date'        => 'required|date',
-            'description'       => 'required|string|max:300',
-            'reference'         => 'nullable|string|max:100',
-            'notes'             => 'nullable|string|max:2000',
-            'action'            => 'required|in:borrador,aprobado',
-            'lines'             => 'required|array|min:2',
+            'entry_date'          => 'required|date',
+            'description'         => 'required|string|max:300',
+            'reference'           => 'nullable|string|max:100',
+            'notes'               => 'nullable|string|max:2000',
+            'action'              => 'required|in:borrador,aprobado',
+            'lines'               => 'required|array|min:2',
             'lines.*.account_id'  => 'required|exists:accounting_accounts,id',
             'lines.*.description' => 'nullable|string|max:255',
             'lines.*.debit'       => 'required|numeric|min:0',
@@ -153,15 +175,22 @@ class JournalController extends Controller
 
         $this->validateBalance($data['lines']);
 
+        try {
+            $this->periods->validateDateOrFail($data['entry_date']);
+        } catch (AccountingPeriodException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+
         DB::transaction(function () use ($data, $entry, $request) {
             $entry->update([
-                'entry_date'  => $data['entry_date'],
-                'description' => $data['description'],
-                'reference'   => $data['reference'] ?? null,
-                'notes'       => $data['notes'] ?? null,
-                'status'      => $data['action'],
-                'approved_by' => $data['action'] === 'aprobado' ? $request->user()?->id : null,
-                'approved_at' => $data['action'] === 'aprobado' ? now() : null,
+                'entry_date'     => $data['entry_date'],
+                'description'    => $data['description'],
+                'reference'      => $data['reference'] ?? null,
+                'notes'          => $data['notes'] ?? null,
+                'status'         => $data['action'],
+                'source_document' => $data['reference'] ?? $entry->source_document,
+                'approved_by'    => $data['action'] === 'aprobado' ? $request->user()?->id : null,
+                'approved_at'    => $data['action'] === 'aprobado' ? now() : null,
             ]);
 
             $entry->lines()->delete();
@@ -211,19 +240,28 @@ class JournalController extends Controller
         ]);
 
         DB::transaction(function () use ($entry, $data, $request) {
-            $entry->update(['status' => 'anulado', 'notes' => ($entry->notes ? $entry->notes . "\n" : '') . 'Anulado: ' . $data['motivo']]);
+            $entry->update([
+                'status' => 'anulado',
+                'notes'  => ($entry->notes ? $entry->notes . "\n" : '') . 'Anulado: ' . $data['motivo'],
+            ]);
 
-            // Reversal entry
+            // Usa el mismo paquete que el asiento original para el número de reversión
+            $package = $entry->accountingPackage ?? AccountingPackage::where('code', 'CG')->first();
+
             $reversal = JournalEntry::create([
-                'entry_number' => JournalEntry::nextNumber(),
-                'entry_date'   => now()->toDateString(),
-                'description'  => 'REVERSIÓN: ' . $entry->description,
-                'reference'    => $entry->entry_number,
-                'status'       => 'aprobado',
-                'created_by'   => $request->user()?->id,
-                'approved_by'  => $request->user()?->id,
-                'approved_at'  => now(),
-                'notes'        => 'Asiento de reversión automático por anulación de ' . $entry->entry_number . '. Motivo: ' . $data['motivo'],
+                'entry_number'          => JournalEntry::nextNumber($package),
+                'entry_date'            => now()->toDateString(),
+                'description'           => 'REVERSIÓN: ' . $entry->description,
+                'reference'             => $entry->entry_number,
+                'status'                => 'aprobado',
+                'created_by'            => $request->user()?->id,
+                'approved_by'           => $request->user()?->id,
+                'approved_at'           => now(),
+                'notes'                 => 'Asiento de reversión automático por anulación de ' . $entry->entry_number . '. Motivo: ' . $data['motivo'],
+                'accounting_package_id' => $entry->accounting_package_id,
+                'source_type'           => $entry->source_type,
+                'source_id'             => $entry->source_id,
+                'source_document'       => $entry->source_document,
             ]);
 
             foreach ($entry->lines as $i => $line) {

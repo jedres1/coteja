@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exceptions\AccountingPeriodException;
 use App\Http\Controllers\Controller;
 use App\Models\BillingSetting;
 use App\Models\Customer;
 use App\Models\PurchaseInvoice;
 use App\Models\Supplier;
+use App\Services\Accounting\AccountingEntryService;
+use App\Services\Accounting\AccountingPeriodService;
 use App\Services\PurchaseInvoiceMailboxImporter;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -134,9 +137,22 @@ class PurchaseInvoiceController extends Controller
         return view('admin.purchase-invoices.pending-approval', compact('invoices', 'total', 'showAll'));
     }
 
-    public function approve(PurchaseInvoice $purchaseInvoice)
+    public function approve(PurchaseInvoice $purchaseInvoice, Request $request, AccountingEntryService $accounting, AccountingPeriodService $periods)
     {
+        try {
+            $periods->validateDateOrFail($purchaseInvoice->purchase_date ?? now());
+        } catch (AccountingPeriodException $e) {
+            return back()->withErrors($e->getMessage());
+        }
+
         $purchaseInvoice->update(['status' => 'approved']);
+
+        try {
+            $accounting->createFromPurchase($purchaseInvoice->load('supplier'), $request->user()?->id);
+        } catch (\Throwable) {
+            // No interrumpir la aprobación si falla la contabilidad
+        }
+
         return back()->with('status', 'Factura aprobada y enviada a Cuentas por pagar.');
     }
 
@@ -146,16 +162,43 @@ class PurchaseInvoiceController extends Controller
         return back()->with('status', 'Factura rechazada.');
     }
 
-    public function approveBulk(Request $request)
+    public function approveBulk(Request $request, AccountingEntryService $accounting, AccountingPeriodService $periods)
     {
         $ids = $request->validate([
             'ids'   => ['required', 'array'],
             'ids.*' => ['integer', 'exists:purchase_invoices,id'],
         ])['ids'];
 
-        $updated = PurchaseInvoice::whereIn('id', $ids)->where('status', 'extracted')->update(['status' => 'approved']);
+        $invoices = PurchaseInvoice::with('supplier')
+            ->whereIn('id', $ids)
+            ->where('status', 'extracted')
+            ->get();
 
-        return back()->with('status', "{$updated} factura(s) aprobada(s) y enviadas a Cuentas por pagar.");
+        $blocked = 0;
+        $updated = 0;
+
+        foreach ($invoices as $invoice) {
+            try {
+                $periods->validateDateOrFail($invoice->purchase_date ?? now());
+            } catch (AccountingPeriodException $e) {
+                $blocked++;
+                continue;
+            }
+
+            $invoice->update(['status' => 'approved']);
+            $updated++;
+
+            try {
+                $accounting->createFromPurchase($invoice, $request->user()?->id);
+            } catch (\Throwable) {}
+        }
+
+        $msg = "{$updated} factura(s) aprobada(s) y enviadas a Cuentas por pagar.";
+        if ($blocked > 0) {
+            $msg .= " {$blocked} factura(s) bloqueada(s) por período contable cerrado.";
+        }
+
+        return back()->with('status', $msg);
     }
 
     public function rejectBulk(Request $request)

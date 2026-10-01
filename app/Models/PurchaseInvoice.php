@@ -47,4 +47,10 @@ class PurchaseInvoice extends Model
             ->withPivot('amount_applied')
             ->withTimestamps();
     }
+
+    public function journalEntry()
+    {
+        return $this->hasOne(JournalEntry::class, 'source_id')
+            ->where('source_type', 'purchase');
+    }
 }
