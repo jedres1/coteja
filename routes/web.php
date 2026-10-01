@@ -107,6 +107,7 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:purchases']
 
         Route::get('saldos', 'saldos')->name('saldos');
         Route::get('balanza-comprobacion', 'balanzaComprobacion')->name('balanza-comprobacion');
+        Route::get('libro-mayor', 'libroMayor')->name('libro-mayor');
         Route::get('balance-general', 'balanceGeneral')->name('balance-general');
         Route::get('estado-resultados', 'estadoResultados')->name('estado-resultados');
     });

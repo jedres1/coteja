@@ -125,6 +125,7 @@
                                 <a class="{{ request()->routeIs('admin.accounting.catalogo') ? 'active-link' : '' }}" href="{{ route('admin.accounting.catalogo') }}">Catálogo de cuentas</a>
                                 <a class="{{ request()->routeIs('admin.accounting.saldos') ? 'active-link' : '' }}" href="{{ route('admin.accounting.saldos') }}">Saldos por período</a>
                                 <a class="{{ request()->routeIs('admin.accounting.balanza-comprobacion') ? 'active-link' : '' }}" href="{{ route('admin.accounting.balanza-comprobacion') }}">Balanza de Comprobación</a>
+                                <a class="{{ request()->routeIs('admin.accounting.libro-mayor') ? 'active-link' : '' }}" href="{{ route('admin.accounting.libro-mayor') }}">Libro Mayor</a>
                                 <a class="{{ request()->routeIs('admin.accounting.balance-general') ? 'active-link' : '' }}" href="{{ route('admin.accounting.balance-general') }}">Balance General</a>
                                 <a class="{{ request()->routeIs('admin.accounting.estado-resultados') ? 'active-link' : '' }}" href="{{ route('admin.accounting.estado-resultados') }}">Estado de Resultados</a>
                                 <a class="{{ request()->routeIs('admin.accounting.periodos') ? 'active-link' : '' }}" href="{{ route('admin.accounting.periodos') }}">Períodos contables</a>

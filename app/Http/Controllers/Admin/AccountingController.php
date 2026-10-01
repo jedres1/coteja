@@ -392,6 +392,140 @@ class AccountingController extends Controller
         ));
     }
 
+    // ── Libro Mayor ─────────────────────────────────────────────────────────
+
+    public function libroMayor(Request $request)
+    {
+        $year      = (int) $request->query('year',  now()->year);
+        $month     = (int) $request->query('month', now()->month);
+        $accountId = $request->query('account_id');
+        $acumulado = $request->boolean('acumulado', false);
+
+        $startDate = $acumulado
+            ? sprintf('%04d-01-01', $year)
+            : sprintf('%04d-%02d-01', $year, $month);
+        $endDate = \Carbon\Carbon::create($year, $month, 1)->endOfMonth()->toDateString();
+
+        // Cuentas con movimiento en el período (de detalle = sin hijos)
+        $accountsQuery = DB::table('accounting_accounts as aa')
+            ->whereNotExists(fn ($q) => $q->select(DB::raw(1))
+                ->from('accounting_accounts as ch')
+                ->whereColumn('ch.parent_id', 'aa.id'))
+            ->where('aa.is_active', true)
+            ->whereExists(fn ($q) => $q->select(DB::raw(1))
+                ->from('journal_entry_lines as jel')
+                ->join('journal_entries as je', 'je.id', '=', 'jel.journal_entry_id')
+                ->whereColumn('jel.account_id', 'aa.id')
+                ->where('je.status', 'aprobado')
+                ->whereBetween('je.entry_date', [$startDate, $endDate]))
+            ->when($accountId, fn ($q) => $q->where('aa.id', $accountId))
+            ->orderBy('aa.code')
+            ->get(['aa.id', 'aa.code', 'aa.name', 'aa.type', 'aa.nature']);
+
+        $accountIds = $accountsQuery->pluck('id');
+
+        // Saldos iniciales (movimientos ANTES de $startDate, acumulados desde siempre)
+        $saldosIniciales = DB::table('journal_entry_lines as jel')
+            ->join('journal_entries as je', 'je.id', '=', 'jel.journal_entry_id')
+            ->whereIn('jel.account_id', $accountIds)
+            ->where('je.status', 'aprobado')
+            ->where('je.entry_date', '<', $startDate)
+            ->groupBy('jel.account_id')
+            ->select([
+                'jel.account_id',
+                DB::raw('SUM(jel.debit)  as total_debit'),
+                DB::raw('SUM(jel.credit) as total_credit'),
+            ])
+            ->get()
+            ->keyBy('account_id');
+
+        // Movimientos del período
+        $movements = DB::table('journal_entry_lines as jel')
+            ->join('journal_entries as je', 'je.id', '=', 'jel.journal_entry_id')
+            ->leftJoin('accounting_packages as ap', 'ap.id', '=', 'je.accounting_package_id')
+            ->whereIn('jel.account_id', $accountIds)
+            ->where('je.status', 'aprobado')
+            ->whereBetween('je.entry_date', [$startDate, $endDate])
+            ->orderBy('jel.account_id')
+            ->orderBy('je.entry_date')
+            ->orderBy('je.id')
+            ->select([
+                'jel.account_id',
+                'je.id as entry_id',
+                'je.entry_number',
+                'je.entry_date',
+                'je.description',
+                'je.source_document',
+                'ap.code as package_code',
+                DB::raw('jel.debit  as debe'),
+                DB::raw('jel.credit as haber'),
+            ])
+            ->get()
+            ->groupBy('account_id');
+
+        // Construir el ledger por cuenta con saldo corrido
+        $ledger = $accountsQuery->map(function ($account) use ($saldosIniciales, $movements) {
+            $si = $saldosIniciales->get($account->id);
+            $siDebit  = $si ? (float) $si->total_debit  : 0.0;
+            $siCredit = $si ? (float) $si->total_credit : 0.0;
+
+            // Saldo inicial en términos naturales de la cuenta
+            $saldoInicial = $account->nature === 'deudora'
+                ? $siDebit - $siCredit
+                : $siCredit - $siDebit;
+
+            $saldoCorrente = $saldoInicial;
+            $lines = collect($movements->get($account->id, []))->map(function ($m) use ($account, &$saldoCorrente) {
+                $debe  = (float) $m->debe;
+                $haber = (float) $m->haber;
+                $saldoCorrente += $account->nature === 'deudora'
+                    ? $debe - $haber
+                    : $haber - $debe;
+                return (object) [
+                    'entry_id'      => $m->entry_id,
+                    'entry_number'  => $m->entry_number,
+                    'entry_date'    => $m->entry_date,
+                    'description'   => $m->description,
+                    'source_document' => $m->source_document,
+                    'package_code'  => $m->package_code,
+                    'debe'          => $debe,
+                    'haber'         => $haber,
+                    'saldo'         => $saldoCorrente,
+                ];
+            });
+
+            return (object) [
+                'account'       => $account,
+                'saldo_inicial' => $saldoInicial,
+                'saldo_final'   => $saldoCorrente,
+                'total_debe'    => $lines->sum('debe'),
+                'total_haber'   => $lines->sum('haber'),
+                'lines'         => $lines,
+            ];
+        });
+
+        $allAccounts = AccountingAccount::whereNotExists(fn ($q) => $q->select(DB::raw(1))
+                ->from('accounting_accounts as ch')
+                ->whereColumn('ch.parent_id', 'accounting_accounts.id'))
+            ->where('is_active', true)
+            ->orderBy('code')
+            ->get(['id', 'code', 'name']);
+
+        $period = AccountingPeriod::where('year', $year)->where('month', $month)->first();
+
+        $availableYears = AccountingPeriod::distinct()->orderByDesc('year')->pluck('year')->toArray();
+        if (!in_array(now()->year, $availableYears)) {
+            $availableYears[] = now()->year;
+            rsort($availableYears);
+        }
+
+        return view('admin.accounting.libro-mayor', compact(
+            'ledger', 'allAccounts', 'period',
+            'year', 'month', 'acumulado', 'accountId',
+            'startDate', 'endDate', 'availableYears'
+        ));
+    }
+
     // ── Balance General ─────────────────────────────────────────────────────
 
     public function balanceGeneral(Request $request)
