@@ -40,7 +40,7 @@
 </div>
 
 {{-- Filters --}}
-<form method="GET" action="{{ route('admin.accounting.diario') }}" class="filter-bar" style="margin-bottom:1rem">
+<form method="GET" action="{{ route('admin.accounting.diario.index') }}" class="filter-bar" style="margin-bottom:1rem">
     <div class="filter-group">
         <label class="filter-label">Desde</label>
         <input type="date" name="from" value="{{ $from }}" class="input input-sm">
@@ -63,7 +63,7 @@
         <input type="search" name="search" value="{{ $search }}" placeholder="N.° asiento, descripción…" class="input input-sm">
     </div>
     <button type="submit" class="btn btn-ghost btn-sm">Filtrar</button>
-    <a href="{{ route('admin.accounting.diario') }}" class="btn btn-ghost btn-sm">Limpiar</a>
+    <a href="{{ route('admin.accounting.diario.index') }}" class="btn btn-ghost btn-sm">Limpiar</a>
 </form>
 
 {{-- Table --}}

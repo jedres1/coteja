@@ -29,7 +29,7 @@
 
 <div class="page-header" style="margin-bottom:1.5rem">
     <div>
-        <a href="{{ route('admin.accounting.diario') }}" class="back-link">← Diario contable</a>
+        <a href="{{ route('admin.accounting.diario.index') }}" class="back-link">← Diario contable</a>
         <h1 class="page-title" style="margin-top:.25rem">
             {{ $entry ? 'Editar asiento '.$entry->entry_number : 'Nuevo asiento contable' }}
         </h1>
@@ -106,7 +106,7 @@
 
     {{-- Submit --}}
     <div style="display:flex;gap:.75rem;justify-content:flex-end">
-        <a href="{{ route('admin.accounting.diario') }}" class="btn btn-ghost">Cancelar</a>
+        <a href="{{ route('admin.accounting.diario.index') }}" class="btn btn-ghost">Cancelar</a>
         <button type="button" class="btn btn-secondary" onclick="submitForm('borrador')" id="btn-draft">
             Guardar borrador
         </button>

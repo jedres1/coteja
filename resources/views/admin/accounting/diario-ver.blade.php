@@ -20,7 +20,7 @@
 
 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem">
     <div>
-        <a href="{{ route('admin.accounting.diario') }}" style="font-size:.875rem;color:#2563eb;text-decoration:none">← Diario contable</a>
+        <a href="{{ route('admin.accounting.diario.index') }}" style="font-size:.875rem;color:#2563eb;text-decoration:none">← Diario contable</a>
         <h1 style="margin:.25rem 0 .25rem;font-size:1.5rem;font-weight:700">{{ $entry->entry_number }}</h1>
         <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
             <span class="badge" style="background:{{ $sc['bg'] }};color:{{ $sc['color'] }};border:1px solid {{ $sc['color'] }}40;font-size:.8125rem;padding:.3rem .75rem">

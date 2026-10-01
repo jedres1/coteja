@@ -84,8 +84,11 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:purchases']
     Route::post('control-bancario/conciliacion/{reconciliation}/complete', [BankTransactionController::class, 'completeReconciliation'])->name('bank-transactions.reconciliations.complete');
 
     Route::resource('purchase-invoices', PurchaseInvoiceController::class)->only(['index', 'store', 'update', 'destroy']);
+});
 
-    // Módulo Contabilidad — Catálogo
+// Módulo Contabilidad: admin, consultant o customer con acceso a purchases
+Route::middleware(['auth', 'role:admin,consultant,customer', 'module:purchases'])->prefix('admin')->name('admin.')->group(function () {
+    // Catálogo
     Route::prefix('contabilidad')->name('accounting.')->controller(AccountingController::class)->group(function () {
         Route::get('catalogo', 'catalogo')->name('catalogo');
         Route::post('catalogo', 'store')->name('catalogo.store');
@@ -93,7 +96,7 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:purchases']
         Route::delete('catalogo/{account}', 'destroy')->name('catalogo.destroy');
     });
 
-    // Módulo Contabilidad — Diario
+    // Diario
     Route::prefix('contabilidad/diario')->name('accounting.diario.')->controller(JournalController::class)->group(function () {
         Route::get('',                    'index')  ->name('index');
         Route::get('nuevo',               'create') ->name('create');
