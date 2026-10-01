@@ -110,26 +110,32 @@
                                 <span class="nav-caret">›</span>
                             </button>
                             <div class="nav-sub">
-                                <a class="{{ request()->routeIs('admin.bank-transactions.*') ? 'active-link' : '' }}" href="{{ route('admin.bank-transactions.index') }}">Control bancario</a>
+                                <a class="{{ request()->routeIs('admin.bank-transactions.accounts') ? 'active-link' : '' }}" href="{{ route('admin.bank-transactions.accounts') }}">Cuentas bancarias</a>
+                                <a class="{{ request()->routeIs('admin.bank-transactions.transactions') ? 'active-link' : '' }}" href="{{ route('admin.bank-transactions.transactions') }}">Transacciones</a>
+                                <a class="{{ request()->routeIs('admin.bank-transactions.reconciliations*') ? 'active-link' : '' }}" href="{{ route('admin.bank-transactions.reconciliations') }}">Conciliación</a>
                             </div>
                         </div>
-                        <div class="nav-group">
-                            <button class="nav-toggle" type="button" aria-expanded="false">
+                        <div class="nav-group {{ request()->routeIs('admin.accounting.*') ? 'open' : '' }}">
+                            <button class="nav-toggle" type="button" aria-expanded="{{ request()->routeIs('admin.accounting.*') ? 'true' : 'false' }}">
                                 <span class="nav-label">Contabilidad</span>
                                 <span class="nav-caret">›</span>
                             </button>
                             <div class="nav-sub">
-                                <a href="#">Diario contable</a>
-                                <a href="#">Catálogo de cuentas</a>
+                                <a class="{{ request()->routeIs('admin.accounting.diario.*') ? 'active-link' : '' }}" href="{{ route('admin.accounting.diario.index') }}">Diario contable</a>
+                                <a class="{{ request()->routeIs('admin.accounting.catalogo') ? 'active-link' : '' }}" href="{{ route('admin.accounting.catalogo') }}">Catálogo de cuentas</a>
                             </div>
                         </div>
-                        <div class="nav-group {{ request()->routeIs('admin.factura-sv') && $facturaView === 'productos' ? 'open' : '' }}">
-                            <button class="nav-toggle" type="button" aria-expanded="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'productos' ? 'true' : 'false' }}">
+                        <div class="nav-group {{ request()->routeIs('admin.inventory.*') || (request()->routeIs('admin.factura-sv') && $facturaView === 'productos') ? 'open' : '' }}">
+                            <button class="nav-toggle" type="button" aria-expanded="{{ request()->routeIs('admin.inventory.*') || (request()->routeIs('admin.factura-sv') && $facturaView === 'productos') ? 'true' : 'false' }}">
                                 <span class="nav-label">Inventarios</span>
                                 <span class="nav-caret">›</span>
                             </button>
                             <div class="nav-sub">
+                                <a class="{{ request()->routeIs('admin.inventory.movements') ? 'active-link' : '' }}" href="{{ route('admin.inventory.movements') }}">Movimientos</a>
                                 <a class="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'productos' ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'productos']) }}">Productos</a>
+                                <a class="{{ request()->routeIs('admin.inventory.product-types') ? 'active-link' : '' }}" href="{{ route('admin.inventory.product-types') }}">Tipos de producto</a>
+                                <a class="{{ request()->routeIs('admin.inventory.warehouses') ? 'active-link' : '' }}" href="{{ route('admin.inventory.warehouses') }}">Bodegas</a>
+                                <a class="{{ request()->routeIs('admin.inventory.parameters') ? 'active-link' : '' }}" href="{{ route('admin.inventory.parameters') }}">Parámetros</a>
                             </div>
                         </div>
                         <div class="nav-group {{ request()->routeIs('admin.factura-sv', 'admin.customers.*') ? 'open' : '' }}">
@@ -141,7 +147,8 @@
                                 <a class="{{ request()->routeIs('admin.factura-sv') && (!$facturaView || $facturaView === 'dashboard') ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'dashboard']) }}">Dashboard</a>
                                 <a class="{{ request()->routeIs('admin.customers.*') ? 'active-link' : '' }}" href="{{ route('admin.customers.index') }}">Clientes</a>
                                 <a class="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'nueva-factura' ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'nueva-factura']) }}">Nueva Factura</a>
-                                <a class="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'facturas' ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'facturas']) }}">Facturas</a>
+                                <a class="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'cuentas-por-cobrar' ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'cuentas-por-cobrar']) }}">Cuentas por cobrar</a>
+                                <a class="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'productos-facturacion' ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'productos-facturacion']) }}">Servicios</a>
                                 <a class="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'configuracion' ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'configuracion']) }}">Configuración</a>
                             </div>
                         </div>
@@ -168,20 +175,28 @@
                                 <span class="nav-caret">›</span>
                             </button>
                             <div class="nav-sub">
-                                <a class="{{ request()->routeIs('admin.bank-transactions.*') ? 'active-link' : '' }}" href="{{ route('admin.bank-transactions.index') }}">Control bancario</a>
+                                <a class="{{ request()->routeIs('admin.bank-transactions.accounts') ? 'active-link' : '' }}" href="{{ route('admin.bank-transactions.accounts') }}">Cuentas bancarias</a>
+                                <a class="{{ request()->routeIs('admin.bank-transactions.transactions') ? 'active-link' : '' }}" href="{{ route('admin.bank-transactions.transactions') }}">Transacciones</a>
+                                <a class="{{ request()->routeIs('admin.bank-transactions.reconciliations*') ? 'active-link' : '' }}" href="{{ route('admin.bank-transactions.reconciliations') }}">Conciliación</a>
                             </div>
                         </div>
                     @endif
                     @if(auth()->user()->hasModuleAccess('billing'))
-                        <div class="nav-group {{ request()->routeIs('admin.factura-sv') && $facturaView === 'productos' ? 'open' : '' }}">
-                            <button class="nav-toggle" type="button" aria-expanded="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'productos' ? 'true' : 'false' }}">
+                        @if(auth()->user()->hasModuleAccess('inventory'))
+                        <div class="nav-group {{ request()->routeIs('admin.inventory.*') || (request()->routeIs('admin.factura-sv') && $facturaView === 'productos') ? 'open' : '' }}">
+                            <button class="nav-toggle" type="button" aria-expanded="{{ request()->routeIs('admin.inventory.*') || (request()->routeIs('admin.factura-sv') && $facturaView === 'productos') ? 'true' : 'false' }}">
                                 <span class="nav-label">Inventarios</span>
                                 <span class="nav-caret">›</span>
                             </button>
                             <div class="nav-sub">
+                                <a class="{{ request()->routeIs('admin.inventory.movements') ? 'active-link' : '' }}" href="{{ route('admin.inventory.movements') }}">Movimientos</a>
                                 <a class="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'productos' ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'productos']) }}">Productos</a>
+                                <a class="{{ request()->routeIs('admin.inventory.product-types') ? 'active-link' : '' }}" href="{{ route('admin.inventory.product-types') }}">Tipos de producto</a>
+                                <a class="{{ request()->routeIs('admin.inventory.warehouses') ? 'active-link' : '' }}" href="{{ route('admin.inventory.warehouses') }}">Bodegas</a>
+                                <a class="{{ request()->routeIs('admin.inventory.parameters') ? 'active-link' : '' }}" href="{{ route('admin.inventory.parameters') }}">Parámetros</a>
                             </div>
                         </div>
+                        @endif
                         <div class="nav-group {{ request()->routeIs('admin.factura-sv', 'admin.factura-sv.*') ? 'open' : '' }}">
                             <button class="nav-toggle" type="button" aria-expanded="{{ request()->routeIs('admin.factura-sv', 'admin.factura-sv.*') ? 'true' : 'false' }}">
                                 <span class="nav-label">Facturación</span>
@@ -190,7 +205,8 @@
                             <div class="nav-sub">
                                 <a class="{{ request()->routeIs('admin.factura-sv') && (!$facturaView || $facturaView === 'dashboard') ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'dashboard']) }}">Dashboard</a>
                                 <a class="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'nueva-factura' ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'nueva-factura']) }}">Nueva Factura</a>
-                                <a class="{{ request()->routeIs('admin.factura-sv.facturas') ? 'active-link' : '' }}" href="{{ route('admin.factura-sv.facturas') }}">Facturas</a>
+                                <a class="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'cuentas-por-cobrar' ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'cuentas-por-cobrar']) }}">Cuentas por cobrar</a>
+                                <a class="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'productos-facturacion' ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'productos-facturacion']) }}">Servicios</a>
                                 <a class="{{ request()->routeIs('admin.factura-sv') && $facturaView === 'configuracion' ? 'active-link' : '' }}" href="{{ route('admin.factura-sv', ['view' => 'configuracion']) }}">Configuración</a>
                             </div>
                         </div>

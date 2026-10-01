@@ -12,6 +12,16 @@ class BillingSetting extends Model
 
     protected $fillable = ['key', 'value'];
 
+    public static function get(string $key, mixed $default = null): mixed
+    {
+        $record = static::find($key);
+        if (!$record) {
+            return $default;
+        }
+        $decoded = json_decode((string) $record->value, true);
+        return json_last_error() === JSON_ERROR_NONE ? $decoded : $record->value;
+    }
+
     public static function put(string $key, mixed $value): void
     {
         static::updateOrCreate(

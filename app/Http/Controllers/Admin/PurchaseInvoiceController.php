@@ -118,17 +118,20 @@ class PurchaseInvoiceController extends Controller
         return back()->with('status', 'Estado de pago actualizado.');
     }
 
-    public function pendingApproval()
+    public function pendingApproval(Request $request)
     {
+        $showAll = $request->boolean('ver_todas');
+
         $invoices = PurchaseInvoice::with('supplier')
-            ->where('status', 'extracted')
+            ->when(!$showAll, fn ($q) => $q->where('status', 'extracted'))
+            ->latest('purchase_date')
             ->latest()
             ->paginate(25)
             ->withQueryString();
 
         $total = PurchaseInvoice::where('status', 'extracted')->count();
 
-        return view('admin.purchase-invoices.pending-approval', compact('invoices', 'total'));
+        return view('admin.purchase-invoices.pending-approval', compact('invoices', 'total', 'showAll'));
     }
 
     public function approve(PurchaseInvoice $purchaseInvoice)
@@ -141,6 +144,30 @@ class PurchaseInvoiceController extends Controller
     {
         $purchaseInvoice->update(['status' => 'rejected']);
         return back()->with('status', 'Factura rechazada.');
+    }
+
+    public function approveBulk(Request $request)
+    {
+        $ids = $request->validate([
+            'ids'   => ['required', 'array'],
+            'ids.*' => ['integer', 'exists:purchase_invoices,id'],
+        ])['ids'];
+
+        $updated = PurchaseInvoice::whereIn('id', $ids)->where('status', 'extracted')->update(['status' => 'approved']);
+
+        return back()->with('status', "{$updated} factura(s) aprobada(s) y enviadas a Cuentas por pagar.");
+    }
+
+    public function rejectBulk(Request $request)
+    {
+        $ids = $request->validate([
+            'ids'   => ['required', 'array'],
+            'ids.*' => ['integer', 'exists:purchase_invoices,id'],
+        ])['ids'];
+
+        $updated = PurchaseInvoice::whereIn('id', $ids)->where('status', 'extracted')->update(['status' => 'rejected']);
+
+        return back()->with('status', "{$updated} factura(s) rechazada(s).");
     }
 
     public function index(Request $request)

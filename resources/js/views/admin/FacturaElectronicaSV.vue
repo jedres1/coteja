@@ -37,7 +37,10 @@
     </div>
 
     <section v-if="activeView === 'dashboard'" class="card">
-      <h3>Dashboard</h3>
+      <div class="top compact">
+        <h3>Dashboard</h3>
+        <button class="btn" type="button" @click="setView('nueva-factura')">Nueva Factura</button>
+      </div>
       <div class="stats-grid">
         <div class="stat"><span class="stat-icon">📄</span><div class="stat-info"><span>Facturas Hoy</span><strong>{{ dashboardStats.todayCount }}</strong></div></div>
         <div class="stat"><span class="stat-icon">💰</span><div class="stat-info"><span>Total Enviado Hoy</span><strong>{{ money(dashboardStats.todaySentTotal) }}</strong></div></div>
@@ -45,19 +48,103 @@
         <div class="stat"><span class="stat-icon">⏳</span><div class="stat-info"><span>Pendientes</span><strong>{{ dashboardStats.pendingCount }}</strong></div></div>
         <div class="stat"><span class="stat-icon">↩</span><div class="stat-info"><span>Anuladas</span><strong>{{ dashboardStats.voidedCount }}</strong></div></div>
       </div>
+      <div class="form-grid filters-grid" style="margin-top:16px;">
+        <label>Buscar
+          <input v-model="invoiceFilters.search" type="search" placeholder="Buscar por factura, cliente, documento, sello o estado...">
+        </label>
+        <label>Desde<input v-model="invoiceFilters.from" type="date"></label>
+        <label>Hasta<input v-model="invoiceFilters.to" type="date"></label>
+        <label>Estado
+          <select v-model="invoiceFilters.status">
+            <option value="">Todos los estados</option>
+            <option value="PENDIENTE">Pendientes / acción</option>
+            <option value="CONTINGENCIA">Contingencia</option>
+            <option value="ENVIADO">Enviado</option>
+            <option value="RECHAZADO">Rechazado</option>
+            <option value="ANULADO">Anulado</option>
+          </select>
+        </label>
+        <label>Documento
+          <select v-model="invoiceFilters.type">
+            <option value="">Todos los documentos</option>
+            <option v-for="documentType in dteTypes" :key="documentType.codigo" :value="documentType.codigo">
+              {{ documentType.codigo }} - {{ documentType.nombre }}
+            </option>
+          </select>
+        </label>
+        <button class="btn" type="button" @click="loadInvoices">Filtrar</button>
+      </div>
       <table>
-        <thead><tr><th>Fecha</th><th>No. Control</th><th>Cliente</th><th>Total</th><th>Estado</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>No. Control</th>
+            <th>Cliente</th>
+            <th>Total</th>
+            <th>Estado</th>
+            <th>Contiene Error</th>
+            <th>Aceptado</th>
+            <th>Enviado por Correo</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
         <tbody>
-          <tr v-if="recentInvoices.length === 0"><td colspan="5" class="empty">No hay facturas recientes</td></tr>
-          <tr v-for="invoice in recentInvoices" :key="invoice.id">
+          <tr v-if="invoices.length === 0"><td colspan="9" class="empty">No hay facturas</td></tr>
+          <tr v-for="invoice in invoices" :key="invoice.id">
             <td>{{ invoice.date }}</td>
-            <td>{{ invoice.numberControl }}</td>
+            <td>{{ invoice.numberControl }}<br><span class="muted">{{ invoice.generationCode }}</span></td>
             <td>{{ invoice.customerName }}</td>
             <td>{{ money(invoice.total) }}</td>
             <td><span class="badge" :class="invoice.status.toLowerCase()">{{ invoice.status }}</span></td>
+            <td>{{ invoice.hasError ? 'Sí' : 'No' }}</td>
+            <td>{{ invoice.accepted ? 'Sí' : 'No' }}</td>
+            <td>{{ invoice.emailSent ? 'Sí' : 'No' }}</td>
+            <td>
+              <div class="actions wrap table-actions">
+                <button class="btn secondary" type="button" @click="showInvoiceObservations(invoice)">Ver</button>
+                <button v-if="['FIRMADO', 'PENDIENTE'].includes(invoice.status)" class="btn" type="button" @click="sendStoredInvoice(invoice)" :disabled="loading">Enviar</button>
+                <button v-if="canVoidInvoice(invoice)" class="btn danger" type="button" @click="openVoidInvoice(invoice)" :disabled="loading">Anular</button>
+              </div>
+            </td>
           </tr>
         </tbody>
       </table>
+
+      <div v-if="voidOverlay.visible" class="overlay-layer">
+        <button class="overlay-backdrop" type="button" aria-label="Cerrar" @click="closeVoidOverlay"></button>
+        <div class="card overlay-panel">
+          <div class="overlay-header">
+            <div>
+              <h3>Anular factura</h3>
+              <span class="muted">{{ voidOverlay.invoice?.numberControl }}</span>
+            </div>
+            <button class="btn secondary overlay-close" type="button" @click="closeVoidOverlay">Cerrar</button>
+          </div>
+          <div class="alert alert-info">
+            <small>{{ voidHelpText }}</small>
+          </div>
+          <div class="form-grid">
+            <label>Tipo de anulación CAT-024
+              <select v-model.number="voidForm.tipoAnulacion" @change="handleVoidTypeChanged">
+                <option v-for="option in allowedVoidTypeOptions" :key="option.value" :value="option.value">
+                  {{ option.value }} - {{ option.label }}
+                </option>
+              </select>
+            </label>
+            <label v-if="voidRequiresReplacement" class="full-width">Código de generación reemplazo
+              <input v-model="voidForm.codigoGeneracionR" maxlength="36" placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX">
+              <small>{{ voidReplacementHelp }}</small>
+            </label>
+            <label class="full-width">Motivo
+              <textarea v-model="voidForm.motivo" rows="4" maxlength="250" placeholder="Detalle el motivo de la anulación"></textarea>
+            </label>
+          </div>
+          <div class="actions wrap modal-actions">
+            <button class="btn secondary" type="button" @click="closeVoidOverlay">Cancelar</button>
+            <button class="btn danger" type="button" @click="submitVoidInvoice" :disabled="loading">Enviar anulación</button>
+          </div>
+        </div>
+      </div>
     </section>
 
     <section v-if="activeView === 'nueva-factura'" class="form-section factura-form">
@@ -232,11 +319,22 @@
           <label class="full-width">Producto
             <select v-model="itemForm.productId" @change="applyItemProduct">
               <option value="">Seleccionar producto...</option>
-              <option v-for="product in products" :key="product.id" :value="product.id">
+              <option v-for="product in invoiceProducts" :key="product.id" :value="product.id">
                 {{ product.code }} - {{ product.description }}
               </option>
             </select>
           </label>
+          <template v-if="!hasInventoryModule">
+            <label class="full-width">Descripción
+              <input v-model="itemForm.descripcion" placeholder="Descripción del ítem en la factura">
+            </label>
+            <label class="full-width">Tipo de ítem
+              <select v-model.number="itemForm.tipoItem">
+                <option :value="2">Servicio</option>
+                <option :value="1">Bien</option>
+              </select>
+            </label>
+          </template>
           <label class="full-width">Cantidad<input v-model.number="itemForm.cantidad" type="number" min="0.000001" step="0.01"></label>
           <label class="full-width">Precio Unitario<input v-model.number="itemForm.precioUnitario" type="number" min="0" step="0.01"></label>
           <label class="full-width">Descuento
@@ -305,36 +403,29 @@
       </div>
     </section>
 
-    <section v-if="activeView === 'facturas'" class="card" style="margin-top:16px;">
-      <div class="top compact">
-        <h3>Facturas</h3>
-        <button class="btn" type="button" @click="setView('nueva-factura')">Nueva Factura</button>
+
+    <section v-if="activeView === 'cuentas-por-cobrar'" class="card" style="margin-top:16px;">
+      <h3>Cuentas por Cobrar</h3>
+      <div class="stats-grid">
+        <div class="stat"><span class="stat-icon">💳</span><div class="stat-info"><span>Por cobrar</span><strong>{{ money(arStats.totalPorCobrar) }}</strong></div></div>
+        <div class="stat"><span class="stat-icon">✅</span><div class="stat-info"><span>Cobrado</span><strong>{{ money(arStats.totalCobrado) }}</strong></div></div>
+        <div class="stat"><span class="stat-icon">⏳</span><div class="stat-info"><span>Pendientes</span><strong>{{ arStats.countPendiente }}</strong></div></div>
+        <div class="stat"><span class="stat-icon">◑</span><div class="stat-info"><span>Parciales</span><strong>{{ arStats.countParcial }}</strong></div></div>
+        <div class="stat"><span class="stat-icon">✔</span><div class="stat-info"><span>Pagadas</span><strong>{{ arStats.countPagado }}</strong></div></div>
       </div>
       <div class="form-grid filters-grid">
-        <label>Buscar
-          <input v-model="invoiceFilters.search" type="search" placeholder="Buscar por factura, cliente, documento, sello o estado...">
-        </label>
-        <label>Desde<input v-model="invoiceFilters.from" type="date"></label>
-        <label>Hasta<input v-model="invoiceFilters.to" type="date"></label>
-        <label>Estado
-          <select v-model="invoiceFilters.status">
-            <option value="">Todos los estados</option>
-            <option value="PENDIENTE">Pendientes / acción</option>
-            <option value="CONTINGENCIA">Contingencia</option>
-            <option value="ENVIADO">Enviado</option>
-            <option value="RECHAZADO">Rechazado</option>
-            <option value="ANULADO">Anulado</option>
+        <label>Buscar<input v-model="arFilters.search" type="search" placeholder="Factura o cliente..."></label>
+        <label>Desde<input v-model="arFilters.from" type="date"></label>
+        <label>Hasta<input v-model="arFilters.to" type="date"></label>
+        <label>Estado de pago
+          <select v-model="arFilters.payment_status">
+            <option value="">Todos</option>
+            <option value="pendiente">Pendiente</option>
+            <option value="parcial">Parcial</option>
+            <option value="pagado">Pagado</option>
           </select>
         </label>
-        <label>Documento
-          <select v-model="invoiceFilters.type">
-            <option value="">Todos los documentos</option>
-            <option v-for="documentType in dteTypes" :key="documentType.codigo" :value="documentType.codigo">
-              {{ documentType.codigo }} - {{ documentType.nombre }}
-            </option>
-          </select>
-        </label>
-        <button class="btn" type="button" @click="loadInvoices">Filtrar</button>
+        <button class="btn" type="button" @click="loadAccountsReceivable">Filtrar</button>
       </div>
       <table>
         <thead>
@@ -343,67 +434,58 @@
             <th>No. Control</th>
             <th>Cliente</th>
             <th>Total</th>
-            <th>Estado</th>
-            <th>Contiene Error</th>
-            <th>Aceptado</th>
-            <th>Enviado por Correo</th>
+            <th>Abonado</th>
+            <th>Saldo</th>
+            <th>Estado pago</th>
             <th>Acciones</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-if="invoices.length === 0"><td colspan="9" class="empty">No hay facturas</td></tr>
-          <tr v-for="invoice in invoices" :key="invoice.id">
+          <tr v-if="arInvoices.length === 0"><td colspan="8" class="empty">No hay facturas aceptadas en cuentas por cobrar</td></tr>
+          <tr v-for="invoice in arInvoices" :key="invoice.id">
             <td>{{ invoice.date }}</td>
-            <td>{{ invoice.numberControl }}<br><span class="muted">{{ invoice.generationCode }}</span></td>
+            <td>{{ invoice.numberControl }}</td>
             <td>{{ invoice.customerName }}</td>
             <td>{{ money(invoice.total) }}</td>
-            <td><span class="badge" :class="invoice.status.toLowerCase()">{{ invoice.status }}</span></td>
-            <td>{{ invoice.hasError ? 'Sí' : 'No' }}</td>
-            <td>{{ invoice.accepted ? 'Sí' : 'No' }}</td>
-            <td>{{ invoice.emailSent ? 'Sí' : 'No' }}</td>
+            <td>{{ money(invoice.amountPaid) }}</td>
+            <td><strong>{{ money(invoice.balance) }}</strong></td>
+            <td><span class="badge" :class="'ar-' + invoice.paymentStatus">{{ arPaymentStatusLabel(invoice.paymentStatus) }}</span></td>
             <td>
-              <div class="actions wrap table-actions">
-                <button class="btn secondary" type="button" @click="showInvoiceObservations(invoice)">Ver</button>
-                <button v-if="['FIRMADO', 'PENDIENTE'].includes(invoice.status)" class="btn" type="button" @click="sendStoredInvoice(invoice)" :disabled="loading">Enviar</button>
-                <button v-if="canVoidInvoice(invoice)" class="btn danger" type="button" @click="openVoidInvoice(invoice)" :disabled="loading">Anular</button>
-              </div>
+              <button v-if="invoice.paymentStatus !== 'pagado'" class="btn" type="button" @click="openPaymentOverlay(invoice)">Registrar pago</button>
+              <span v-else class="muted">{{ invoice.paidAt }}</span>
             </td>
           </tr>
         </tbody>
       </table>
 
-      <div v-if="voidOverlay.visible" class="overlay-layer">
-        <button class="overlay-backdrop" type="button" aria-label="Cerrar" @click="closeVoidOverlay"></button>
+      <div v-if="showPaymentOverlay" class="overlay-layer">
+        <button class="overlay-backdrop" type="button" aria-label="Cerrar" @click="closePaymentOverlay"></button>
         <div class="card overlay-panel">
           <div class="overlay-header">
             <div>
-              <h3>Anular factura</h3>
-              <span class="muted">{{ voidOverlay.invoice?.numberControl }}</span>
+              <h3>Registrar pago</h3>
+              <span class="muted">{{ arSelectedInvoice?.numberControl }} — Saldo: {{ money(arSelectedInvoice?.balance) }}</span>
             </div>
-            <button class="btn secondary overlay-close" type="button" @click="closeVoidOverlay">Cerrar</button>
-          </div>
-          <div class="alert alert-info">
-            <small>{{ voidHelpText }}</small>
+            <button class="btn secondary overlay-close" type="button" @click="closePaymentOverlay">Cerrar</button>
           </div>
           <div class="form-grid">
-            <label>Tipo de anulación CAT-024
-              <select v-model.number="voidForm.tipoAnulacion" @change="handleVoidTypeChanged">
-                <option v-for="option in allowedVoidTypeOptions" :key="option.value" :value="option.value">
-                  {{ option.value }} - {{ option.label }}
-                </option>
+            <label>Monto recibido *<input v-model.number="paymentForm.amount" type="number" min="0.01" step="0.01"></label>
+            <label>Método de pago
+              <select v-model="paymentForm.method">
+                <option value="">Seleccionar...</option>
+                <option value="Efectivo">Efectivo</option>
+                <option value="Transferencia">Transferencia bancaria</option>
+                <option value="Cheque">Cheque</option>
+                <option value="Tarjeta">Tarjeta</option>
+                <option value="Otro">Otro</option>
               </select>
             </label>
-            <label v-if="voidRequiresReplacement" class="full-width">Código de generación reemplazo
-              <input v-model="voidForm.codigoGeneracionR" maxlength="36" placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX">
-              <small>{{ voidReplacementHelp }}</small>
-            </label>
-            <label class="full-width">Motivo
-              <textarea v-model="voidForm.motivo" rows="4" maxlength="250" placeholder="Detalle el motivo de la anulación"></textarea>
-            </label>
+            <label class="full-width">Referencia / No. comprobante<input v-model="paymentForm.reference" placeholder="Número de comprobante, cheque o referencia..."></label>
+            <label class="full-width">Notas<input v-model="paymentForm.notes" placeholder="Observaciones adicionales..."></label>
           </div>
           <div class="actions wrap modal-actions">
-            <button class="btn secondary" type="button" @click="closeVoidOverlay">Cancelar</button>
-            <button class="btn danger" type="button" @click="submitVoidInvoice" :disabled="loading">Enviar anulación</button>
+            <button class="btn secondary" type="button" @click="closePaymentOverlay">Cancelar</button>
+            <button class="btn" type="button" @click="submitPayment" :disabled="loading">Guardar pago</button>
           </div>
         </div>
       </div>
@@ -418,16 +500,32 @@
         <label>Buscar producto<input v-model="productSearch" type="search" placeholder="Buscar producto..."></label>
       </div>
       <table>
-        <thead><tr><th>Código</th><th>Descripción</th><th>Tipo</th><th>Precio Base</th><th>IVA</th><th>Precio Final</th><th>Acciones</th></tr></thead>
+        <thead><tr><th>Código</th><th>Descripción</th><th>Tipo DTE</th><th v-if="hasInventoryModule">Tipo Producto</th><th>Precio Base</th><th>IVA</th><th>Precio Final</th><th>Stock</th><th>Mín.</th><th>Acciones</th></tr></thead>
         <tbody>
-          <tr v-if="filteredProducts.length === 0"><td colspan="7" class="empty">No hay productos</td></tr>
+          <tr v-if="filteredProducts.length === 0"><td :colspan="hasInventoryModule ? 10 : 9" class="empty">No hay productos</td></tr>
           <tr v-for="product in filteredProducts" :key="product.id">
             <td>{{ product.code }}</td>
             <td>{{ product.description }}</td>
             <td>{{ productTypeName(product.type) }}</td>
+            <td v-if="hasInventoryModule" style="font-size:12px">
+              {{ product.productTypeName || '—' }}
+              <span v-if="product.controlsInventory" style="color:var(--ok);font-size:10px;display:block">● stock</span>
+            </td>
             <td>${{ Number(product.price).toFixed(2) }}</td>
             <td>{{ product.isExempt ? 'Exento' : '13%' }}</td>
             <td>${{ productFinalPrice(product).toFixed(2) }}</td>
+            <td>
+              <span v-if="product.stockQuantity !== null"
+                :style="product.minStock !== null && product.stockQuantity <= product.minStock ? 'color:var(--bad);font-weight:700' : ''">
+                {{ product.stockQuantity }}
+                <span v-if="product.minStock !== null && product.stockQuantity <= product.minStock" title="Stock bajo">⚠</span>
+              </span>
+              <span v-else class="muted">—</span>
+            </td>
+            <td>
+              <span v-if="product.minStock !== null">{{ product.minStock }}</span>
+              <span v-else class="muted">—</span>
+            </td>
             <td><button class="btn secondary" type="button" @click="openProductEdit(product)">Editar</button></td>
           </tr>
         </tbody>
@@ -444,12 +542,20 @@
             <button class="btn secondary overlay-close" type="button" @click="closeProductOverlay">Cerrar</button>
           </div>
           <div class="form-grid product-form-grid">
-            <label>Tipo
+            <label>Tipo DTE
               <select v-model="productForm.type">
                 <option value="1">Bien</option>
                 <option value="2">Servicio</option>
-                <option value="3">Ambos</option>
-                <option value="4">Otros</option>
+                <option v-if="hasInventoryModule" value="3">Ambos</option>
+                <option v-if="hasInventoryModule" value="4">Otros</option>
+              </select>
+            </label>
+            <label v-if="hasInventoryModule && productTypes.length">Tipo de producto
+              <select v-model="productForm.productTypeId">
+                <option :value="null">Sin clasificar</option>
+                <option v-for="pt in productTypes" :key="pt.id" :value="pt.id">
+                  {{ pt.name }}{{ pt.controlsInventory ? ' (controla stock)' : '' }}
+                </option>
               </select>
             </label>
             <label>Código<input v-model="productForm.code" placeholder="PROD-001"></label>
@@ -469,9 +575,79 @@
               </select>
             </label>
             <label class="full-width">Notas<input v-model="productForm.notes"></label>
+            <template v-if="['1','3'].includes(productForm.type)">
+              <label>Stock actual
+                <input v-model.number="productForm.stockQuantity" type="number" min="0" step="1" placeholder="Ej: 100">
+                <small>Unidades disponibles en inventario</small>
+              </label>
+              <label>Stock mínimo
+                <input v-model.number="productForm.minStock" type="number" min="0" step="1" placeholder="Ej: 10">
+                <small>Alerta cuando el stock llegue a este nivel</small>
+              </label>
+            </template>
             <div class="actions wrap modal-actions full-width">
               <button class="btn secondary" type="button" @click="closeProductOverlay">Cancelar</button>
               <button class="btn" type="button" @click="saveProduct" :disabled="loading">Guardar producto</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section v-if="activeView === 'productos-facturacion'" class="card" style="margin-top:16px;">
+      <div class="top compact">
+        <h3>Servicios</h3>
+        <button class="btn" type="button" @click="openProductCreate">Nuevo servicio</button>
+      </div>
+      <div class="form-grid mini">
+        <label>Buscar servicio<input v-model="productSearch" type="search" placeholder="Buscar servicio..."></label>
+      </div>
+      <table>
+        <thead><tr><th>Código</th><th>Descripción</th><th>Precio Base</th><th>IVA</th><th>Precio Final</th><th>Acciones</th></tr></thead>
+        <tbody>
+          <tr v-if="filteredServices.length === 0"><td colspan="6" class="empty">No hay servicios registrados</td></tr>
+          <tr v-for="product in filteredServices" :key="product.id">
+            <td>{{ product.code }}</td>
+            <td>{{ product.description }}</td>
+            <td>${{ Number(product.price).toFixed(2) }}</td>
+            <td>{{ product.isExempt ? 'Exento' : '13%' }}</td>
+            <td>${{ productFinalPrice(product).toFixed(2) }}</td>
+            <td><button class="btn secondary" type="button" @click="openProductEdit(product)">Editar</button></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div v-if="showProductOverlay" class="overlay-layer product-overlay">
+        <button class="overlay-backdrop" type="button" aria-label="Cerrar" @click="closeProductOverlay"></button>
+        <div class="card overlay-panel">
+          <div class="overlay-header">
+            <div>
+              <h3>{{ productForm.id ? 'Editar servicio' : 'Nuevo servicio' }}</h3>
+              <span class="muted">Configure el servicio para usarlo en facturación.</span>
+            </div>
+            <button class="btn secondary overlay-close" type="button" @click="closeProductOverlay">Cerrar</button>
+          </div>
+          <div class="form-grid product-form-grid">
+            <label>Código<input v-model="productForm.code" placeholder="SERV-001"></label>
+            <label>Descripción<input v-model="productForm.description"></label>
+            <label>Precio<input v-model.number="productForm.price" type="number" min="0" step="0.01"></label>
+            <label>Unidad
+              <select v-model="productForm.unit">
+                <option v-for="unit in unitOptions" :key="unit.codigo" :value="unit.codigo">
+                  {{ unit.codigo }} - {{ unit.nombre }}
+                </option>
+              </select>
+            </label>
+            <label>IVA
+              <select v-model="productForm.isExempt">
+                <option :value="false">Gravado</option>
+                <option :value="true">Exento</option>
+              </select>
+            </label>
+            <label class="full-width">Notas<input v-model="productForm.notes"></label>
+            <div class="actions wrap modal-actions full-width">
+              <button class="btn secondary" type="button" @click="closeProductOverlay">Cancelar</button>
+              <button class="btn" type="button" @click="saveProduct" :disabled="loading">Guardar servicio</button>
             </div>
           </div>
         </div>
@@ -864,6 +1040,8 @@ const retencion = reactive({
 
 const itemForm = reactive({
   productId: '',
+  descripcion: '',
+  tipoItem: 2,
   cantidad: 1,
   precioUnitario: 0,
   tipoDescuento: 'monto',
@@ -894,13 +1072,18 @@ const importedSettings = window.cotejaBilling?.settings || {};
 const importedCorrelatives = window.cotejaBilling?.correlatives || {};
 const products = ref([]);
 const invoices = ref([]);
-const recentInvoices = ref([]);
 const selectedInvoice = ref({});
 const invoiceDetail = reactive({ visible: false });
 const invoiceFilters = reactive({ search: '', from: formatLocalDate(new Date()), to: formatLocalDate(new Date()), status: '', type: '' });
 const voidOverlay = reactive({ visible: false, invoice: null });
 const voidForm = reactive({ tipoAnulacion: 2, motivo: '', codigoGeneracionR: '' });
 const dashboardStats = reactive({ todayCount: 0, todaySentTotal: 0, sentCount: 0, pendingCount: 0, voidedCount: 0 });
+const arStats = reactive({ totalPorCobrar: 0, totalCobrado: 0, countPendiente: 0, countParcial: 0, countPagado: 0 });
+const arInvoices = ref([]);
+const arFilters = reactive({ search: '', from: '', to: '', payment_status: '' });
+const showPaymentOverlay = ref(false);
+const arSelectedInvoice = ref(null);
+const paymentForm = reactive({ amount: 0, method: '', reference: '', notes: '' });
 const processOverlay = reactive({
   visible: false,
   title: 'Procesando documento',
@@ -947,8 +1130,13 @@ const productForm = reactive({
   price: 0,
   unit: '59',
   isExempt: false,
-  notes: ''
+  notes: '',
+  stockQuantity: null,
+  minStock: null,
+  productTypeId: null,
 });
+const productTypes = ref([]);
+const hasInventoryModule = ref(false);
 
 const subtotalBruto = computed(() => items.value.reduce((sum, item) => sum + lineGross(item), 0));
 const subtotalGravado = computed(() => Math.max(0, items.value.reduce((sum, item) => sum + (item.exento ? 0 : lineBase(item)), 0) - descuentoGeneralGravado.value));
@@ -1008,6 +1196,21 @@ const filteredProducts = computed(() => {
     product.code,
     product.description,
     productTypeName(product.type),
+    unitName(product.unit)
+  ].some((value) => String(value || '').toLowerCase().includes(term)));
+});
+
+const invoiceProducts = computed(() =>
+  hasInventoryModule.value ? products.value : products.value.filter((p) => String(p.type) === '2')
+);
+
+const filteredServices = computed(() => {
+  const term = productSearch.value.trim().toLowerCase();
+  const services = products.value.filter((p) => String(p.type) === '2');
+  if (!term) return services;
+  return services.filter((product) => [
+    product.code,
+    product.description,
     unitName(product.unit)
   ].some((value) => String(value || '').toLowerCase().includes(term)));
 });
@@ -1100,7 +1303,7 @@ onMounted(async () => {
   window.addEventListener('coteja:factura-view', handleExternalNavigation);
   applyImportedSettings();
   setActivityInputFromEmitter();
-  await Promise.all([loadProducts(), loadCatalogs(), loadInvoices(), loadDashboard()]);
+  await Promise.all([loadProducts(), loadCatalogs(), loadInvoices(), loadDashboard(), loadAccountsReceivable()]);
 });
 
 onBeforeUnmount(() => {
@@ -1440,6 +1643,8 @@ function applyItemProduct() {
   const product = products.value.find((item) => String(item.id) === String(itemForm.productId));
   if (!product) return;
   itemForm.precioUnitario = Number(product.price || 0);
+  itemForm.descripcion = product.description || '';
+  itemForm.tipoItem = 2;
 }
 
 function addItemFromForm() {
@@ -1452,8 +1657,8 @@ function addItemFromForm() {
 
   items.value.push({
     codigo: product.code,
-    descripcion: product.description,
-    tipo_item: Number(product.type || 2),
+    descripcion: hasInventoryModule.value ? product.description : (itemForm.descripcion.trim() || product.description),
+    tipo_item: hasInventoryModule.value ? Number(product.type || 2) : Number(itemForm.tipoItem || 2),
     cantidad: Number(itemForm.cantidad || 1),
     precio_unitario: Number(itemForm.precioUnitario || 0),
     unidad_medida: product.unit,
@@ -1469,7 +1674,7 @@ function addItemFromForm() {
 }
 
 function resetItemForm() {
-  Object.assign(itemForm, { productId: '', cantidad: 1, precioUnitario: 0, tipoDescuento: 'monto', valorDescuento: 0, numeroDocumentoRelacionado: '' });
+  Object.assign(itemForm, { productId: '', descripcion: '', tipoItem: 2, cantidad: 1, precioUnitario: 0, tipoDescuento: 'monto', valorDescuento: 0, numeroDocumentoRelacionado: '' });
 }
 
 function resetInvoiceForm() {
@@ -1742,10 +1947,48 @@ function endOfLocalDay(date) {
   return end;
 }
 
+async function loadAccountsReceivable() {
+  const response = await axios.get('/admin/factura-sv/cuentas-por-cobrar', { params: { ...arFilters } });
+  Object.assign(arStats, response.data?.stats || {});
+  arInvoices.value = response.data?.invoices?.data || [];
+}
+
+function openPaymentOverlay(invoice) {
+  arSelectedInvoice.value = invoice;
+  Object.assign(paymentForm, { amount: invoice.balance, method: '', reference: '', notes: '' });
+  showPaymentOverlay.value = true;
+}
+
+function closePaymentOverlay() {
+  showPaymentOverlay.value = false;
+  arSelectedInvoice.value = null;
+}
+
+async function submitPayment() {
+  const invoice = arSelectedInvoice.value;
+  if (!invoice) return;
+  try {
+    const data = await request(`/admin/factura-sv/facturas/${invoice.id}/pagar`, { ...paymentForm });
+    message.value = data.message || 'Pago registrado.';
+    closePaymentOverlay();
+    await loadAccountsReceivable();
+  } catch (e) {
+    if (!error.value) error.value = e.response?.data?.message || e.message;
+  } finally {
+    scrollToStatus();
+  }
+}
+
+function arPaymentStatusLabel(status) {
+  return { pendiente: 'Pendiente', parcial: 'Parcial', pagado: 'Pagado' }[status] || status;
+}
+
 async function loadProducts() {
   const response = await axios.get('/admin/factura-sv/productos');
   const data = response.data;
   products.value = data.products || [];
+  productTypes.value = data.productTypes || [];
+  hasInventoryModule.value = data.hasInventory || false;
 }
 
 async function loadInvoices() {
@@ -1756,7 +1999,6 @@ async function loadInvoices() {
 async function loadDashboard() {
   const response = await axios.get('/admin/factura-sv/dashboard');
   Object.assign(dashboardStats, response.data?.stats || {});
-  recentInvoices.value = response.data?.recent || [];
 }
 
 async function saveProduct() {
@@ -1789,7 +2031,7 @@ function closeProductOverlay() {
 }
 
 function resetProductForm() {
-  Object.assign(productForm, { id: null, code: '', description: '', type: '2', price: 0, unit: '59', isExempt: false, notes: '' });
+  Object.assign(productForm, { id: null, code: '', description: '', type: '2', price: 0, unit: '59', isExempt: false, notes: '', stockQuantity: null, minStock: null, productTypeId: null });
 }
 
 function productTypeName(type) {
@@ -2064,7 +2306,7 @@ async function emitir() {
 
     const hasBlockingStep = (data.steps || []).some((step) => step.status === 'error');
     const hasPendingStep = (data.steps || []).some((step) => step.status === 'warning');
-    setView('facturas');
+    setView('dashboard');
     message.value = hasPendingStep
       ? 'Factura generada y guardada. Hay acciones pendientes de firma o envío.'
       : 'Factura generada, guardada y procesada.';
@@ -2790,6 +3032,15 @@ summary {
 .anulado     { background: #f1f5f9; color: #475569; }
 .invalidado  { background: #f1f5f9; color: #475569; }
 .contingencia { background: #fff7ed; color: #9a3412; }
+
+/* Accounts receivable payment status badges */
+.ar-pendiente  { background: #fef3c7; color: #92400e; }
+.ar-parcial    { background: #dbeafe; color: #1e40af; }
+.ar-pagado     { background: #d1fae5; color: #065f46; }
+
+:global(body.dark-mode) .ar-pendiente { background: #451a03; color: #fde68a; }
+:global(body.dark-mode) .ar-parcial   { background: #1e3a5f; color: #bfdbfe; }
+:global(body.dark-mode) .ar-pagado    { background: #052e16; color: #86efac; }
 
 :global(body.dark-mode) .pendiente    { background: #451a03; color: #fde68a; }
 :global(body.dark-mode) .firmado      { background: #1e3a5f; color: #bfdbfe; }

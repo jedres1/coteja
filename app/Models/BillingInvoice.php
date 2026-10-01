@@ -28,6 +28,9 @@ class BillingInvoice extends Model
         'observations',
         'json_dte',
         'signed_dte',
+        'payment_status',
+        'amount_paid',
+        'paid_at',
     ];
 
     protected $casts = [
@@ -35,10 +38,12 @@ class BillingInvoice extends Model
         'subtotal' => 'decimal:2',
         'iva' => 'decimal:2',
         'total' => 'decimal:2',
+        'amount_paid' => 'decimal:2',
         'has_error' => 'boolean',
         'accepted' => 'boolean',
         'email_sent' => 'boolean',
         'voided_at' => 'datetime',
+        'paid_at' => 'datetime',
         'void_json' => 'array',
         'json_dte' => 'array',
         'signed_dte' => 'array',
@@ -47,5 +52,15 @@ class BillingInvoice extends Model
     public function customer()
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function payments()
+    {
+        return $this->hasMany(BillingInvoicePayment::class);
+    }
+
+    public function getBalanceAttribute(): float
+    {
+        return max(0, (float) $this->total - (float) $this->amount_paid);
     }
 }

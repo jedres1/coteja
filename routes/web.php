@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AppReleaseController;
+use App\Http\Controllers\Admin\InventoryController;
 use App\Http\Controllers\Admin\BackupController;
 use App\Http\Controllers\Admin\CompanyController;
 use App\Http\Controllers\Admin\CustomerController;
@@ -8,6 +9,8 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\LicenseController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\PlanController;
+use App\Http\Controllers\Admin\AccountingController;
+use App\Http\Controllers\Admin\JournalController;
 use App\Http\Controllers\Admin\BankTransactionController;
 use App\Http\Controllers\Admin\PurchaseInvoiceController;
 use App\Http\Controllers\Admin\SupplierController;
@@ -53,13 +56,68 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:purchases']
     Route::post('purchase-invoices/settings', [PurchaseInvoiceController::class, 'settingsUpdate'])->name('purchase-invoices.settings.update');
     Route::post('purchase-invoices/extract', [PurchaseInvoiceController::class, 'extract'])->name('purchase-invoices.extract');
     Route::get('extraccion-pendiente', [PurchaseInvoiceController::class, 'pendingApproval'])->name('purchase-invoices.pending-approval');
+    Route::post('purchase-invoices/aprobar-masivo', [PurchaseInvoiceController::class, 'approveBulk'])->name('purchase-invoices.approve-bulk');
+    Route::post('purchase-invoices/rechazar-masivo', [PurchaseInvoiceController::class, 'rejectBulk'])->name('purchase-invoices.reject-bulk');
     Route::post('purchase-invoices/{purchaseInvoice}/aprobar', [PurchaseInvoiceController::class, 'approve'])->name('purchase-invoices.approve');
     Route::post('purchase-invoices/{purchaseInvoice}/rechazar', [PurchaseInvoiceController::class, 'reject'])->name('purchase-invoices.reject');
     Route::get('cuentas-por-pagar', [PurchaseInvoiceController::class, 'accountsPayable'])->name('purchase-invoices.accounts-payable');
     Route::post('purchase-invoices/{purchaseInvoice}/pay', [PurchaseInvoiceController::class, 'markPaid'])->name('purchase-invoices.pay');
     Route::get('control-bancario', [BankTransactionController::class, 'index'])->name('bank-transactions.index');
     Route::post('control-bancario', [BankTransactionController::class, 'store'])->name('bank-transactions.store');
+
+    // Bank accounts
+    Route::get('control-bancario/cuentas', [BankTransactionController::class, 'accounts'])->name('bank-transactions.accounts');
+    Route::post('control-bancario/cuentas', [BankTransactionController::class, 'storeAccount'])->name('bank-transactions.accounts.store');
+    Route::put('control-bancario/cuentas/{account}', [BankTransactionController::class, 'updateAccount'])->name('bank-transactions.accounts.update');
+    Route::delete('control-bancario/cuentas/{account}', [BankTransactionController::class, 'destroyAccount'])->name('bank-transactions.accounts.destroy');
+
+    // Transactions
+    Route::get('control-bancario/transacciones', [BankTransactionController::class, 'transactions'])->name('bank-transactions.transactions');
+    Route::post('control-bancario/transacciones', [BankTransactionController::class, 'storeTransaction'])->name('bank-transactions.transactions.store');
+
+    // Reconciliations
+    Route::get('control-bancario/conciliacion', [BankTransactionController::class, 'reconciliations'])->name('bank-transactions.reconciliations');
+    Route::post('control-bancario/conciliacion', [BankTransactionController::class, 'storeReconciliation'])->name('bank-transactions.reconciliations.store');
+    Route::get('control-bancario/conciliacion/{reconciliation}', [BankTransactionController::class, 'showReconciliation'])->name('bank-transactions.reconciliations.show');
+    Route::post('control-bancario/conciliacion/{reconciliation}/upload', [BankTransactionController::class, 'uploadStatement'])->name('bank-transactions.reconciliations.upload');
+    Route::post('control-bancario/conciliacion/{reconciliation}/toggle', [BankTransactionController::class, 'toggleReconcile'])->name('bank-transactions.reconciliations.toggle');
+    Route::post('control-bancario/conciliacion/{reconciliation}/complete', [BankTransactionController::class, 'completeReconciliation'])->name('bank-transactions.reconciliations.complete');
+
     Route::resource('purchase-invoices', PurchaseInvoiceController::class)->only(['index', 'store', 'update', 'destroy']);
+
+    // Módulo Contabilidad — Catálogo
+    Route::prefix('contabilidad')->name('accounting.')->controller(AccountingController::class)->group(function () {
+        Route::get('catalogo', 'catalogo')->name('catalogo');
+        Route::post('catalogo', 'store')->name('catalogo.store');
+        Route::put('catalogo/{account}', 'update')->name('catalogo.update');
+        Route::delete('catalogo/{account}', 'destroy')->name('catalogo.destroy');
+    });
+
+    // Módulo Contabilidad — Diario
+    Route::prefix('contabilidad/diario')->name('accounting.diario.')->controller(JournalController::class)->group(function () {
+        Route::get('',                    'index')  ->name('index');
+        Route::get('nuevo',               'create') ->name('create');
+        Route::post('',                   'store')  ->name('store');
+        Route::get('{entry}',             'show')   ->name('show');
+        Route::get('{entry}/editar',      'edit')   ->name('edit');
+        Route::put('{entry}',             'update') ->name('update');
+        Route::post('{entry}/aprobar',    'approve')->name('approve');
+        Route::post('{entry}/anular',     'annul')  ->name('annul');
+        Route::delete('{entry}',          'destroy')->name('destroy');
+    });
+});
+
+// Módulo Inventario: admin, consultant o customer con acceso a inventory
+Route::middleware(['auth', 'role:admin,consultant,customer', 'module:inventory'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('inventario/tipos-producto', [InventoryController::class, 'productTypes'])->name('inventory.product-types');
+    Route::post('inventario/tipos-producto', [InventoryController::class, 'storeProductType'])->name('inventory.product-types.store');
+    Route::delete('inventario/tipos-producto/{productType}', [InventoryController::class, 'destroyProductType'])->name('inventory.product-types.destroy');
+    Route::get('inventario/bodegas', [InventoryController::class, 'warehouses'])->name('inventory.warehouses');
+    Route::post('inventario/bodegas', [InventoryController::class, 'storeWarehouse'])->name('inventory.warehouses.store');
+    Route::get('inventario/parametros', [InventoryController::class, 'parameters'])->name('inventory.parameters');
+    Route::post('inventario/parametros', [InventoryController::class, 'saveParameters'])->name('inventory.parameters.save');
+    Route::get('inventario/movimientos', [InventoryController::class, 'movements'])->name('inventory.movements');
+    Route::post('inventario/movimientos', [InventoryController::class, 'storeMovement'])->name('inventory.movements.store');
 });
 
 // Módulo Facturación: admin, consultant o customer con acceso a billing
@@ -91,6 +149,8 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:billing'])-
         Route::post('facturas/{invoice}/enviar', 'enviarFacturaGuardada')->name('facturas.enviar');
         Route::post('facturas/{invoice}/correo', 'enviarCorreoFacturaGuardada')->name('facturas.correo');
         Route::post('facturas/{invoice}/anular', 'anularFacturaGuardada')->name('facturas.anular');
+        Route::post('facturas/{invoice}/pagar', 'registerPayment')->name('facturas.pagar');
+        Route::get('cuentas-por-cobrar', 'accountsReceivable')->name('cuentas-por-cobrar');
         Route::get('productos', 'productos')->name('productos');
         Route::post('productos', 'guardarProducto')->name('productos.guardar');
         Route::post('configuracion', 'guardarConfiguracion')->name('configuracion.guardar');

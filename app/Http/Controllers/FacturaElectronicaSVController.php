@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Admin\InventoryController;
 use App\Models\BillingDteCorrelative;
 use App\Models\BillingInvoice;
+use App\Models\BillingInvoicePayment;
 use App\Models\BillingProduct;
 use App\Models\BillingSetting;
+use App\Models\InventoryMovement;
+use App\Models\ProductType;
 use App\Services\Billing\CorrelativeService;
 use App\Services\Billing\InvoiceVoidService;
 use App\Services\DteEngine;
@@ -21,21 +25,136 @@ class FacturaElectronicaSVController extends Controller
         private readonly InvoiceVoidService $voids,
     ) {}
 
-    public function productos()
+    public function accountsReceivable(Request $request)
     {
+        $paymentStatus = $request->query('payment_status', '');
+        $search = trim((string) $request->query('search', ''));
+
+        $query = BillingInvoice::query()
+            ->whereIn('status', ['ENVIADO', 'ACEPTADO'])
+            ->where('document_type', '!=', '05')
+            ->when($paymentStatus !== '', fn ($q) => $q->where('payment_status', $paymentStatus))
+            ->when($search !== '', fn ($q) => $q->where(function ($q) use ($search) {
+                $q->where('number_control', 'like', "%{$search}%")
+                    ->orWhere('customer_name', 'like', "%{$search}%");
+            }))
+            ->when($request->query('from'), fn ($q, $from) => $q->whereDate('issued_at', '>=', $from))
+            ->when($request->query('to'), fn ($q, $to) => $q->whereDate('issued_at', '<=', $to))
+            ->latest('issued_at')
+            ->latest('id');
+
+        $all = BillingInvoice::query()
+            ->whereIn('status', ['ENVIADO', 'ACEPTADO'])
+            ->where('document_type', '!=', '05');
+
+        $stats = [
+            'totalPorCobrar' => (float) (clone $all)->where('payment_status', '!=', 'pagado')->sum(\DB::raw('total - amount_paid')),
+            'totalCobrado' => (float) (clone $all)->sum('amount_paid'),
+            'countPendiente' => (clone $all)->where('payment_status', 'pendiente')->count(),
+            'countParcial' => (clone $all)->where('payment_status', 'parcial')->count(),
+            'countPagado' => (clone $all)->where('payment_status', 'pagado')->count(),
+        ];
+
+        $invoices = $query->paginate(15);
+
         return response()->json([
             'success' => true,
-            'products' => BillingProduct::orderBy('description')->get()->map(fn (BillingProduct $product) => [
-                'id' => $product->id,
-                'code' => $product->code,
-                'description' => $product->description,
-                'type' => $product->type,
-                'price' => (float) $product->price,
-                'unit' => $product->unit,
-                'isExempt' => $product->is_exempt,
-                'notes' => $product->notes,
-                'invoiceItem' => $product->toInvoiceItem(),
+            'stats' => $stats,
+            'invoices' => $invoices->through(fn (BillingInvoice $invoice) => [
+                'id' => $invoice->id,
+                'date' => optional($invoice->issued_at)->format('Y-m-d'),
+                'numberControl' => $invoice->number_control,
+                'documentType' => $invoice->document_type,
+                'customerName' => $invoice->customer_name,
+                'total' => (float) $invoice->total,
+                'amountPaid' => (float) $invoice->amount_paid,
+                'balance' => $invoice->balance,
+                'paymentStatus' => $invoice->payment_status,
+                'paidAt' => optional($invoice->paid_at)->format('Y-m-d'),
+                'status' => $invoice->status,
             ]),
+        ]);
+    }
+
+    public function registerPayment(Request $request, BillingInvoice $invoice)
+    {
+        if (! in_array($invoice->status, ['ENVIADO', 'ACEPTADO'])) {
+            return response()->json(['success' => false, 'message' => 'Solo se pueden registrar pagos en facturas aceptadas o enviadas.'], 422);
+        }
+
+        if ($invoice->payment_status === 'pagado') {
+            return response()->json(['success' => false, 'message' => 'Esta factura ya está completamente pagada.'], 422);
+        }
+
+        $data = $request->validate([
+            'amount' => 'required|numeric|min:0.01',
+            'method' => 'nullable|string|max:100',
+            'reference' => 'nullable|string|max:200',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $maxAllowed = $invoice->balance;
+        if ((float) $data['amount'] > $maxAllowed + 0.001) {
+            return response()->json(['success' => false, 'message' => "El monto ingresado (\${$data['amount']}) supera el saldo pendiente (\${$maxAllowed})."], 422);
+        }
+
+        BillingInvoicePayment::create([
+            'billing_invoice_id' => $invoice->id,
+            'amount' => $data['amount'],
+            'method' => $data['method'] ?? null,
+            'reference' => $data['reference'] ?? null,
+            'notes' => $data['notes'] ?? null,
+        ]);
+
+        $newAmountPaid = round((float) $invoice->amount_paid + (float) $data['amount'], 2);
+        $newStatus = $newAmountPaid >= (float) $invoice->total - 0.001 ? 'pagado' : ($newAmountPaid > 0 ? 'parcial' : 'pendiente');
+
+        $invoice->update([
+            'amount_paid' => $newAmountPaid,
+            'payment_status' => $newStatus,
+            'paid_at' => $newStatus === 'pagado' ? now() : $invoice->paid_at,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => $newStatus === 'pagado' ? 'Pago registrado. Factura marcada como pagada.' : 'Pago parcial registrado.',
+            'invoice' => [
+                'id' => $invoice->id,
+                'total' => (float) $invoice->total,
+                'amountPaid' => (float) $newAmountPaid,
+                'balance' => max(0, (float) $invoice->total - $newAmountPaid),
+                'paymentStatus' => $newStatus,
+                'paidAt' => $newStatus === 'pagado' ? now()->format('Y-m-d') : null,
+            ],
+        ]);
+    }
+
+    public function productos(Request $request)
+    {
+        $hasInventory = $request->user()?->hasModuleAccess('inventory') ?? false;
+
+        return response()->json([
+            'success'      => true,
+            'hasInventory' => $hasInventory,
+            'productTypes' => ProductType::orderBy('name')->get()
+                ->map(fn (ProductType $t) => ['id' => $t->id, 'name' => $t->name, 'controlsInventory' => $t->controls_inventory]),
+            'products' => BillingProduct::with('productType')->orderBy('description')->get()
+                ->map(fn (BillingProduct $product) => [
+                    'id'              => $product->id,
+                    'code'            => $product->code,
+                    'description'     => $product->description,
+                    'type'            => $product->type,
+                    'price'           => (float) $product->price,
+                    'unit'            => $product->unit,
+                    'isExempt'        => $product->is_exempt,
+                    'notes'           => $product->notes,
+                    'stockQuantity'   => $product->stock_quantity,
+                    'minStock'        => $product->min_stock,
+                    'productTypeId'   => $product->product_type_id,
+                    'productTypeName' => $product->productType?->name,
+                    'controlsInventory' => $product->productType?->controls_inventory ?? false,
+                    'invoiceItem'     => $product->toInvoiceItem(),
+                ]),
         ]);
     }
 
@@ -193,42 +312,65 @@ class FacturaElectronicaSVController extends Controller
 
     public function guardarProducto(Request $request)
     {
+        $hasInventory = $request->user()?->hasModuleAccess('inventory') ?? false;
+
         $data = $request->validate([
-            'id' => 'nullable|integer|exists:billing_products,id',
-            'code' => 'required|string|max:100',
-            'description' => 'required|string|max:255',
-            'type' => 'required|string|in:1,2,3,4',
-            'price' => 'required|numeric|min:0',
-            'unit' => 'required|string|in:59,11,14,22,23,26,29,58,99',
-            'isExempt' => 'boolean',
-            'notes' => 'nullable|string|max:1000',
+            'id'            => 'nullable|integer|exists:billing_products,id',
+            'code'          => 'required|string|max:100',
+            'description'   => 'required|string|max:255',
+            'type'          => ['required', 'string', $hasInventory ? 'in:1,2,3,4' : 'in:1,2'],
+            'price'         => 'required|numeric|min:0',
+            'unit'          => 'required|string|in:59,11,14,22,23,26,29,58,99',
+            'isExempt'       => 'boolean',
+            'notes'          => 'nullable|string|max:1000',
+            'stockQuantity'  => 'nullable|integer|min:0',
+            'minStock'       => 'nullable|integer|min:0',
+            'productTypeId'  => 'nullable|exists:product_types,id',
         ]);
+
+        // Usuarios sin inventario: auto-asignar tipo según DTE type
+        $productTypeId = $data['productTypeId'] ?? null;
+        if (!$hasInventory && !$productTypeId) {
+            $defaultName   = $data['type'] === '2' ? 'Servicio' : 'Bien Terminado';
+            $defaultType   = ProductType::firstOrCreate(['name' => $defaultName], ['controls_inventory' => $data['type'] !== '2']);
+            $productTypeId = $defaultType->id;
+        }
 
         $product = BillingProduct::updateOrCreate(
             ['id' => $data['id'] ?? null],
             [
-                'code' => $data['code'],
-                'description' => $data['description'],
-                'type' => $data['type'],
-                'price' => $data['price'],
-                'unit' => $data['unit'],
-                'is_exempt' => $data['isExempt'] ?? false,
-                'notes' => $data['notes'] ?? null,
+                'code'            => $data['code'],
+                'description'     => $data['description'],
+                'type'            => $data['type'],
+                'price'           => $data['price'],
+                'unit'            => $data['unit'],
+                'is_exempt'       => $data['isExempt'] ?? false,
+                'notes'           => $data['notes'] ?? null,
+                'stock_quantity'  => isset($data['stockQuantity']) ? (int) $data['stockQuantity'] : null,
+                'min_stock'       => isset($data['minStock']) ? (int) $data['minStock'] : null,
+                'product_type_id' => $productTypeId,
             ],
         );
+
+        $product->load('productType');
 
         return response()->json([
             'success' => true,
             'product' => [
-                'id' => $product->id,
-                'code' => $product->code,
-                'description' => $product->description,
-                'type' => $product->type,
-                'price' => (float) $product->price,
-                'unit' => $product->unit,
-                'isExempt' => $product->is_exempt,
-                'notes' => $product->notes,
-                'invoiceItem' => $product->toInvoiceItem(),
+                'id'               => $product->id,
+                'code'             => $product->code,
+                'description'      => $product->description,
+                'type'             => $product->type,
+                'price'            => (float) $product->price,
+                'unit'             => $product->unit,
+                'isExempt'         => $product->is_exempt,
+                'notes'            => $product->notes,
+                'stockQuantity'    => $product->stock_quantity,
+                'minStock'         => $product->min_stock,
+                'productTypeId'    => $product->product_type_id,
+                'productTypeName'  => $product->productType?->name,
+                'controlsInventory' => $product->productType?->controls_inventory ?? false,
+                'invoiceItem'      => $product->toInvoiceItem(),
             ],
         ]);
     }
@@ -338,6 +480,9 @@ class FacturaElectronicaSVController extends Controller
         ];
         $steps[] = ['key' => 'save', 'status' => 'done', 'message' => 'Factura guardada localmente.'];
 
+        // Registrar salidas de inventario si el usuario tiene acceso al módulo
+        $this->registrarSalidasInventario($request, $data['items'], $invoice);
+
         $firma = $this->normalizarFirma($data['firma'] ?? []);
         $signedDte = null;
         if (! empty($firma['certificado_path']) && ! empty($firma['password'])) {
@@ -398,7 +543,7 @@ class FacturaElectronicaSVController extends Controller
 
                 if ($accepted) {
                     $steps[] = ['key' => 'attachments', 'status' => 'done', 'message' => 'Creando PDF y JSON con respuesta de Hacienda.'];
-                    $mailResult = $this->enviarCorreoDte(
+                    $steps[] = $this->enviarCorreoDte(
                         $invoice->fresh(),
                         $signedDte,
                         $data['config'],
@@ -406,7 +551,6 @@ class FacturaElectronicaSVController extends Controller
                         $data['cliente'],
                         $sent,
                     );
-                    $steps[] = $mailResult;
                 } else {
                     $steps[] = ['key' => 'attachments', 'status' => 'warning', 'message' => 'No se crearon adjuntos de correo porque el documento no fue aprobado.'];
                     $steps[] = ['key' => 'email', 'status' => 'warning', 'message' => 'No se envió correo porque Hacienda no devolvió sello de aprobación.'];
@@ -480,12 +624,28 @@ class FacturaElectronicaSVController extends Controller
             return response()->json(['success' => false, 'message' => 'Faltan credenciales de Hacienda para enviar.'], 422);
         }
 
-        $sent = $this->engine->send(
-            $dte,
-            $emisor['nit'] ?? data_get($invoice->json_dte, 'emisor.nit', ''),
-            $hacienda,
-            $firma['password'] ?? null,
-        );
+        try {
+            $sent = $this->engine->send(
+                $dte,
+                $emisor['nit'] ?? data_get($invoice->json_dte, 'emisor.nit', ''),
+                $hacienda,
+                $firma['password'] ?? null,
+            );
+        } catch (\Throwable $e) {
+            $invoice->update([
+                'status' => 'RECHAZADO',
+                'has_error' => true,
+                'observations' => $e->getMessage(),
+            ]);
+            $steps[] = ['key' => 'send', 'status' => 'error', 'message' => 'No se pudo enviar a Hacienda: '.$e->getMessage()];
+
+            return response()->json([
+                'success' => false,
+                'message' => 'No se pudo enviar a Hacienda: '.$e->getMessage(),
+                'invoice' => $invoice->fresh(),
+                'steps' => $steps,
+            ], 422);
+        }
 
         $accepted = (bool) ($sent['success'] ?? false) && ! empty($sent['selloRecibido']);
         $invoice->update([
@@ -598,6 +758,49 @@ class FacturaElectronicaSVController extends Controller
         ];
     }
 
+    private function registrarSalidasInventario($request, array $items, BillingInvoice $invoice): void
+    {
+        if (!$request->user()?->hasModuleAccess('inventory')) {
+            return;
+        }
+
+        $warehouseId = (int) BillingSetting::get('inventory_sales_warehouse_id');
+        if (!$warehouseId) {
+            return;
+        }
+
+        $docNumber = $invoice->number_control;
+
+        $itemsByCode = collect($items)
+            ->filter(fn ($item) => !blank($item['codigo'] ?? null))
+            ->groupBy('codigo');
+
+        foreach ($itemsByCode as $code => $codeItems) {
+            $product = BillingProduct::with('productType')
+                ->where('code', $code)
+                ->first();
+
+            if (!$product || !($product->productType?->controls_inventory ?? false)) {
+                continue;
+            }
+
+            $qty = collect($codeItems)->sum('cantidad');
+
+            InventoryMovement::create([
+                'product_id'         => $product->id,
+                'warehouse_id'       => $warehouseId,
+                'type'               => 'exit',
+                'quantity'           => $qty,
+                'document_type'      => 'billing',
+                'document_number'    => $docNumber,
+                'billing_invoice_id' => $invoice->id,
+                'notes'              => 'Salida automática por factura electrónica.',
+            ]);
+
+            InventoryController::syncWarehouseStock($product, $warehouseId, (float) $qty, 'exit');
+        }
+    }
+
     private function normalizarFirma(array $input): array
     {
         $settings = BillingSetting::allAsArray();
@@ -659,60 +862,64 @@ class FacturaElectronicaSVController extends Controller
             ],
         ];
 
-        $pdf = $this->engine->pdf(
-            [
-                'numero_control' => $invoice->number_control,
-                'codigo_generacion' => $invoice->generation_code,
-                'fecha_emision' => optional($invoice->issued_at)->format('Y-m-d'),
-                'cliente' => $invoice->customer_name,
-                'subtotal' => (float) $invoice->subtotal,
-                'iva' => (float) $invoice->iva,
-                'total' => (float) $invoice->total,
-                'estado' => $invoice->status,
-                'sello_recepcion' => $invoice->reception_stamp,
-            ],
-            $dte,
-            $config,
-            "DTE_{$safeCode}.pdf",
-        );
+        try {
+            $pdf = $this->engine->pdf(
+                [
+                    'numero_control' => $invoice->number_control,
+                    'codigo_generacion' => $invoice->generation_code,
+                    'fecha_emision' => optional($invoice->issued_at)->format('Y-m-d'),
+                    'cliente' => $invoice->customer_name,
+                    'subtotal' => (float) $invoice->subtotal,
+                    'iva' => (float) $invoice->iva,
+                    'total' => (float) $invoice->total,
+                    'estado' => $invoice->status,
+                    'sello_recepcion' => $invoice->reception_stamp,
+                ],
+                $dte,
+                $config,
+                "DTE_{$safeCode}.pdf",
+            );
 
-        $host = $correo['smtpHost'] ?? 'smtp.gmail.com';
-        $port = (int) ($correo['smtpPort'] ?? 465);
-        $secure = filter_var($correo['smtpSecure'] ?? true, FILTER_VALIDATE_BOOL);
-        $from = trim((string) ($correo['from'] ?? $usuario));
-        $fromName = trim((string) ($correo['fromName'] ?? $config['nombre_empresa'] ?? $from));
+            $host = $correo['smtpHost'] ?? 'smtp.gmail.com';
+            $port = (int) ($correo['smtpPort'] ?? 465);
+            $secure = filter_var($correo['smtpSecure'] ?? true, FILTER_VALIDATE_BOOL);
+            $from = trim((string) ($correo['from'] ?? $usuario));
+            $fromName = trim((string) ($correo['fromName'] ?? $config['nombre_empresa'] ?? $from));
 
-        config([
-            'mail.mailers.billing_smtp' => [
-                'transport' => 'smtp',
-                'scheme' => $secure || $port === 465 ? 'smtps' : null,
-                'host' => $host,
-                'port' => $port,
-                'username' => $usuario,
-                'password' => $password,
-                'timeout' => null,
-                'local_domain' => parse_url((string) config('app.url'), PHP_URL_HOST),
-            ],
-            'mail.from.address' => $from,
-            'mail.from.name' => $fromName,
-        ]);
+            config([
+                'mail.mailers.billing_smtp' => [
+                    'transport' => 'smtp',
+                    'scheme' => $secure || $port === 465 ? 'smtps' : null,
+                    'host' => $host,
+                    'port' => $port,
+                    'username' => $usuario,
+                    'password' => $password,
+                    'timeout' => null,
+                    'local_domain' => parse_url((string) config('app.url'), PHP_URL_HOST),
+                ],
+                'mail.from.address' => $from,
+                'mail.from.name' => $fromName,
+            ]);
 
-        Mail::mailer('billing_smtp')->raw(
-            "Estimado cliente,\n\nAdjunto encontrara el PDF y JSON del Documento Tributario Electronico {$codigo}.\n\nSaludos.",
-            function ($message) use ($destinatario, $from, $fromName, $codigo, $pdf, $jsonAdjunto, $safeCode) {
-                $message
-                    ->from($from, $fromName)
-                    ->to($destinatario)
-                    ->subject("Documento Tributario Electronico {$codigo}");
+            Mail::mailer('billing_smtp')->raw(
+                "Estimado cliente,\n\nAdjunto encontrara el PDF y JSON del Documento Tributario Electronico {$codigo}.\n\nSaludos.",
+                function ($message) use ($destinatario, $from, $fromName, $codigo, $pdf, $jsonAdjunto, $safeCode) {
+                    $message
+                        ->from($from, $fromName)
+                        ->to($destinatario)
+                        ->subject("Documento Tributario Electronico {$codigo}");
 
-                $message->attachData(base64_decode($pdf['base64'] ?? ''), "DTE_{$safeCode}.pdf", ['mime' => 'application/pdf']);
-                $message->attachData(json_encode($jsonAdjunto, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), "DTE_{$safeCode}.json", ['mime' => 'application/json']);
-            }
-        );
+                    $message->attachData(base64_decode($pdf['base64'] ?? ''), "DTE_{$safeCode}.pdf", ['mime' => 'application/pdf']);
+                    $message->attachData(json_encode($jsonAdjunto, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), "DTE_{$safeCode}.json", ['mime' => 'application/json']);
+                }
+            );
 
-        $invoice->update(['email_sent' => true]);
+            $invoice->update(['email_sent' => true]);
 
-        return ['key' => 'email', 'status' => 'done', 'message' => 'PDF y JSON enviados al correo del cliente.'];
+            return ['key' => 'email', 'status' => 'done', 'message' => 'PDF y JSON enviados al correo del cliente.'];
+        } catch (\Throwable $e) {
+            return ['key' => 'email', 'status' => 'warning', 'message' => 'Documento aprobado por Hacienda, pero no se pudo enviar el correo: '.$e->getMessage()];
+        }
     }
 
     public function estadoFirmador(Request $request)
