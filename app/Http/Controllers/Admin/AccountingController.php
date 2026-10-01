@@ -314,27 +314,41 @@ class AccountingController extends Controller
 
     public function balanzaComprobacion(Request $request)
     {
-        $year      = (int) $request->query('year',  now()->year);
-        $month     = (int) $request->query('month', now()->month);
-        $acumulado = $request->boolean('acumulado', false);
-        $tipo      = $request->query('tipo', '');
+        $year             = (int) $request->query('year',  now()->year);
+        $month            = (int) $request->query('month', now()->month);
+        $acumulado        = $request->boolean('acumulado', false);
+        $tipo             = $request->query('tipo', '');
+        $soloConMovimiento = $request->boolean('solo_movimiento', false);
 
-        $rows = DB::table('journal_entry_lines as jel')
+        // Subquery: movimientos del período por cuenta (solo partidas aprobadas)
+        $movsSub = DB::table('journal_entry_lines as jel')
             ->join('journal_entries as je', 'je.id', '=', 'jel.journal_entry_id')
-            ->join('accounting_accounts as aa', 'aa.id', '=', 'jel.account_id')
             ->where('je.status', 'aprobado')
-            ->when($tipo !== '', fn ($q) => $q->where('aa.type', $tipo))
+            ->whereYear('je.entry_date', $year)
             ->when($acumulado,
-                fn ($q) => $q->whereYear('je.entry_date', $year)
-                              ->whereRaw('MONTH(je.entry_date) <= ?', [$month]),
-                fn ($q) => $q->whereYear('je.entry_date', $year)
-                              ->whereMonth('je.entry_date', $month)
+                fn ($q) => $q->whereRaw('MONTH(je.entry_date) <= ?', [$month]),
+                fn ($q) => $q->whereMonth('je.entry_date', $month)
             )
-            ->groupBy('aa.id', 'aa.code', 'aa.name', 'aa.type', 'aa.nature')
+            ->groupBy('jel.account_id')
             ->select([
-                'aa.id', 'aa.code', 'aa.name', 'aa.type', 'aa.nature',
+                'jel.account_id',
                 DB::raw('SUM(jel.debit)  as suma_debe'),
                 DB::raw('SUM(jel.credit) as suma_haber'),
+            ]);
+
+        // Base: todas las cuentas que aceptan movimientos (sin hijos = cuentas de detalle)
+        $rows = DB::table('accounting_accounts as aa')
+            ->whereNotExists(fn ($q) => $q->select(DB::raw(1))
+                ->from('accounting_accounts as ch')
+                ->whereColumn('ch.parent_id', 'aa.id'))
+            ->where('aa.is_active', true)
+            ->when($tipo !== '', fn ($q) => $q->where('aa.type', $tipo))
+            ->leftJoinSub($movsSub, 'movs', 'movs.account_id', '=', 'aa.id')
+            ->when($soloConMovimiento, fn ($q) => $q->whereNotNull('movs.account_id'))
+            ->select([
+                'aa.id', 'aa.code', 'aa.name', 'aa.type', 'aa.nature',
+                DB::raw('COALESCE(movs.suma_debe,  0) as suma_debe'),
+                DB::raw('COALESCE(movs.suma_haber, 0) as suma_haber'),
             ])
             ->orderBy('aa.code')
             ->get()
@@ -343,22 +357,25 @@ class AccountingController extends Controller
                 $haber = (float) $r->suma_haber;
                 $neto  = $debe - $haber;
                 return (object) [
-                    'id'           => $r->id,
-                    'code'         => $r->code,
-                    'name'         => $r->name,
-                    'type'         => $r->type,
-                    'nature'       => $r->nature,
-                    'suma_debe'    => $debe,
-                    'suma_haber'   => $haber,
-                    'saldo_deudor' => $neto > 0 ? $neto : 0.0,
+                    'id'             => $r->id,
+                    'code'           => $r->code,
+                    'name'           => $r->name,
+                    'type'           => $r->type,
+                    'nature'         => $r->nature,
+                    'suma_debe'      => $debe,
+                    'suma_haber'     => $haber,
+                    'saldo_deudor'   => $neto > 0 ? $neto   : 0.0,
                     'saldo_acreedor' => $neto < 0 ? abs($neto) : 0.0,
+                    'tiene_movimiento' => ($debe + $haber) > 0,
                 ];
             });
 
-        $totalSumaDebe    = $rows->sum('suma_debe');
-        $totalSumaHaber   = $rows->sum('suma_haber');
-        $totalSaldoDeudor = $rows->sum('saldo_deudor');
-        $totalSaldoAcreedor = $rows->sum('saldo_acreedor');
+        // Totales sólo sobre cuentas con movimiento (las en cero no afectan cuadre)
+        $conMovimiento      = $rows->filter(fn ($r) => $r->tiene_movimiento);
+        $totalSumaDebe      = $conMovimiento->sum('suma_debe');
+        $totalSumaHaber     = $conMovimiento->sum('suma_haber');
+        $totalSaldoDeudor   = $conMovimiento->sum('saldo_deudor');
+        $totalSaldoAcreedor = $conMovimiento->sum('saldo_acreedor');
 
         $period = AccountingPeriod::where('year', $year)->where('month', $month)->first();
 
@@ -369,7 +386,7 @@ class AccountingController extends Controller
         }
 
         return view('admin.accounting.balanza-comprobacion', compact(
-            'rows', 'period', 'year', 'month', 'acumulado', 'tipo',
+            'rows', 'period', 'year', 'month', 'acumulado', 'tipo', 'soloConMovimiento',
             'totalSumaDebe', 'totalSumaHaber', 'totalSaldoDeudor', 'totalSaldoAcreedor',
             'availableYears'
         ));
