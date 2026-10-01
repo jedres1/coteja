@@ -106,6 +106,7 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:purchases']
         Route::post('periodos/{period}/cerrar', 'cerrarPeriodo')->name('periodos.cerrar');
 
         Route::get('saldos', 'saldos')->name('saldos');
+        Route::get('balanza-comprobacion', 'balanzaComprobacion')->name('balanza-comprobacion');
         Route::get('balance-general', 'balanceGeneral')->name('balance-general');
         Route::get('estado-resultados', 'estadoResultados')->name('estado-resultados');
     });

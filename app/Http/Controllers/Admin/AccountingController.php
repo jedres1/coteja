@@ -310,6 +310,71 @@ class AccountingController extends Controller
         ));
     }
 
+    // ── Balanza de Comprobación ─────────────────────────────────────────────
+
+    public function balanzaComprobacion(Request $request)
+    {
+        $year      = (int) $request->query('year',  now()->year);
+        $month     = (int) $request->query('month', now()->month);
+        $acumulado = $request->boolean('acumulado', false);
+        $tipo      = $request->query('tipo', '');
+
+        $rows = DB::table('journal_entry_lines as jel')
+            ->join('journal_entries as je', 'je.id', '=', 'jel.journal_entry_id')
+            ->join('accounting_accounts as aa', 'aa.id', '=', 'jel.account_id')
+            ->where('je.status', 'aprobado')
+            ->when($tipo !== '', fn ($q) => $q->where('aa.type', $tipo))
+            ->when($acumulado,
+                fn ($q) => $q->whereYear('je.entry_date', $year)
+                              ->whereRaw('MONTH(je.entry_date) <= ?', [$month]),
+                fn ($q) => $q->whereYear('je.entry_date', $year)
+                              ->whereMonth('je.entry_date', $month)
+            )
+            ->groupBy('aa.id', 'aa.code', 'aa.name', 'aa.type', 'aa.nature')
+            ->select([
+                'aa.id', 'aa.code', 'aa.name', 'aa.type', 'aa.nature',
+                DB::raw('SUM(jel.debit)  as suma_debe'),
+                DB::raw('SUM(jel.credit) as suma_haber'),
+            ])
+            ->orderBy('aa.code')
+            ->get()
+            ->map(function ($r) {
+                $debe  = (float) $r->suma_debe;
+                $haber = (float) $r->suma_haber;
+                $neto  = $debe - $haber;
+                return (object) [
+                    'id'           => $r->id,
+                    'code'         => $r->code,
+                    'name'         => $r->name,
+                    'type'         => $r->type,
+                    'nature'       => $r->nature,
+                    'suma_debe'    => $debe,
+                    'suma_haber'   => $haber,
+                    'saldo_deudor' => $neto > 0 ? $neto : 0.0,
+                    'saldo_acreedor' => $neto < 0 ? abs($neto) : 0.0,
+                ];
+            });
+
+        $totalSumaDebe    = $rows->sum('suma_debe');
+        $totalSumaHaber   = $rows->sum('suma_haber');
+        $totalSaldoDeudor = $rows->sum('saldo_deudor');
+        $totalSaldoAcreedor = $rows->sum('saldo_acreedor');
+
+        $period = AccountingPeriod::where('year', $year)->where('month', $month)->first();
+
+        $availableYears = AccountingPeriod::distinct()->orderByDesc('year')->pluck('year')->toArray();
+        if (!in_array(now()->year, $availableYears)) {
+            $availableYears[] = now()->year;
+            rsort($availableYears);
+        }
+
+        return view('admin.accounting.balanza-comprobacion', compact(
+            'rows', 'period', 'year', 'month', 'acumulado', 'tipo',
+            'totalSumaDebe', 'totalSumaHaber', 'totalSaldoDeudor', 'totalSaldoAcreedor',
+            'availableYears'
+        ));
+    }
+
     // ── Balance General ─────────────────────────────────────────────────────
 
     public function balanceGeneral(Request $request)
