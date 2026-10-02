@@ -5,6 +5,7 @@ const schemas = {
   '01': require(path.join(__dirname, '../schemas/fe-fc-v1.json')),
   '03': require(path.join(__dirname, '../schemas/fe-ccf-v3.json')),
   '05': require(path.join(__dirname, '../schemas/fe-nc-v3.json')),
+  '06': require(path.join(__dirname, '../schemas/fe-nd-v3.json')),
   '07': require(path.join(__dirname, '../schemas/fe-cr-v1.json')),
   '11': require(path.join(__dirname, '../schemas/fe-fex-v1.json')),
   '14': require(path.join(__dirname, '../schemas/fe-fse-v1.json'))

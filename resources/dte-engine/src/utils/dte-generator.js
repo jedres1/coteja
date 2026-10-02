@@ -245,12 +245,14 @@ class DTEGenerator {
     const correlativo = opciones.correlativo || 1;
     const numeroControl = this.generarNumeroControl('14', config.codigo_establecimiento, config.punto_venta, correlativo);
 
+    const cuerpoDocumento = this.construirCuerpoDocumentoFSE(items);
+
     return {
       identificacion: this.construirIdentificacion(config, '14', 1, numeroControl, codigoGeneracion, now, opciones),
       emisor: this.construirEmisorFSE(config),
       sujetoExcluido: this.construirSujetoExcluido(cliente),
-      cuerpoDocumento: this.construirCuerpoDocumentoFSE(items),
-      resumen: this.construirResumenFSE(resumen),
+      cuerpoDocumento,
+      resumen: this.construirResumenFSE(resumen, cuerpoDocumento),
       apendice: opciones.apendice || null
     };
   }
@@ -334,6 +336,10 @@ class DTEGenerator {
     delete emisor.codEstable;
     delete emisor.codPuntoVentaMH;
     delete emisor.codPuntoVenta;
+    // Schema tipo 07 exige telefono emisor ^[A-Z0-9]{8,30}$
+    if (emisor.telefono) {
+      emisor.telefono = String(emisor.telefono).replace(/[^A-Z0-9]/gi, '').toUpperCase() || null;
+    }
     return emisor;
   }
 
@@ -408,6 +414,8 @@ class DTEGenerator {
   construirReceptorRetencion(cliente) {
     const tipoDocumento = cliente.tipo_documento || '36';
     const direccion = this.construirDireccionReceptor(cliente, true);
+    // Schema tipo 07 exige telefono receptor ^[0-9+;]{8,30}$
+    const telefonoRaw = String(cliente.telefono || '').replace(/[^0-9+;]/g, '');
 
     return {
       tipoDocumento,
@@ -418,7 +426,7 @@ class DTEGenerator {
       descActividad: this.normalizarDescripcionActividad(cliente.giro, cliente.desc_actividad),
       nombreComercial: cliente.nombre_comercial || null,
       direccion,
-      telefono: cliente.telefono || null,
+      telefono: telefonoRaw || null,
       correo: cliente.email
     };
   }
@@ -1196,8 +1204,13 @@ class DTEGenerator {
   /**
    * Construir resumen FSE
    */
-  construirResumenFSE(resumen) {
-    const total = this.redondear(resumen.total || 0);
+  construirResumenFSE(resumen, cuerpoDocumento = []) {
+    const totalCompraItems = this.redondear(
+      Array.isArray(cuerpoDocumento)
+        ? cuerpoDocumento.reduce((sum, item) => sum + Number(item.compra || 0), 0)
+        : 0
+    );
+    const total = totalCompraItems || this.redondear(resumen.total || resumen.subtotal || resumen.subTotal || 0);
     const descuento = this.redondear(resumen.descuento || 0);
     const subTotal = this.redondear(resumen.subTotal ?? Math.max(0, total - descuento));
     const ivaRete1 = 0;
@@ -1209,7 +1222,7 @@ class DTEGenerator {
       totalCompra: total,
       descu: descuento,
       totalDescu: descuento,
-      subTotal,
+      subTotal: total,
       ivaRete1,
       reteRenta,
       totalPagar,
