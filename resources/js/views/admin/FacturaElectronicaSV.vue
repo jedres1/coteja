@@ -173,6 +173,48 @@
             </select>
           </label>
         </div>
+
+        <div v-if="selectedCustomerId && receptorCargado" class="receptor-resumen">
+          <div class="receptor-resumen-titulo">Datos del receptor cargados</div>
+          <div class="receptor-resumen-grid">
+            <span class="receptor-label">Nombre</span>
+            <span class="receptor-valor">{{ receptorCargado.nombre || '—' }}</span>
+
+            <span class="receptor-label">Documento</span>
+            <span class="receptor-valor">
+              <span v-if="receptorCargado.numero_documento">{{ receptorCargado.tipo_documento }} {{ receptorCargado.numero_documento }}</span>
+              <span v-else class="receptor-faltante">Sin documento</span>
+              <span v-if="receptorCargado.nrc" class="receptor-nrc"> · NRC {{ receptorCargado.nrc }}</span>
+              <span v-else-if="['03','05','06'].includes(tipo)" class="receptor-faltante"> · NRC faltante</span>
+            </span>
+
+            <span class="receptor-label">Actividad</span>
+            <span class="receptor-valor">
+              <span v-if="receptorCargado.giro">{{ receptorCargado.giro }} — {{ receptorCargado.desc_actividad || '—' }}</span>
+              <span v-else :class="['03','05','06'].includes(tipo) ? 'receptor-faltante' : 'receptor-opcional'">
+                {{ ['03','05','06'].includes(tipo) ? 'Faltante (requerido para CCF)' : 'No configurada' }}
+              </span>
+            </span>
+
+            <span class="receptor-label">Dirección</span>
+            <span class="receptor-valor">
+              <span v-if="receptorCargado.direccion">
+                {{ receptorCargado.departamento }} / {{ receptorCargado.municipio }} · {{ receptorCargado.direccion }}
+              </span>
+              <span v-else :class="['03','05','06'].includes(tipo) ? 'receptor-faltante' : 'receptor-opcional'">
+                {{ ['03','05','06'].includes(tipo) ? 'Faltante (requerido para CCF)' : 'No configurada' }}
+              </span>
+            </span>
+
+            <span class="receptor-label">Contacto</span>
+            <span class="receptor-valor">
+              <span v-if="receptorCargado.email || receptorCargado.telefono">
+                {{ [receptorCargado.email, receptorCargado.telefono].filter(Boolean).join(' · ') }}
+              </span>
+              <span v-else class="receptor-opcional">Sin contacto</span>
+            </span>
+          </div>
+        </div>
       </section>
 
     <section v-if="activeView === 'nueva-factura' && ['05', '06', '07'].includes(tipo)" class="form-section">
@@ -1070,6 +1112,7 @@ const correlativos = reactive({ '01': 1, '03': 1, '05': 1, '06': 1, '07': 1, '11
 const billingCustomers = window.cotejaBilling?.customers || [];
 const importedSettings = window.cotejaBilling?.settings || {};
 const importedCorrelatives = window.cotejaBilling?.correlatives || {};
+const clientesVariosId = window.cotejaBilling?.clientesVariosId || null;
 const products = ref([]);
 const invoices = ref([]);
 const selectedInvoice = ref({});
@@ -1187,6 +1230,7 @@ const municipalityOptions = computed(() => geographicCatalog.value.municipios?.[
 const districtOptions = computed(() => geographicCatalog.value.distritos?.[emisor.municipio] || []);
 const currentDocumentDate = computed(() => formatLocalDate(new Date()));
 const currentYear = computed(() => new Date().getFullYear());
+const receptorCargado = computed(() => selectedCustomerId.value ? { ...cliente } : null);
 const numeroControlPreview = computed(() => controlPreviewFor(tipo.value));
 const filteredProducts = computed(() => {
   const term = productSearch.value.trim().toLowerCase();
@@ -1454,26 +1498,17 @@ function handleDteTypeChanged() {
   if (!['01', '03'].includes(tipo.value)) factura.notas = '';
 }
 
+const clienteVacio = { tipo_documento: '', numero_documento: '', nrc: '', nombre: '', nombre_comercial: '', giro: '', desc_actividad: '', email: '', telefono: '', direccion: '', departamento: '', municipio: '' };
+
 function applySelectedCustomer() {
   const customer = billingCustomers.find((item) => String(item.id) === String(selectedCustomerId.value));
-  if (!customer) return;
+  if (!customer) {
+    Object.assign(cliente, clienteVacio);
+    return;
+  }
 
   tipo.value = customer.preferredDteType || tipo.value;
-  Object.assign(cliente, {
-    tipo_documento: '',
-    numero_documento: '',
-    nrc: '',
-    nombre: '',
-    nombre_comercial: '',
-    giro: '',
-    desc_actividad: '',
-    email: '',
-    telefono: '',
-    direccion: '',
-    departamento: '',
-    municipio: '',
-    ...(customer.receptor || {})
-  });
+  Object.assign(cliente, { ...clienteVacio, ...(customer.receptor || {}) });
 }
 
 if (['hacienda', 'eventos'].includes(activeView.value)) {
@@ -1516,6 +1551,10 @@ function configPayload() {
 }
 
 function facturaCliente() {
+  const esClientesVarios = String(selectedCustomerId.value) === String(clientesVariosId);
+  if (esClientesVarios) {
+    return { ...clienteVacio, nombre: 'CONSUMIDOR FINAL' };
+  }
   return { ...cliente };
 }
 
@@ -1794,17 +1833,35 @@ function cleanFiscalDocument(value) {
 }
 
 function validateInvoice() {
-  if (!selectedCustomerId.value) return 'Seleccione un cliente para continuar.';
+  if (!selectedCustomerId.value) {
+    return 'Seleccione un cliente. Para ventas sin datos del receptor use "CLIENTES VARIOS".';
+  }
+
   if (tipo.value !== '07' && items.value.length === 0) return 'Agregue al menos un producto o servicio.';
 
   if (['03', '05', '06'].includes(tipo.value)) {
     const nitReceptor = cleanFiscalDocument(cliente.numero_documento);
     if (!nitReceptor || nitReceptor.length !== 14) {
-      return 'Para CCF/Notas el receptor debe tener NIT válido de 14 dígitos.';
+      return 'Para CCF/Notas el receptor debe tener NIT de 14 dígitos. Edite el cliente y complete el campo.';
     }
     const nitEmisor = cleanFiscalDocument(emisor.nit);
     if (nitEmisor && nitReceptor === nitEmisor) {
-      return 'Para CCF/Notas el receptor no puede ser el mismo NIT del emisor. Seleccione un cliente/contribuyente distinto.';
+      return 'El receptor no puede tener el mismo NIT que el emisor. Seleccione un cliente distinto.';
+    }
+    if (!cliente.nrc) {
+      return 'Para CCF/Notas el receptor debe tener NRC. Edite el cliente y complete el campo.';
+    }
+    if (!cliente.giro) {
+      return 'Para CCF/Notas el receptor debe tener código de actividad económica. Edite el cliente y complete el campo.';
+    }
+    if (!cliente.desc_actividad) {
+      return 'Para CCF/Notas el receptor debe tener descripción de actividad. Edite el cliente y complete el campo.';
+    }
+    if (!cliente.departamento || !cliente.municipio) {
+      return 'Para CCF/Notas el receptor debe tener departamento y municipio. Edite el cliente y complete los campos.';
+    }
+    if (!cliente.direccion) {
+      return 'Para CCF/Notas el receptor debe tener dirección. Edite el cliente y complete el campo.';
     }
   }
 
@@ -2414,6 +2471,59 @@ textarea {
   min-height: 80px;
   font-family: inherit;
   font-size: inherit;
+}
+
+.receptor-resumen {
+  margin-top: 1rem;
+  padding: .85rem 1rem;
+  background: var(--bg, #f9fafb);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: .88rem;
+}
+
+.receptor-resumen-titulo {
+  font-weight: 600;
+  color: var(--muted);
+  font-size: .78rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-bottom: .6rem;
+}
+
+.receptor-resumen-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: .3rem .75rem;
+  align-items: baseline;
+}
+
+.receptor-label {
+  color: var(--muted);
+  font-size: .82rem;
+  white-space: nowrap;
+}
+
+.receptor-valor {
+  color: var(--ink);
+}
+
+.receptor-nrc {
+  color: var(--muted);
+}
+
+.receptor-faltante {
+  color: #dc2626;
+  font-weight: 500;
+}
+
+.receptor-opcional {
+  color: var(--muted);
+  font-style: italic;
+}
+
+:global(body.dark-mode) .receptor-resumen {
+  background: #1a1a2e;
 }
 
 .alert {

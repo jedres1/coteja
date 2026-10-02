@@ -10,11 +10,14 @@ use App\Models\Plan;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Database\Seeders\AccountingAccountSeeder;
 
 class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        $this->call(AccountingAccountSeeder::class);
+
         User::updateOrCreate(
             ['email' => 'jandres.gerardo@outlook.com'],
             [
@@ -56,6 +59,16 @@ class DatabaseSeeder extends Seeder
                 'cloud_backup' => true,
                 'unlimited_documents' => true,
                 'is_active' => true,
+            ]
+        );
+
+        Customer::updateOrCreate(
+            ['email' => 'clientes.varios@coteja.internal'],
+            [
+                'name' => 'CLIENTES VARIOS',
+                'phone' => null,
+                'status' => 'active',
+                'preferred_dte_type' => '01',
             ]
         );
 

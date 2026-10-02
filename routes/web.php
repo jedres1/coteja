@@ -149,6 +149,7 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:billing'])-
                 ->get()
                 ->mapWithKeys(fn (BillingDteCorrelative $row) => [$row->document_type => $row->next_number])
                 ->all(),
+            'clientesVariosId' => Customer::where('email', 'clientes.varios@coteja.internal')->value('id'),
             'billingCustomers' => Customer::where('status', 'active')
                 ->orderBy('name')
                 ->get()
@@ -157,6 +158,7 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:billing'])-
                     'name' => $customer->name,
                     'preferredDteType' => $customer->preferred_dte_type,
                     'receptor' => $customer->toDteReceptor(),
+                    'isClientesVarios' => $customer->email === 'clientes.varios@coteja.internal',
                 ]),
         ]);
     })->name('factura-sv');

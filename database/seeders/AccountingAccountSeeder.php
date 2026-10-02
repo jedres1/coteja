@@ -9,8 +9,6 @@ class AccountingAccountSeeder extends Seeder
 {
     public function run(): void
     {
-        AccountingAccount::truncate();
-
         $accounts = [
             // ─── 1 ACTIVOS ───────────────────────────────────────────────
             ['code' => '1',      'name' => 'ACTIVOS',                               'type' => 'activo',     'nature' => 'deudora',   'level' => 1, 'parent' => null],
@@ -112,18 +110,19 @@ class AccountingAccountSeeder extends Seeder
             ['code' => '5.3.02', 'name' => 'Ganancia en Venta de Activos',          'type' => 'ingreso',    'nature' => 'acreedora', 'level' => 3, 'parent' => '5.3'],
         ];
 
-        // First pass: insert all, collect code→id map
+        // First pass: upsert por code, sin parent_id aún
         $idMap = [];
         foreach ($accounts as $data) {
-            $account = AccountingAccount::create([
-                'code'      => $data['code'],
-                'name'      => $data['name'],
-                'type'      => $data['type'],
-                'nature'    => $data['nature'],
-                'level'     => $data['level'],
-                'parent_id' => null,
-                'is_active' => true,
-            ]);
+            $account = AccountingAccount::updateOrCreate(
+                ['code' => $data['code']],
+                [
+                    'name'      => $data['name'],
+                    'type'      => $data['type'],
+                    'nature'    => $data['nature'],
+                    'level'     => $data['level'],
+                    'is_active' => true,
+                ]
+            );
             $idMap[$data['code']] = $account->id;
         }
 
