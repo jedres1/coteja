@@ -150,14 +150,38 @@
     <section v-if="activeView === 'nueva-factura'" class="form-section factura-form">
         <h3>Información del Cliente</h3>
         <div class="form-grid">
-          <label class="form-group">Cliente
-            <select v-model="selectedCustomerId" @change="applySelectedCustomer">
-              <option value="">Seleccionar cliente...</option>
-              <option v-for="customer in billingCustomers" :key="customer.id" :value="customer.id">
-                {{ customerOptionLabel(customer) }}
-              </option>
-            </select>
-          </label>
+          <div class="form-group">
+            <label>Cliente</label>
+            <div class="combobox" :class="{ open: customerDropdownOpen }">
+              <div class="combobox-inner">
+                <input
+                  v-model="customerSearch"
+                  type="text"
+                  class="combobox-input"
+                  placeholder="Buscar cliente por nombre o documento..."
+                  autocomplete="off"
+                  @focus="customerDropdownOpen = true"
+                  @input="onCustomerInput"
+                  @blur="scheduleCloseCustomer"
+                >
+                <button v-if="selectedCustomerId" class="combobox-clear" type="button" @mousedown.prevent="clearCustomer" title="Quitar cliente">×</button>
+                <span class="combobox-arrow" @mousedown.prevent="toggleCustomerDropdown">▾</span>
+              </div>
+              <ul v-if="customerDropdownOpen" class="combobox-list">
+                <li v-if="!filteredCustomers.length" class="combobox-empty">Sin resultados</li>
+                <li
+                  v-for="customer in filteredCustomers"
+                  :key="customer.id"
+                  class="combobox-option"
+                  :class="{ selected: String(customer.id) === String(selectedCustomerId) }"
+                  @mousedown.prevent="selectCustomer(customer)"
+                >
+                  <span class="combobox-option-name">{{ customer.name }}</span>
+                  <span class="combobox-option-meta">{{ customer.isClientesVarios ? 'Sistema' : documentTypeName(customer.preferredDteType) }}</span>
+                </li>
+              </ul>
+            </div>
+          </div>
           <label class="form-group">Tipo de Documento
             <select v-model="tipo" @change="handleDteTypeChanged">
               <option v-for="documentType in enabledDteTypes" :key="documentType.codigo" :value="documentType.codigo">
@@ -358,14 +382,38 @@
           <button class="btn secondary" type="button" @click="closeItemModal">Cerrar</button>
         </div>
         <div class="form-grid">
-          <label class="full-width">Producto
-            <select v-model="itemForm.productId" @change="applyItemProduct">
-              <option value="">Seleccionar producto...</option>
-              <option v-for="product in invoiceProducts" :key="product.id" :value="product.id">
-                {{ product.code }} - {{ product.description }}
-              </option>
-            </select>
-          </label>
+          <div class="full-width">
+            <label>Producto</label>
+            <div class="combobox" :class="{ open: itemProductDropdownOpen }">
+              <div class="combobox-inner">
+                <input
+                  v-model="itemProductSearch"
+                  type="text"
+                  class="combobox-input"
+                  placeholder="Buscar por código o descripción..."
+                  autocomplete="off"
+                  @focus="itemProductDropdownOpen = true"
+                  @input="onItemProductInput"
+                  @blur="scheduleCloseItemProduct"
+                >
+                <button v-if="itemForm.productId" class="combobox-clear" type="button" @mousedown.prevent="clearItemProduct" title="Quitar producto">×</button>
+                <span class="combobox-arrow" @mousedown.prevent="toggleItemProductDropdown">▾</span>
+              </div>
+              <ul v-if="itemProductDropdownOpen" class="combobox-list">
+                <li v-if="!filteredInvoiceProductsModal.length" class="combobox-empty">Sin resultados</li>
+                <li
+                  v-for="product in filteredInvoiceProductsModal"
+                  :key="product.id"
+                  class="combobox-option"
+                  :class="{ selected: String(product.id) === String(itemForm.productId) }"
+                  @mousedown.prevent="selectItemProduct(product)"
+                >
+                  <span class="combobox-option-name">{{ product.description }}</span>
+                  <span class="combobox-option-meta">{{ product.code }}</span>
+                </li>
+              </ul>
+            </div>
+          </div>
           <template v-if="!hasInventoryModule">
             <label class="full-width">Descripción
               <input v-model="itemForm.descripcion" placeholder="Descripción del ítem en la factura">
@@ -749,8 +797,6 @@
             <datalist id="catalogo-actividades">
               <option v-for="activity in economicActivities" :key="activity.codigo" :value="`${activity.codigo} - ${activity.descripcion}`"></option>
             </datalist>
-            <label>Código actividad<input v-model="emisor.actividad_economica" readonly></label>
-            <label>Descripción actividad<input v-model="emisor.desc_actividad" readonly></label>
             <label>Teléfono<input v-model="emisor.telefono" type="tel"></label>
             <label>Email<input v-model="emisor.email" type="email"></label>
             <label>Departamento
@@ -1006,9 +1052,13 @@ const statusCard = ref(null);
 const activeView = ref(new URLSearchParams(window.location.search).get('view') || 'dashboard');
 const tipo = ref('01');
 const selectedCustomerId = ref('');
+const customerSearch = ref('');
+const customerDropdownOpen = ref(false);
 const configUnlocked = ref(false);
 const activityInput = ref('');
 const productSearch = ref('');
+const itemProductSearch = ref('');
+const itemProductDropdownOpen = ref(false);
 const showItemForm = ref(false);
 const showProductOverlay = ref(false);
 const dte = ref(null);
@@ -1247,6 +1297,24 @@ const filteredProducts = computed(() => {
 const invoiceProducts = computed(() =>
   hasInventoryModule.value ? products.value : products.value.filter((p) => String(p.type) === '2')
 );
+
+const filteredCustomers = computed(() => {
+  const term = customerSearch.value.trim().toLowerCase();
+  if (!term) return billingCustomers;
+  return billingCustomers.filter((c) =>
+    [c.name, c.receptor?.numero_documento, c.receptor?.nrc]
+      .some((v) => String(v || '').toLowerCase().includes(term))
+  );
+});
+
+const filteredInvoiceProductsModal = computed(() => {
+  const term = itemProductSearch.value.trim().toLowerCase();
+  const pool = hasInventoryModule.value ? products.value : products.value.filter((p) => String(p.type) === '2');
+  if (!term) return pool;
+  return pool.filter((p) =>
+    [p.code, p.description].some((v) => String(v || '').toLowerCase().includes(term))
+  );
+});
 
 const filteredServices = computed(() => {
   const term = productSearch.value.trim().toLowerCase();
@@ -1511,6 +1579,62 @@ function applySelectedCustomer() {
   Object.assign(cliente, { ...clienteVacio, ...(customer.receptor || {}) });
 }
 
+let _customerCloseTimer = null;
+function scheduleCloseCustomer() {
+  _customerCloseTimer = setTimeout(() => { customerDropdownOpen.value = false; }, 200);
+}
+function toggleCustomerDropdown() {
+  customerDropdownOpen.value = !customerDropdownOpen.value;
+}
+function onCustomerInput() {
+  customerDropdownOpen.value = true;
+  if (selectedCustomerId.value) {
+    selectedCustomerId.value = '';
+    Object.assign(cliente, clienteVacio);
+  }
+}
+function selectCustomer(customer) {
+  selectedCustomerId.value = customer.id;
+  customerSearch.value = customer.name;
+  customerDropdownOpen.value = false;
+  applySelectedCustomer();
+}
+function clearCustomer() {
+  selectedCustomerId.value = '';
+  customerSearch.value = '';
+  customerDropdownOpen.value = false;
+  Object.assign(cliente, clienteVacio);
+}
+
+let _itemProductCloseTimer = null;
+function scheduleCloseItemProduct() {
+  _itemProductCloseTimer = setTimeout(() => { itemProductDropdownOpen.value = false; }, 200);
+}
+function toggleItemProductDropdown() {
+  itemProductDropdownOpen.value = !itemProductDropdownOpen.value;
+}
+function onItemProductInput() {
+  itemProductDropdownOpen.value = true;
+  if (itemForm.productId) {
+    itemForm.productId = '';
+    itemForm.descripcion = '';
+    itemForm.precioUnitario = 0;
+  }
+}
+function selectItemProduct(product) {
+  itemForm.productId = product.id;
+  itemProductSearch.value = `${product.code} - ${product.description}`;
+  itemProductDropdownOpen.value = false;
+  applyItemProduct();
+}
+function clearItemProduct() {
+  itemForm.productId = '';
+  itemProductSearch.value = '';
+  itemProductDropdownOpen.value = false;
+  itemForm.descripcion = '';
+  itemForm.precioUnitario = 0;
+}
+
 if (['hacienda', 'eventos'].includes(activeView.value)) {
   activeView.value = 'configuracion';
 }
@@ -1713,11 +1837,13 @@ function addItemFromForm() {
 }
 
 function resetItemForm() {
+  itemProductSearch.value = '';
   Object.assign(itemForm, { productId: '', descripcion: '', tipoItem: 2, cantidad: 1, precioUnitario: 0, tipoDescuento: 'monto', valorDescuento: 0, numeroDocumentoRelacionado: '' });
 }
 
 function resetInvoiceForm() {
   selectedCustomerId.value = '';
+  customerSearch.value = '';
   Object.assign(cliente, {
     tipo_documento: '',
     numero_documento: '',
@@ -3165,5 +3291,120 @@ summary {
 
 :global(body.dark-mode) .resumen-row {
   border-bottom-color: #263244;
+}
+
+/* ── Combobox (customer & product search) ─────────────────── */
+.combobox {
+  position: relative;
+}
+
+.combobox-inner {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  transition: border-color 140ms, box-shadow 140ms;
+  overflow: hidden;
+}
+
+.combobox.open .combobox-inner,
+.combobox-inner:focus-within {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent);
+}
+
+.combobox-input {
+  flex: 1;
+  min-width: 0;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  background: transparent;
+  padding: 8px 10px;
+  outline: none;
+  font-size: inherit;
+}
+
+.combobox-clear,
+.combobox-arrow {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 0;
+  line-height: 1;
+}
+
+.combobox-clear { font-size: 18px; }
+.combobox-clear:hover { color: #dc2626; }
+.combobox-arrow { font-size: 11px; }
+
+.combobox-list {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 8px 28px rgb(0 0 0 / .14);
+}
+
+.combobox-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: .9rem;
+}
+
+.combobox-option:hover,
+.combobox-option.selected {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+:global(body.dark-mode) .combobox-option:hover,
+:global(body.dark-mode) .combobox-option.selected {
+  background: #1e3a5f;
+  color: #bfdbfe;
+}
+
+.combobox-option-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.combobox-option-meta {
+  flex: 0 0 auto;
+  font-size: .78rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.combobox-empty {
+  padding: 10px;
+  text-align: center;
+  color: var(--muted);
+  font-size: .88rem;
 }
 </style>
