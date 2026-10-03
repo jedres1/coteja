@@ -875,7 +875,7 @@
             <label class="full-width">Ruta del Certificado (.p12, .pfx)
               <span class="inline-field">
                 <input v-model="certificado.path" placeholder="/ruta/al/certificado.p12" readonly>
-                <input ref="certFileInput" type="file" accept=".p12,.pfx" style="display:none" @change="uploadCertificado">
+                <input ref="certFileInput" type="file" accept=".p12,.pfx,.crt" style="display:none" @change="uploadCertificado">
                 <button class="btn secondary" type="button" @click="certFileInput.click()">Seleccionar</button>
               </span>
             </label>

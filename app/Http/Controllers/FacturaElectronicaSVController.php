@@ -973,7 +973,7 @@ class FacturaElectronicaSVController extends Controller
 
     public function subirCertificado(Request $request)
     {
-        $request->validate(['certificado' => 'required|file|extensions:p12,pfx|max:4096']);
+        $request->validate(['certificado' => 'required|file|extensions:p12,pfx,crt|max:4096']);
         $path = $request->file('certificado')->storeAs('certificados', $request->file('certificado')->getClientOriginalName());
 
         return response()->json(['path' => storage_path('app/'.$path)]);
