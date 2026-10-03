@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\LicenseController;
 use App\Http\Controllers\Admin\PaymentController;
+use App\Http\Controllers\Admin\PayrollController;
 use App\Http\Controllers\Admin\PlanController;
 use App\Http\Controllers\Admin\AccountingController;
 use App\Http\Controllers\Admin\JournalController;
@@ -183,6 +184,22 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:billing'])-
         Route::post('logo', 'subirLogo')->name('logo.subir');
         Route::post('certificado', 'subirCertificado')->name('certificado.subir');
         Route::post('pdf', 'pdf')->name('pdf');
+    });
+});
+
+// Módulo Nómina
+Route::middleware(['auth', 'role:admin,consultant,customer', 'module:payroll'])->prefix('admin')->name('admin.')->group(function () {
+    Route::prefix('nomina')->name('payroll.')->controller(PayrollController::class)->group(function () {
+        Route::get('', 'index')->name('index');
+        Route::post('empleados', 'storeEmployee')->name('employees.store');
+        Route::put('empleados/{employee}', 'updateEmployee')->name('employees.update');
+        Route::delete('empleados/{employee}', 'destroyEmployee')->name('employees.destroy');
+        Route::post('periodos', 'storePeriod')->name('periods.store');
+        Route::get('periodos/{period}', 'showPeriod')->name('periods.show');
+        Route::put('lineas/{line}', 'updateLine')->name('lines.update');
+        Route::post('periodos/{period}/aplicar', 'applyPeriod')->name('periods.apply');
+        Route::delete('periodos/{period}', 'destroyPeriod')->name('periods.destroy');
+        Route::post('configuracion', 'saveSettings')->name('settings.save');
     });
 });
 

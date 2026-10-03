@@ -101,7 +101,7 @@ class UserController extends Controller
             'is_active' => ['nullable', 'boolean'],
             'password' => [$isUpdate ? 'nullable' : 'required', 'string', 'min:8'],
             'module_accesses' => ['nullable', 'array'],
-            'module_accesses.*' => ['in:billing,purchases,inventory,accounting,banking'],
+            'module_accesses.*' => ['in:billing,purchases,inventory,accounting,banking,payroll'],
             'company_ids' => ['nullable', 'array'],
             'company_ids.*' => ['integer', 'exists:companies,id'],
         ]);
@@ -154,6 +154,7 @@ class UserController extends Controller
             'inventory'  => 'Inventario',
             'accounting' => 'Contabilidad',
             'banking'    => 'Control Bancario',
+            'payroll'    => 'Control de Nómina',
         ];
     }
 }
