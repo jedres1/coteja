@@ -49,7 +49,7 @@ Route::middleware(['auth', 'role:admin,consultant'])->prefix('admin')->name('adm
     });
 });
 
-// Módulo Compras: admin, consultant o customer con acceso a purchases
+// Módulo Compras
 Route::middleware(['auth', 'role:admin,consultant,customer', 'module:purchases'])->prefix('admin')->name('admin.')->group(function () {
     Route::resource('suppliers', SupplierController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::get('purchase-invoices/settings', [PurchaseInvoiceController::class, 'settingsIndex'])->name('purchase-invoices.settings');
@@ -62,6 +62,11 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:purchases']
     Route::post('purchase-invoices/{purchaseInvoice}/rechazar', [PurchaseInvoiceController::class, 'reject'])->name('purchase-invoices.reject');
     Route::get('cuentas-por-pagar', [PurchaseInvoiceController::class, 'accountsPayable'])->name('purchase-invoices.accounts-payable');
     Route::post('purchase-invoices/{purchaseInvoice}/pay', [PurchaseInvoiceController::class, 'markPaid'])->name('purchase-invoices.pay');
+    Route::resource('purchase-invoices', PurchaseInvoiceController::class)->only(['index', 'store', 'update', 'destroy']);
+});
+
+// Módulo Control Bancario
+Route::middleware(['auth', 'role:admin,consultant,customer', 'module:banking'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('control-bancario', [BankTransactionController::class, 'index'])->name('bank-transactions.index');
     Route::post('control-bancario', [BankTransactionController::class, 'store'])->name('bank-transactions.store');
 
@@ -82,12 +87,10 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:purchases']
     Route::post('control-bancario/conciliacion/{reconciliation}/upload', [BankTransactionController::class, 'uploadStatement'])->name('bank-transactions.reconciliations.upload');
     Route::post('control-bancario/conciliacion/{reconciliation}/toggle', [BankTransactionController::class, 'toggleReconcile'])->name('bank-transactions.reconciliations.toggle');
     Route::post('control-bancario/conciliacion/{reconciliation}/complete', [BankTransactionController::class, 'completeReconciliation'])->name('bank-transactions.reconciliations.complete');
-
-    Route::resource('purchase-invoices', PurchaseInvoiceController::class)->only(['index', 'store', 'update', 'destroy']);
 });
 
-// Módulo Contabilidad: admin, consultant o customer con acceso a purchases
-Route::middleware(['auth', 'role:admin,consultant,customer', 'module:purchases'])->prefix('admin')->name('admin.')->group(function () {
+// Módulo Contabilidad
+Route::middleware(['auth', 'role:admin,consultant,customer', 'module:accounting'])->prefix('admin')->name('admin.')->group(function () {
     // Catálogo y Configuración
     Route::prefix('contabilidad')->name('accounting.')->controller(AccountingController::class)->group(function () {
         Route::get('catalogo', 'catalogo')->name('catalogo');
