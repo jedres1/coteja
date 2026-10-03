@@ -177,6 +177,8 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:billing'])-
         Route::post('configuracion', 'guardarConfiguracion')->name('configuracion.guardar');
         Route::post('firmador/estado', 'estadoFirmador')->name('firmador.estado');
         Route::post('autenticar', 'autenticar')->name('autenticar');
+        Route::post('logo', 'subirLogo')->name('logo.subir');
+        Route::post('certificado', 'subirCertificado')->name('certificado.subir');
         Route::post('pdf', 'pdf')->name('pdf');
     });
 });

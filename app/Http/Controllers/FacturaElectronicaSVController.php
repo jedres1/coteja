@@ -963,6 +963,22 @@ class FacturaElectronicaSVController extends Controller
         return response()->json($this->engine->authenticate($data['config']));
     }
 
+    public function subirLogo(Request $request)
+    {
+        $request->validate(['logo' => 'required|file|mimes:png,jpg,jpeg|max:2048']);
+        $path = $request->file('logo')->store('logos', 'public');
+
+        return response()->json(['path' => '/storage/'.$path]);
+    }
+
+    public function subirCertificado(Request $request)
+    {
+        $request->validate(['certificado' => 'required|file|extensions:p12,pfx|max:4096']);
+        $path = $request->file('certificado')->storeAs('certificados', $request->file('certificado')->getClientOriginalName());
+
+        return response()->json(['path' => storage_path('app/'.$path)]);
+    }
+
     public function pdf(Request $request)
     {
         $data = $request->validate([

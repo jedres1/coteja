@@ -779,7 +779,8 @@
             <label class="full-width">Imagen para PDF
               <span class="inline-field">
                 <input v-model="emisor.logo_path" placeholder="/ruta/al/logo.png" readonly>
-                <button class="btn secondary" type="button" disabled>Seleccionar</button>
+                <input ref="logoFileInput" type="file" accept=".png,.jpg,.jpeg" style="display:none" @change="uploadLogo">
+                <button class="btn secondary" type="button" @click="logoFileInput.click()">Seleccionar</button>
                 <button class="btn secondary" type="button" @click="emisor.logo_path = ''">Quitar</button>
               </span>
               <small>Se mostrará en el encabezado del PDF. Formatos: PNG, JPG o JPEG.</small>
@@ -873,8 +874,9 @@
           <div v-if="firma.tipo === 'local'" class="form-grid nested-config-grid">
             <label class="full-width">Ruta del Certificado (.p12, .pfx)
               <span class="inline-field">
-                <input v-model="certificado.path" placeholder="/ruta/al/certificado.p12">
-                <button class="btn secondary" type="button" disabled>Seleccionar</button>
+                <input v-model="certificado.path" placeholder="/ruta/al/certificado.p12" readonly>
+                <input ref="certFileInput" type="file" accept=".p12,.pfx" style="display:none" @change="uploadCertificado">
+                <button class="btn secondary" type="button" @click="certFileInput.click()">Seleccionar</button>
               </span>
             </label>
             <label>Contraseña del Certificado<input v-model="passwordPri" type="password" placeholder="Contraseña del certificado" autocomplete="off"></label>
@@ -1056,6 +1058,8 @@ const customerSearch = ref('');
 const customerDropdownOpen = ref(false);
 const configUnlocked = ref(false);
 const activityInput = ref('');
+const logoFileInput = ref(null);
+const certFileInput = ref(null);
 const productSearch = ref('');
 const itemProductSearch = ref('');
 const itemProductDropdownOpen = ref(false);
@@ -2515,6 +2519,46 @@ async function checkSigner() {
 async function autenticar() {
   const data = await request('/admin/factura-sv/autenticar', { config: mhConfig.value });
   message.value = data.success ? 'Autenticación correcta.' : 'No se pudo autenticar.';
+}
+
+async function uploadLogo(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const form = new FormData();
+  form.append('logo', file);
+  loading.value = true;
+  error.value = '';
+  message.value = '';
+  try {
+    const response = await axios.post('/admin/factura-sv/logo', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+    emisor.logo_path = response.data.path;
+    message.value = 'Imagen cargada correctamente.';
+  } catch (e) {
+    error.value = e.response?.data?.message || e.message;
+  } finally {
+    loading.value = false;
+    logoFileInput.value.value = '';
+  }
+}
+
+async function uploadCertificado(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const form = new FormData();
+  form.append('certificado', file);
+  loading.value = true;
+  error.value = '';
+  message.value = '';
+  try {
+    const response = await axios.post('/admin/factura-sv/certificado', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+    certificado.path = response.data.path;
+    message.value = 'Certificado cargado correctamente.';
+  } catch (e) {
+    error.value = e.response?.data?.message || e.message;
+  } finally {
+    loading.value = false;
+    certFileInput.value.value = '';
+  }
 }
 
 function format(value) {
