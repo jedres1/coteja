@@ -12,7 +12,6 @@ class InitialDataSeeder extends Seeder
         // ── Clientes ──────────────────────────────────────────────────────────
         DB::table('customers')->upsert([
             [
-                'id'                   => 1,
                 'name'                 => 'Cliente Demo',
                 'email'                => 'cliente@demo.test',
                 'phone'                => '0000-0000',
@@ -34,7 +33,6 @@ class InitialDataSeeder extends Seeder
                 'updated_at'           => '2026-05-21 03:50:13',
             ],
             [
-                'id'                   => 2,
                 'name'                 => 'José Gerardo Jandres Argueta',
                 'email'                => 'jjandres09cost5@gmail.com',
                 'phone'                => '70398265',
@@ -55,19 +53,25 @@ class InitialDataSeeder extends Seeder
                 'created_at'           => '2026-05-30 02:39:30',
                 'updated_at'           => '2026-05-30 02:39:30',
             ],
-        ], ['id'], [
+        ], ['email'], [
             'name', 'email', 'phone', 'document_type', 'document_number', 'nrc',
             'trade_name', 'address_department', 'address_municipality', 'address',
             'preferred_dte_type', 'billing_email', 'billing_phone', 'status',
         ]);
+
+        $demoCustomerId = DB::table('customers')
+            ->where('email', 'cliente@demo.test')
+            ->value('id');
+        $jandresCustomerId = DB::table('customers')
+            ->where('email', 'jjandres09cost5@gmail.com')
+            ->value('id');
 
         // ── Usuarios ──────────────────────────────────────────────────────────
         // Las contraseñas están almacenadas como bcrypt (cost 12).
         // Para cambiarlas use: php artisan tinker → Hash::make('nueva_clave')
         DB::table('users')->upsert([
             [
-                'id'                => 1,
-                'customer_id'       => 2,
+                'customer_id'       => $jandresCustomerId,
                 'name'              => 'Administrador',
                 'email'             => 'jandres.gerardo@outlook.com',
                 // contraseña original (bcrypt hash — no es texto plano)
@@ -80,8 +84,7 @@ class InitialDataSeeder extends Seeder
                 'updated_at'        => '2026-09-26 11:13:34',
             ],
             [
-                'id'                => 2,
-                'customer_id'       => 1,
+                'customer_id'       => $demoCustomerId,
                 'name'              => 'Cliente Demo',
                 'email'             => 'cliente@demo.com',
                 'password'          => '$2y$12$TB1OEpPWj93tyJ7iZlpWR.d09Dx5Gc9DtJHJ0JDqh5pmnhFCnJ.v2', // 12345678
@@ -93,7 +96,6 @@ class InitialDataSeeder extends Seeder
                 'updated_at'        => '2026-09-26 09:26:04',
             ],
             [
-                'id'                => 4,
                 'customer_id'       => null,
                 'name'              => 'admin',
                 'email'             => 'admin@coteja.com',
@@ -105,7 +107,7 @@ class InitialDataSeeder extends Seeder
                 'created_at'        => '2026-09-26 09:36:49',
                 'updated_at'        => '2026-09-26 10:55:07',
             ],
-        ], ['id'], [
+        ], ['email'], [
             'customer_id', 'name', 'email', 'password', 'role',
             'is_active', 'module_accesses',
         ]);

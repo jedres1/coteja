@@ -17,7 +17,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(AccountingAccountSeeder::class);
-
+        $this->call(InitialDataSeeder::class);
         User::updateOrCreate(
             ['email' => 'jandres.gerardo@outlook.com'],
             [
