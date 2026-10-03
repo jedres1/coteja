@@ -132,6 +132,17 @@
                                 <a class="{{ request()->routeIs('admin.accounting.configuracion') ? 'active-link' : '' }}" href="{{ route('admin.accounting.configuracion') }}">Configuración</a>
                             </div>
                         </div>
+                        <div class="nav-group {{ request()->routeIs('admin.payroll.*') ? 'open' : '' }}">
+                            <button class="nav-toggle" type="button" aria-expanded="{{ request()->routeIs('admin.payroll.*') ? 'true' : 'false' }}">
+                                <span class="nav-label">Nómina</span>
+                                <span class="nav-caret">›</span>
+                            </button>
+                            <div class="nav-sub">
+                                <a class="{{ request()->routeIs('admin.payroll.index') ? 'active-link' : '' }}" href="{{ route('admin.payroll.index') }}">Empleados</a>
+                                <a class="{{ request()->routeIs('admin.payroll.periods.*') ? 'active-link' : '' }}" href="{{ route('admin.payroll.index') }}#nominas">Períodos de Nómina</a>
+                                <a class="{{ request()->routeIs('admin.payroll.settings.*') ? 'active-link' : '' }}" href="{{ route('admin.payroll.index') }}#configuracion">Configuración</a>
+                            </div>
+                        </div>
                         <div class="nav-group {{ request()->routeIs('admin.inventory.*') || (request()->routeIs('admin.factura-sv') && $facturaView === 'productos') ? 'open' : '' }}">
                             <button class="nav-toggle" type="button" aria-expanded="{{ request()->routeIs('admin.inventory.*') || (request()->routeIs('admin.factura-sv') && $facturaView === 'productos') ? 'true' : 'false' }}">
                                 <span class="nav-label">Inventarios</span>
@@ -185,6 +196,19 @@
                                 <a class="{{ request()->routeIs('admin.bank-transactions.accounts') ? 'active-link' : '' }}" href="{{ route('admin.bank-transactions.accounts') }}">Cuentas bancarias</a>
                                 <a class="{{ request()->routeIs('admin.bank-transactions.transactions') ? 'active-link' : '' }}" href="{{ route('admin.bank-transactions.transactions') }}">Transacciones</a>
                                 <a class="{{ request()->routeIs('admin.bank-transactions.reconciliations*') ? 'active-link' : '' }}" href="{{ route('admin.bank-transactions.reconciliations') }}">Conciliación</a>
+                            </div>
+                        </div>
+                    @endif
+                    @if(auth()->user()->hasModuleAccess('payroll'))
+                        <div class="nav-group {{ request()->routeIs('admin.payroll.*') ? 'open' : '' }}">
+                            <button class="nav-toggle" type="button" aria-expanded="{{ request()->routeIs('admin.payroll.*') ? 'true' : 'false' }}">
+                                <span class="nav-label">Nómina</span>
+                                <span class="nav-caret">›</span>
+                            </button>
+                            <div class="nav-sub">
+                                <a class="{{ request()->routeIs('admin.payroll.index') ? 'active-link' : '' }}" href="{{ route('admin.payroll.index') }}">Empleados</a>
+                                <a class="{{ request()->routeIs('admin.payroll.periods.*') ? 'active-link' : '' }}" href="{{ route('admin.payroll.index') }}#nominas">Períodos de Nómina</a>
+                                <a class="{{ request()->routeIs('admin.payroll.settings.*') ? 'active-link' : '' }}" href="{{ route('admin.payroll.index') }}#configuracion">Configuración</a>
                             </div>
                         </div>
                     @endif
