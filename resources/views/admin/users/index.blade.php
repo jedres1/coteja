@@ -79,6 +79,7 @@
                         <th>Rol</th>
                         <th>Cliente vinculado</th>
                         <th>Empresas</th>
+                        <th>Módulos</th>
                         <th>Estado</th>
                         <th>Creado</th>
                         <th>Acción</th>
@@ -105,6 +106,19 @@
                                     {{ $managedUser->accessibleCompanies->pluck('business_name')->join(', ') }}
                                 @else
                                     <span class="muted">Sin empresas</span>
+                                @endif
+                            </td>
+                            <td>
+                                @if($managedUser->canAccessAdmin())
+                                    <span class="muted">Todos</span>
+                                @elseif(!empty($managedUser->module_accesses))
+                                    <div class="module-badges">
+                                        @foreach($managedUser->module_accesses as $mod)
+                                            <span class="badge module-badge">{{ $modules[$mod] ?? $mod }}</span>
+                                        @endforeach
+                                    </div>
+                                @else
+                                    <span class="muted">Ninguno</span>
                                 @endif
                             </td>
                             <td>
@@ -148,7 +162,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="7" class="empty">No hay usuarios registrados</td></tr>
+                        <tr><td colspan="8" class="empty">No hay usuarios registrados</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -175,6 +189,8 @@
         .module-access-options { display: flex; flex-wrap: wrap; gap: 10px; }
         .check-row { display: inline-flex; grid-template-columns: auto 1fr; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
         .check-row input { width: auto; }
+        .module-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+        .module-badge { background: #ede9fe; color: #5b21b6; font-size: 11px; }
         .company-access-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
         .pagination-wrap nav > div:first-child { display: none; }
         .pagination-wrap nav > div:last-child,
