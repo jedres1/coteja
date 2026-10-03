@@ -101,7 +101,7 @@ class UserController extends Controller
             'is_active' => ['nullable', 'boolean'],
             'password' => [$isUpdate ? 'nullable' : 'required', 'string', 'min:8'],
             'module_accesses' => ['nullable', 'array'],
-            'module_accesses.*' => ['in:billing,purchases'],
+            'module_accesses.*' => ['in:billing,purchases,inventory'],
             'company_ids' => ['nullable', 'array'],
             'company_ids.*' => ['integer', 'exists:companies,id'],
         ]);
@@ -150,7 +150,8 @@ class UserController extends Controller
     {
         return [
             'billing' => 'Facturación',
-            'purchases' => 'Compras',
+            'purchases' => 'Compras / Contabilidad',
+            'inventory' => 'Inventario',
         ];
     }
 }
