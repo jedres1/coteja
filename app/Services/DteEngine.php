@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
 class DteEngine
@@ -18,12 +19,28 @@ class DteEngine
 
     public function signInternal(array $documento, string $nit, string $passwordPri, string $certificadoPath): array
     {
+        $certificadoPath = $this->resolveCertificatePath($certificadoPath);
+
         return $this->run('sign-internal', compact('documento', 'nit', 'passwordPri', 'certificadoPath'));
     }
 
     public function validateCertificate(string $nit, string $passwordPri, string $certificadoPath): array
     {
+        $certificadoPath = $this->resolveCertificatePath($certificadoPath);
+
         return $this->run('validate-certificate', compact('nit', 'passwordPri', 'certificadoPath'));
+    }
+
+    private function resolveCertificatePath(string $path): string
+    {
+        if (is_file($path)) {
+            return $path;
+        }
+
+        $relativePath = 'certificados/'.basename($path);
+        $disk = Storage::disk('local');
+
+        return $disk->exists($relativePath) ? $disk->path($relativePath) : $path;
     }
 
     public function authenticate(array $config): array

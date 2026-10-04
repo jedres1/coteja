@@ -8,6 +8,7 @@ use App\Models\AccountingPackage;
 use App\Models\Employee;
 use App\Models\JournalEntry;
 use App\Models\PayrollLine;
+use App\Models\PayrollConcept;
 use App\Models\PayrollPeriod;
 use App\Models\PayrollSetting;
 use App\Services\Payroll\PayrollCalculatorService;
@@ -21,26 +22,36 @@ class PayrollController extends Controller
     {
         return view('admin.payroll.index', [
             'employees' => Employee::orderBy('name')->get(),
+            'activeTab' => request()->query('tab') === 'nominas' ? 'nominas' : 'empleados',
             'periods'   => PayrollPeriod::withCount('lines')
                 ->withSum('lines', 'net_salary')
                 ->orderBy('period_start', 'desc')
                 ->limit(12)
                 ->get(),
-            'settings'  => PayrollSetting::current()->load([
-                'accountingPackage',
-                'accountSalaries',
-                'accountIsssEmployer',
-                'accountAfpEmployer',
-                'accountIsssEmployeePayable',
-                'accountIsssEmployerPayable',
-                'accountAfpEmployeePayable',
-                'accountAfpEmployerPayable',
-                'accountIsrPayable',
-                'accountSalariesPayable',
-            ]),
-            'accounts'  => AccountingAccount::where('level', 3)->orderBy('code')->get(),
-            'packages'  => AccountingPackage::orderBy('code')->get(),
         ]);
+    }
+
+    public function conceptsIndex()
+    {
+        return view('admin.payroll.concepts', [
+            'employees' => Employee::orderBy('name')->get(),
+            'concepts' => PayrollConcept::whereNull('system_key')->with(['account', 'employees'])->orderBy('name')->get(),
+            'legalConcepts' => PayrollConcept::whereNotNull('system_key')->with(['account', 'payableAccount'])->orderBy('id')->get(),
+            'accounts' => AccountingAccount::where('level', 3)->orderBy('code')->get(),
+        ]);
+    }
+
+    public function settingsIndex()
+    {
+        return view('admin.payroll.settings', [
+            'settings' => $this->payrollSettings(),
+            'accounts' => AccountingAccount::where('level', 3)->orderBy('code')->get(),
+        ]);
+    }
+
+    private function payrollSettings(): PayrollSetting
+    {
+        return PayrollSetting::current();
     }
 
     public function storeEmployee(Request $request)
@@ -128,6 +139,7 @@ class PayrollController extends Controller
                 'isss_employer'       => $calc['isssEmployer'],
                 'afp_employer'        => $calc['afpEmployer'],
                 'total_employer_cost' => $calc['totalCost'],
+                'concept_details'     => $calc['conceptDetails'],
             ]);
         }
 
@@ -146,10 +158,16 @@ class PayrollController extends Controller
 
     public function updateLine(Request $request, PayrollLine $line)
     {
+        if ($line->period->isApplied()) {
+            return back()->withErrors('No se pueden editar líneas de una nómina aplicada.');
+        }
+
         $request->validate([
             'overtime_hours'  => ['nullable', 'numeric', 'min:0'],
             'overtime_amount' => ['nullable', 'numeric', 'min:0'],
             'bonuses'         => ['nullable', 'numeric', 'min:0'],
+            'concept_inputs' => ['nullable', 'array'],
+            'concept_inputs.*' => ['nullable', 'numeric', 'min:0'],
             'notes'           => ['nullable', 'string'],
         ]);
 
@@ -160,6 +178,7 @@ class PayrollController extends Controller
             'overtime_hours'  => $request->overtime_hours ?? 0,
             'overtime_amount' => $request->overtime_amount ?? 0,
             'bonuses'         => $request->bonuses ?? 0,
+            'concept_inputs'  => $request->input('concept_inputs', []),
         ]);
 
         $line->update([
@@ -176,6 +195,7 @@ class PayrollController extends Controller
             'isss_employer'       => $calc['isssEmployer'],
             'afp_employer'        => $calc['afpEmployer'],
             'total_employer_cost' => $calc['totalCost'],
+            'concept_details'     => $calc['conceptDetails'],
             'notes'               => $request->notes,
         ]);
 
@@ -209,46 +229,159 @@ class PayrollController extends Controller
         return redirect()->route('admin.payroll.index')->with('status', 'Período eliminado.');
     }
 
-    public function saveSettings(Request $request)
+    public function storeConcept(Request $request)
     {
-        $data = $request->only([
-            'accounting_package_id',
-            'account_salaries_id',
-            'account_isss_employer_id',
-            'account_afp_employer_id',
-            'account_isss_employee_payable_id',
-            'account_isss_employer_payable_id',
-            'account_afp_employee_payable_id',
-            'account_afp_employer_payable_id',
-            'account_isr_payable_id',
-            'account_salaries_payable_id',
-            'isss_salary_cap',
-            'isss_employee_rate',
-            'isss_employer_rate',
-            'afp_employee_rate',
-            'afp_employer_rate',
+        $data = $this->validateConcept($request);
+        $employeeIds = $data['employee_ids'] ?? [];
+        unset($data['employee_ids']);
+
+        $concept = PayrollConcept::create($data);
+        if (! $concept->applies_to_all) {
+            $concept->employees()->sync($employeeIds);
+        }
+
+        return redirect()->route('admin.payroll.concepts.index')->with('status', 'Concepto de nómina creado.');
+    }
+
+    public function updateConcept(Request $request, PayrollConcept $concept)
+    {
+        if ($concept->system_key) {
+            return back()->withErrors('La fórmula legal se administra desde los parámetros de nómina; aquí solo se asignan sus cuentas.');
+        }
+
+        $data = $this->validateConcept($request);
+        $employeeIds = $data['employee_ids'] ?? [];
+        unset($data['employee_ids']);
+
+        $concept->update($data);
+        $concept->employees()->sync($concept->applies_to_all ? [] : $employeeIds);
+
+        return redirect()->route('admin.payroll.concepts.index')->with('status', 'Concepto de nómina actualizado.');
+    }
+
+    public function destroyConcept(PayrollConcept $concept)
+    {
+        if ($concept->system_key) {
+            return back()->withErrors('Los conceptos legales no se pueden eliminar.');
+        }
+
+        $concept->delete();
+
+        return redirect()->route('admin.payroll.concepts.index')->with('status', 'Concepto de nómina eliminado.');
+    }
+
+    public function updateConceptAccounts(Request $request, PayrollConcept $concept)
+    {
+        abort_unless($concept->system_key, 404);
+
+        $employerConcept = in_array($concept->system_key, ['isss_patronal', 'afp_patronal'], true);
+        $data = $request->validate([
+            'account_id' => ['required', 'exists:accounting_accounts,id'],
+            'payable_account_id' => [$employerConcept ? 'required' : 'nullable', 'exists:accounting_accounts,id'],
         ]);
 
-        // Nullify blank FK fields
-        foreach ([
-            'accounting_package_id',
-            'account_salaries_id',
-            'account_isss_employer_id',
-            'account_afp_employer_id',
-            'account_isss_employee_payable_id',
-            'account_isss_employer_payable_id',
-            'account_afp_employee_payable_id',
-            'account_afp_employer_payable_id',
-            'account_isr_payable_id',
-            'account_salaries_payable_id',
-        ] as $field) {
-            if (empty($data[$field])) {
-                $data[$field] = null;
+        $expectedType = in_array($concept->system_key, ['salario', 'isss_patronal', 'afp_patronal'], true)
+            ? 'gasto'
+            : 'pasivo';
+        $accountValid = AccountingAccount::whereKey($data['account_id'])
+            ->where('level', 3)
+            ->where('type', $expectedType)
+            ->exists();
+
+        if (! $accountValid) {
+            return back()->withErrors(['account_id' => 'Seleccione una cuenta de nivel 3 tipo ' . $expectedType . '.']);
+        }
+
+        if ($employerConcept && ! AccountingAccount::whereKey($data['payable_account_id'])->where('level', 3)->where('type', 'pasivo')->exists()) {
+            return back()->withErrors(['payable_account_id' => 'Seleccione una cuenta de pasivo de nivel 3.']);
+        }
+
+        $concept->update([
+            'account_id' => $data['account_id'],
+            'payable_account_id' => $employerConcept ? $data['payable_account_id'] : null,
+        ]);
+
+        return redirect()->route('admin.payroll.concepts.index')->with('status', 'Cuentas del concepto legal actualizadas.');
+    }
+
+    private function validateConcept(Request $request): array
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'type' => ['required', 'in:beneficio,deduccion'],
+            'calculation_method' => ['required', 'in:fijo,porcentaje,formula,editable'],
+            'amount' => ['nullable', 'numeric', 'min:0'],
+            'rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'formula' => ['nullable', 'string', 'max:255'],
+            'account_id' => ['required', 'exists:accounting_accounts,id'],
+            'applies_to_all' => ['nullable', 'boolean'],
+            'employee_ids' => ['nullable', 'array'],
+            'employee_ids.*' => ['integer', 'exists:employees,id'],
+        ]);
+
+        if ($data['calculation_method'] === 'formula' && empty($data['formula'])) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'formula' => 'Ingrese una fórmula para calcular este concepto.',
+            ]);
+        }
+        if ($data['calculation_method'] === 'fijo' && ! isset($data['amount'])) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'amount' => 'Ingrese el monto fijo del concepto.',
+            ]);
+        }
+        if ($data['calculation_method'] === 'porcentaje' && ! isset($data['rate'])) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'rate' => 'Ingrese el porcentaje del concepto.',
+            ]);
+        }
+        $accountType = $data['type'] === 'beneficio' ? 'gasto' : 'pasivo';
+        if (! AccountingAccount::whereKey($data['account_id'])->where('level', 3)->where('type', $accountType)->exists()) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'account_id' => 'Seleccione una cuenta de nivel 3 tipo ' . $accountType . '.',
+            ]);
+        }
+        if ($data['calculation_method'] === 'formula') {
+            try {
+                (new \App\Services\Payroll\PayrollFormulaEvaluator())->evaluate($data['formula'], [
+                    'salary' => 100,
+                    'gross' => 100,
+                    'overtime' => 0,
+                ]);
+            } catch (\InvalidArgumentException $exception) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'formula' => $exception->getMessage(),
+                ]);
             }
+        }
+
+        $data['amount'] = $data['amount'] ?? 0;
+        $data['rate'] = $data['rate'] ?? 0;
+        $data['applies_to_all'] = $request->boolean('applies_to_all');
+        $data['is_active'] = true;
+
+        return $data;
+    }
+
+    public function saveSettings(Request $request)
+    {
+        $data = $request->validate([
+            'account_salaries_payable_id' => ['required', 'exists:accounting_accounts,id'],
+            'isss_salary_cap' => ['required', 'numeric', 'min:0'],
+            'isss_employee_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+            'isss_employer_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+            'afp_employee_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+            'afp_employer_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+        ]);
+
+        if (! AccountingAccount::whereKey($data['account_salaries_payable_id'])
+            ->where('level', 3)->where('type', 'pasivo')->exists()) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'account_salaries_payable_id' => 'Seleccione una cuenta de pasivo de nivel 3.',
+            ]);
         }
 
         PayrollSetting::current()->update($data);
 
-        return back()->with('status', 'Configuración guardada.');
+        return redirect()->route('admin.payroll.settings.index')->with('status', 'Configuración guardada.');
     }
 }

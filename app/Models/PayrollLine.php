@@ -13,7 +13,7 @@ class PayrollLine extends Model
         'gross_salary', 'isss_employee', 'afp_employee', 'isr',
         'total_deductions', 'net_salary',
         'isss_employer', 'afp_employer', 'total_employer_cost',
-        'notes',
+        'concept_details', 'notes',
     ];
 
     protected $casts = [
@@ -30,6 +30,7 @@ class PayrollLine extends Model
         'isss_employer'     => 'decimal:2',
         'afp_employer'      => 'decimal:2',
         'total_employer_cost' => 'decimal:2',
+        'concept_details' => 'array',
     ];
 
     public function employee(): BelongsTo

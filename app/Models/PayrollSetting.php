@@ -35,7 +35,13 @@ class PayrollSetting extends Model
 
     public static function current(): static
     {
-        return static::firstOrCreate([]);
+        return static::firstOrCreate([], [
+            'isss_salary_cap' => 1000,
+            'isss_employee_rate' => 0.0300,
+            'isss_employer_rate' => 0.0750,
+            'afp_employee_rate' => 0.0725,
+            'afp_employer_rate' => 0.0875,
+        ]);
     }
 
     public function accountingPackage(): BelongsTo

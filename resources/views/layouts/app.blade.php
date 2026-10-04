@@ -138,9 +138,10 @@
                                 <span class="nav-caret">›</span>
                             </button>
                             <div class="nav-sub">
-                                <a class="{{ request()->routeIs('admin.payroll.index') ? 'active-link' : '' }}" href="{{ route('admin.payroll.index') }}">Empleados</a>
-                                <a class="{{ request()->routeIs('admin.payroll.periods.*') ? 'active-link' : '' }}" href="{{ route('admin.payroll.index') }}#nominas">Períodos de Nómina</a>
-                                <a class="{{ request()->routeIs('admin.payroll.settings.*') ? 'active-link' : '' }}" href="{{ route('admin.payroll.index') }}#configuracion">Configuración</a>
+                                <a data-payroll-tab="empleados" class="{{ request()->routeIs('admin.payroll.index') && request('tab') !== 'nominas' ? 'active-link' : '' }}" href="{{ route('admin.payroll.index') }}">Empleados</a>
+                                <a data-payroll-tab="nominas" class="{{ request()->routeIs('admin.payroll.periods.*') || (request()->routeIs('admin.payroll.index') && request('tab') === 'nominas') ? 'active-link' : '' }}" href="{{ route('admin.payroll.index', ['tab' => 'nominas']) }}">Períodos de Nómina</a>
+                                <a class="{{ request()->routeIs('admin.payroll.concepts.*') ? 'active-link' : '' }}" href="{{ route('admin.payroll.concepts.index') }}">Gestión de conceptos</a>
+                                <a class="{{ request()->routeIs('admin.payroll.settings.*') ? 'active-link' : '' }}" href="{{ route('admin.payroll.settings.index') }}">Configuración</a>
                             </div>
                         </div>
                         <div class="nav-group {{ request()->routeIs('admin.inventory.*') || (request()->routeIs('admin.factura-sv') && $facturaView === 'productos') ? 'open' : '' }}">
@@ -206,9 +207,10 @@
                                 <span class="nav-caret">›</span>
                             </button>
                             <div class="nav-sub">
-                                <a class="{{ request()->routeIs('admin.payroll.index') ? 'active-link' : '' }}" href="{{ route('admin.payroll.index') }}">Empleados</a>
-                                <a class="{{ request()->routeIs('admin.payroll.periods.*') ? 'active-link' : '' }}" href="{{ route('admin.payroll.index') }}#nominas">Períodos de Nómina</a>
-                                <a class="{{ request()->routeIs('admin.payroll.settings.*') ? 'active-link' : '' }}" href="{{ route('admin.payroll.index') }}#configuracion">Configuración</a>
+                                <a data-payroll-tab="empleados" class="{{ request()->routeIs('admin.payroll.index') && request('tab') !== 'nominas' ? 'active-link' : '' }}" href="{{ route('admin.payroll.index') }}">Empleados</a>
+                                <a data-payroll-tab="nominas" class="{{ request()->routeIs('admin.payroll.periods.*') || (request()->routeIs('admin.payroll.index') && request('tab') === 'nominas') ? 'active-link' : '' }}" href="{{ route('admin.payroll.index', ['tab' => 'nominas']) }}">Períodos de Nómina</a>
+                                <a class="{{ request()->routeIs('admin.payroll.concepts.*') ? 'active-link' : '' }}" href="{{ route('admin.payroll.concepts.index') }}">Gestión de conceptos</a>
+                                <a class="{{ request()->routeIs('admin.payroll.settings.*') ? 'active-link' : '' }}" href="{{ route('admin.payroll.settings.index') }}">Configuración</a>
                             </div>
                         </div>
                     @endif

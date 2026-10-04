@@ -18,13 +18,15 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(AccountingAccountSeeder::class);
         $this->call(InitialDataSeeder::class);
+        $this->call(PayrollSystemConceptsSeeder::class);
+        $this->call(PayrollTestEmployeesSeeder::class);
         User::updateOrCreate(
             ['email' => 'jandres.gerardo@outlook.com'],
             [
                 'name' => 'Administrador',
                 'role' => 'admin',
                 'is_active' => true,
-                'password' => Hash::make(env('COTEJA_ADMIN_PASSWORD', 'change-me-admin-2026')),
+                'password' => Hash::make(config('services.coteja.admin_password')),
             ]
         );
 
@@ -84,7 +86,7 @@ class DatabaseSeeder extends Seeder
                 'name' => 'Cliente Demo',
                 'role' => 'customer',
                 'is_active' => true,
-                'password' => Hash::make(env('COTEJA_DEMO_CUSTOMER_PASSWORD', 'change-me-customer-2026')),
+                'password' => Hash::make(config('services.coteja.demo_customer_password')),
             ]
         );
 

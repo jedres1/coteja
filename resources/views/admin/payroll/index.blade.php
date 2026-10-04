@@ -54,13 +54,14 @@
         .settings-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:14px; }
         .settings-grid label { display:grid; gap:5px; font-size:13px; font-weight:600; color:#374151; }
         .settings-grid input,.settings-grid select { width:100%; padding:9px 11px; border:1px solid var(--line); border-radius:8px; font:inherit; background:var(--panel); color:var(--ink); font-size:13px; box-sizing:border-box; }
+        .form-grid select[multiple] { min-height:96px; }
         .section-label { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:20px 0 10px; }
     </style>
 
     <div class="nom-top">
         <div>
             <h1>Control de Nómina</h1>
-            <p>Empleados, períodos y configuración</p>
+            <p>Empleados y períodos de nómina</p>
         </div>
     </div>
 
@@ -75,15 +76,14 @@
 
     {{-- Tab bar --}}
     <div class="tab-bar">
-        <button class="tab-btn active" data-tab="empleados">Empleados</button>
-        <button class="tab-btn" data-tab="nominas">Nóminas</button>
-        <button class="tab-btn" data-tab="configuracion">Configuración</button>
+        <button class="tab-btn {{ $activeTab === 'empleados' ? 'active' : '' }}" data-tab="empleados">Empleados</button>
+        <button class="tab-btn {{ $activeTab === 'nominas' ? 'active' : '' }}" data-tab="nominas">Nóminas</button>
     </div>
 
     {{-- ═══════════════════════════════════════════════
          TAB: EMPLEADOS
     ═══════════════════════════════════════════════ --}}
-    <div class="tab-section active" data-section="empleados">
+    <div class="tab-section {{ $activeTab === 'empleados' ? 'active' : '' }}" data-section="empleados">
         <div class="card">
             <div class="card-section-head">
                 <h3>Empleados ({{ $employees->count() }})</h3>
@@ -275,7 +275,7 @@
     {{-- ═══════════════════════════════════════════════
          TAB: NÓMINAS
     ═══════════════════════════════════════════════ --}}
-    <div class="tab-section" data-section="nominas">
+    <div class="tab-section {{ $activeTab === 'nominas' ? 'active' : '' }}" data-section="nominas">
         <div class="card">
             <div class="card-section-head">
                 <h3>Períodos de Nómina</h3>
@@ -291,17 +291,20 @@
                                 </div>
                                 <button class="btn secondary sm" type="button" data-overlay-close>Cerrar</button>
                             </div>
-                            <form method="post" action="{{ route('admin.payroll.periods.store') }}">
+                            <form id="payroll-period-form" method="post" action="{{ route('admin.payroll.periods.store') }}">
                                 @csrf
                                 <div class="form-grid">
                                     <label class="span-full">Nombre del período <span style="color:var(--bad)">*</span>
                                         <input type="text" name="name" value="{{ old('name') }}" required placeholder="Ej: Nómina Octubre 2026">
                                     </label>
+                                    <label class="span-full">Seleccionar mes
+                                        <input type="month" id="period-month" value="{{ old('period_month', now()->format('Y-m')) }}">
+                                    </label>
                                     <label>Fecha inicio <span style="color:var(--bad)">*</span>
-                                        <input type="date" name="period_start" value="{{ old('period_start') }}" required>
+                                        <input type="date" id="period-start" name="period_start" value="{{ old('period_start', now()->startOfMonth()->toDateString()) }}" required>
                                     </label>
                                     <label>Fecha fin <span style="color:var(--bad)">*</span>
-                                        <input type="date" name="period_end" value="{{ old('period_end') }}" required>
+                                        <input type="date" id="period-end" name="period_end" value="{{ old('period_end', now()->endOfMonth()->toDateString()) }}" required>
                                     </label>
                                     <label class="span-full">Notas
                                         <textarea name="notes" rows="3">{{ old('notes') }}</textarea>
@@ -365,6 +368,149 @@
                             </tr>
                         @empty
                             <tr><td colspan="7" class="empty">No hay períodos de nómina registrados.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+        @if(false)
+        {{-- ═══════════════════════════════════════════════
+            Secciones trasladadas a vistas independientes.
+    ═══════════════════════════════════════════════ --}}
+    <div class="tab-section {{ old('_tab') === 'conceptos' ? 'active' : '' }}" data-section="conceptos" id="conceptos">
+        <div class="card" style="margin-bottom:18px">
+            <div class="card-section-head"><h3>Conceptos legales integrados</h3></div>
+            <div style="overflow-x:auto">
+                <table class="nom-table">
+                    <thead><tr><th>Concepto</th><th>Tipo</th><th>Fórmula aplicada</th><th>Cuentas contables</th></tr></thead>
+                    <tbody>
+                        @foreach($legalConcepts as $concept)
+                            <tr>
+                                <td><strong>{{ $concept['name'] }}</strong></td>
+                                <td>{{ $concept['type'] }}</td>
+                                <td><code>{{ $concept['formula'] }}</code></td>
+                                <td>{{ $concept['account'] }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+            <p style="padding:0 16px 14px;margin:0;color:var(--muted);font-size:12px">
+                ISSS y AFP usan las tasas y el tope de Configuración. ISR usa la tabla progresiva existente en el cálculo de nómina.
+            </p>
+        </div>
+
+        <div class="card" style="padding:20px 24px;margin-bottom:18px">
+            <h3 style="margin:0 0 16px;font-size:16px">Nuevo concepto de nómina</h3>
+            <form method="post" action="{{ route('admin.payroll.concepts.store') }}">
+                @csrf
+                <input type="hidden" name="_tab" value="conceptos">
+                <div class="form-grid">
+                    <label>Nombre
+                        <input name="name" required maxlength="255" placeholder="Comisión por venta">
+                    </label>
+                    <label>Tipo
+                        <select name="type" required>
+                            <option value="beneficio">Beneficio</option>
+                            <option value="deduccion">Deducción</option>
+                        </select>
+                    </label>
+                    <label>Forma de cálculo
+                        <select name="calculation_method" required>
+                            <option value="fijo">Monto fijo</option>
+                            <option value="porcentaje">Porcentaje del salario</option>
+                            <option value="formula">Fórmula</option>
+                            <option value="editable">Monto editable por período</option>
+                        </select>
+                    </label>
+                    <label>Monto fijo ($)
+                        <input type="number" name="amount" min="0" step="0.01" value="0">
+                    </label>
+                    <label>Porcentaje (%)
+                        <input type="number" name="rate" min="0" max="100" step="0.0001" value="0">
+                    </label>
+                    <label>Fórmula
+                        <input name="formula" maxlength="255" placeholder="salary * 0.10">
+                    </label>
+                    <label>Cuenta contable
+                        <select name="account_id" required>
+                            <option value="">— Seleccionar —</option>
+                            @foreach($accounts as $account)
+                                <option value="{{ $account->id }}">{{ $account->code }} — {{ $account->name }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label>Empleados específicos
+                        <select name="employee_ids[]" multiple>
+                            @foreach($employees as $employee)
+                                <option value="{{ $employee->id }}">{{ $employee->name }} ({{ $employee->position ?: 'Sin cargo' }})</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label class="span-full" style="display:flex;align-items:center;gap:9px">
+                        <input type="checkbox" name="applies_to_all" value="1" style="width:auto">
+                        Aplicar a todos los empleados activos
+                    </label>
+                </div>
+                <p style="font-size:12px;color:var(--muted);margin:10px 0">En fórmulas use `salary`, `gross` y `overtime`, además de +, -, *, / y paréntesis. Los montos editables se ingresan en cada período.</p>
+                <button class="btn" type="submit">Crear concepto</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <div class="card-section-head"><h3>Gestión de conceptos ({{ $concepts->count() }})</h3></div>
+            <div style="overflow-x:auto">
+                <table class="nom-table">
+                    <thead><tr><th>Concepto</th><th>Tipo</th><th>Cálculo</th><th>Cuenta contable</th><th>Aplicación</th><th>Acciones</th></tr></thead>
+                    <tbody>
+                        @forelse($concepts as $concept)
+                            <tr>
+                                <td><strong>{{ $concept->name }}</strong></td>
+                                <td>{{ ucfirst($concept->type) }}</td>
+                                <td>{{ ucfirst($concept->calculation_method) }}</td>
+                                <td>{{ $concept->account?->code }} — {{ $concept->account?->name }}</td>
+                                <td>{{ $concept->applies_to_all ? 'Todos los empleados' : ($concept->employees->pluck('name')->join(', ') ?: 'Sin asignar') }}</td>
+                                <td>
+                                    <div class="row-actions">
+                                        <details class="overlay-modal">
+                                            <summary class="btn secondary sm">Editar</summary>
+                                            <div class="overlay-layer">
+                                                <button class="overlay-backdrop" type="button" data-overlay-close aria-label="Cerrar"></button>
+                                                <div class="card overlay-panel wide" style="padding:20px">
+                                                    <div class="overlay-header"><h3>Editar concepto: {{ $concept->name }}</h3><button class="btn secondary sm" type="button" data-overlay-close>Cerrar</button></div>
+                                                    <form method="post" action="{{ route('admin.payroll.concepts.update', $concept) }}">
+                                                        @csrf
+                                                        @method('PUT')
+                                                        <input type="hidden" name="_tab" value="conceptos">
+                                                        <div class="form-grid">
+                                                            <label>Nombre<input name="name" value="{{ $concept->name }}" required maxlength="255"></label>
+                                                            <label>Tipo<select name="type"><option value="beneficio" @selected($concept->type==='beneficio')>Beneficio</option><option value="deduccion" @selected($concept->type==='deduccion')>Deducción</option></select></label>
+                                                            <label>Forma de cálculo<select name="calculation_method"><option value="fijo" @selected($concept->calculation_method==='fijo')>Monto fijo</option><option value="porcentaje" @selected($concept->calculation_method==='porcentaje')>Porcentaje del salario</option><option value="formula" @selected($concept->calculation_method==='formula')>Fórmula</option><option value="editable" @selected($concept->calculation_method==='editable')>Monto editable por período</option></select></label>
+                                                            <label>Monto fijo ($)<input type="number" name="amount" value="{{ $concept->amount }}" min="0" step="0.01"></label>
+                                                            <label>Porcentaje (%)<input type="number" name="rate" value="{{ $concept->rate }}" min="0" max="100" step="0.0001"></label>
+                                                            <label>Fórmula<input name="formula" value="{{ $concept->formula }}" maxlength="255" placeholder="salary * 0.10"></label>
+                                                            <label>Cuenta contable<select name="account_id" required>@foreach($accounts as $account)<option value="{{ $account->id }}" @selected($concept->account_id===$account->id)>{{ $account->code }} — {{ $account->name }}</option>@endforeach</select></label>
+                                                            <label>Empleados específicos<select name="employee_ids[]" multiple>@foreach($employees as $employee)<option value="{{ $employee->id }}" @selected($concept->employees->contains('id',$employee->id))>{{ $employee->name }} ({{ $employee->position ?: 'Sin cargo' }})</option>@endforeach</select></label>
+                                                            <label class="span-full" style="display:flex;align-items:center;gap:9px"><input type="checkbox" name="applies_to_all" value="1" @checked($concept->applies_to_all) style="width:auto">Aplicar a todos los empleados activos</label>
+                                                        </div>
+                                                        <p style="font-size:12px;color:var(--muted)">Variables: salary, gross, overtime. Operadores: +, -, *, / y paréntesis.</p>
+                                                        <button class="btn" type="submit">Guardar concepto</button>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </details>
+                                        <form method="post" action="{{ route('admin.payroll.concepts.destroy', $concept) }}" data-confirm-delete="Eliminar concepto">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button class="btn danger sm" type="submit">Eliminar</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="6" class="empty">Aún no hay conceptos configurados.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -520,15 +666,60 @@
         </div>
     </div>
 
+    @endif
+
     <script>
+        var periodMonth = document.getElementById('period-month');
+        if (periodMonth) {
+            var periodForm = document.getElementById('payroll-period-form');
+            var periodName = periodForm.querySelector('input[name="name"]');
+            var periodStart = document.getElementById('period-start');
+            var periodEnd = document.getElementById('period-end');
+            var periodNameEdited = periodName.value !== '';
+
+            function applySelectedMonth() {
+                if (!periodMonth.value) return;
+                var parts = periodMonth.value.split('-');
+                var year = Number(parts[0]);
+                var month = Number(parts[1]);
+                var monthText = new Intl.DateTimeFormat('es-SV', {
+                    month: 'long',
+                    year: 'numeric',
+                    timeZone: 'UTC'
+                }).format(new Date(Date.UTC(year, month - 1, 1)));
+
+                periodStart.value = year + '-' + parts[1] + '-01';
+                periodEnd.value = year + '-' + parts[1] + '-' + String(new Date(year, month, 0).getDate()).padStart(2, '0');
+                if (!periodNameEdited) periodName.value = 'Nómina ' + monthText;
+            }
+
+            periodName.addEventListener('input', function() {
+                periodNameEdited = periodName.value !== '';
+            });
+            periodMonth.addEventListener('change', applySelectedMonth);
+            if (!periodNameEdited) applySelectedMonth();
+        }
+
+        function activateTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(function(button) {
+                button.classList.toggle('active', button.dataset.tab === tab);
+            });
+            document.querySelectorAll('.tab-section').forEach(function(section) {
+                section.classList.toggle('active', section.dataset.section === tab);
+            });
+        }
+
         // Tabs
         document.querySelectorAll('.tab-btn').forEach(function(btn) {
             btn.addEventListener('click', function() {
-                var tab = btn.dataset.tab;
-                document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
-                document.querySelectorAll('.tab-section').forEach(function(s) { s.classList.remove('active'); });
-                btn.classList.add('active');
-                document.querySelector('[data-section="' + tab + '"]').classList.add('active');
+                activateTab(btn.dataset.tab);
+                document.querySelectorAll('[data-payroll-tab]').forEach(function(link) {
+                    link.classList.toggle('active-link', link.dataset.payrollTab === btn.dataset.tab);
+                });
+                var url = new URL(window.location.href);
+                if (btn.dataset.tab === 'nominas') url.searchParams.set('tab', 'nominas');
+                else url.searchParams.delete('tab');
+                window.history.replaceState(null, '', url);
             });
         });
 

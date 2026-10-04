@@ -39,6 +39,11 @@ return [
         'node' => env('DTE_ENGINE_NODE', 'node'),
     ],
 
+    'coteja' => [
+        'admin_password' => env('COTEJA_ADMIN_PASSWORD', 'change-me-admin-2026'),
+        'demo_customer_password' => env('COTEJA_DEMO_CUSTOMER_PASSWORD', 'change-me-customer-2026'),
+    ],
+
     'purchase_invoice_mailbox' => [
         'host' => env('PURCHASE_INVOICE_MAIL_HOST', 'imap.gmail.com'),
         'port' => (int) env('PURCHASE_INVOICE_MAIL_PORT', 993),

@@ -19,6 +19,7 @@ use App\Services\DteEngine;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 
 class FacturaElectronicaSVController extends Controller
 {
@@ -974,9 +975,9 @@ class FacturaElectronicaSVController extends Controller
     public function subirCertificado(Request $request)
     {
         $request->validate(['certificado' => 'required|file|extensions:p12,pfx,crt|max:4096']);
-        $path = $request->file('certificado')->storeAs('certificados', $request->file('certificado')->getClientOriginalName());
+        $path = $request->file('certificado')->storeAs('certificados', $request->file('certificado')->getClientOriginalName(), 'local');
 
-        return response()->json(['path' => storage_path('app/'.$path)]);
+        return response()->json(['path' => Storage::disk('local')->path($path)]);
     }
 
     public function pdf(Request $request)

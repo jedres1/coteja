@@ -191,6 +191,8 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:billing'])-
 Route::middleware(['auth', 'role:admin,consultant,customer', 'module:payroll'])->prefix('admin')->name('admin.')->group(function () {
     Route::prefix('nomina')->name('payroll.')->controller(PayrollController::class)->group(function () {
         Route::get('', 'index')->name('index');
+        Route::get('conceptos', 'conceptsIndex')->name('concepts.index');
+        Route::get('configuracion', 'settingsIndex')->name('settings.index');
         Route::post('empleados', 'storeEmployee')->name('employees.store');
         Route::put('empleados/{employee}', 'updateEmployee')->name('employees.update');
         Route::delete('empleados/{employee}', 'destroyEmployee')->name('employees.destroy');
@@ -199,6 +201,10 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:payroll'])-
         Route::put('lineas/{line}', 'updateLine')->name('lines.update');
         Route::post('periodos/{period}/aplicar', 'applyPeriod')->name('periods.apply');
         Route::delete('periodos/{period}', 'destroyPeriod')->name('periods.destroy');
+        Route::post('conceptos', 'storeConcept')->name('concepts.store');
+        Route::put('conceptos/{concept}/cuentas', 'updateConceptAccounts')->name('concepts.accounts.update');
+        Route::put('conceptos/{concept}', 'updateConcept')->name('concepts.update');
+        Route::delete('conceptos/{concept}', 'destroyConcept')->name('concepts.destroy');
         Route::post('configuracion', 'saveSettings')->name('settings.save');
     });
 });

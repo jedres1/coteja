@@ -159,6 +159,9 @@
                             <td class="left">
                                 <strong>{{ $line->employee->name }}</strong>
                                 <br><span style="color:var(--muted);font-size:11px">{{ $line->employee->code }}</span>
+                                @foreach($line->concept_details ?? [] as $concept)
+                                    <br><span style="color:var(--muted);font-size:11px">{{ $concept['name'] }}: {{ $money($concept['amount']) }}</span>
+                                @endforeach
                                 @if($line->notes)
                                     <br><span style="color:var(--muted);font-size:11px;font-style:italic">{{ $line->notes }}</span>
                                 @endif
@@ -203,6 +206,13 @@
                                                         <label>Bonificaciones ($)
                                                             <input type="number" name="bonuses" value="{{ $line->bonuses }}" min="0" step="0.01">
                                                         </label>
+                                                        @foreach($line->concept_details ?? [] as $concept)
+                                                            @if($concept['calculation_method'] === 'editable')
+                                                                <label>{{ $concept['name'] }} ($)
+                                                                    <input type="number" name="concept_inputs[{{ $concept['concept_id'] }}]" value="{{ $concept['amount'] }}" min="0" step="0.01">
+                                                                </label>
+                                                            @endif
+                                                        @endforeach
                                                         <label class="span-full">Notas
                                                             <textarea name="notes" rows="2">{{ $line->notes }}</textarea>
                                                         </label>
