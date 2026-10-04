@@ -33,9 +33,13 @@ class PurchaseInvoiceMailboxImporter
     public function import(?string $from = null, ?string $to = null): array
     {
         $config = $this->resolveConfig();
+        $configuredTaxIdentifier = $this->configuredTaxIdentifier();
 
         if (blank($config['username']) || blank($config['password'])) {
             throw new RuntimeException('Configure PURCHASE_INVOICE_MAIL_USERNAME y PURCHASE_INVOICE_MAIL_PASSWORD para extraer facturas.');
+        }
+        if (blank($configuredTaxIdentifier)) {
+            throw new RuntimeException('Configure el NIT o DUI del contribuyente en Factura Electrónica antes de extraer facturas.');
         }
 
         $summary = [
@@ -43,6 +47,7 @@ class PurchaseInvoiceMailboxImporter
             'attachments' => 0,
             'imported' => 0,
             'duplicates' => 0,
+            'filtered' => 0,
             'errors' => [],
             'details' => [],
         ];
@@ -78,15 +83,15 @@ class PurchaseInvoiceMailboxImporter
                     $jsonAttachments = $this->jsonAttachments($message);
                     $summary['attachments'] += count($jsonAttachments);
 
-                    $messageImported = false;
+                    $messageProcessed = false;
 
                     foreach ($jsonAttachments as $attachment) {
-                        $result = $this->importJson($attachment['content'], $attachment['filename'], $uid, $summary);
+                        $result = $this->importJson($attachment['content'], $attachment['filename'], $uid, $configuredTaxIdentifier, $summary);
                         $summary[$result]++;
-                        $messageImported = $messageImported || $result === 'imported';
+                        $messageProcessed = $messageProcessed || in_array($result, ['imported', 'duplicates', 'filtered'], true);
                     }
 
-                    if ($messageImported) {
+                    if ($messageProcessed) {
                         $this->command('UID STORE '.$uid.' +FLAGS (\Seen)');
                     }
                 } catch (\Throwable $exception) {
@@ -178,12 +183,44 @@ class PurchaseInvoiceMailboxImporter
         return $details;
     }
 
-    public function hasDuplicateInvoice(int|string $supplierId, string $invoiceNumber): bool
+    public function hasDuplicateInvoice(int|string|null $supplierId, string $invoiceNumber, ?string $codigoGeneracion = null): bool
     {
-        return PurchaseInvoice::query()
-            ->where('supplier_id', $supplierId)
-            ->where('invoice_number', $invoiceNumber)
+        if ($supplierId === null && blank($codigoGeneracion)) {
+            return false;
+        }
+
+        return PurchaseInvoice::query()->where(function ($query) use ($supplierId, $invoiceNumber, $codigoGeneracion) {
+            if ($supplierId !== null) {
+                $query->where(function ($query) use ($supplierId, $invoiceNumber) {
+                    $query->where('supplier_id', $supplierId)
+                        ->where('invoice_number', $invoiceNumber);
+                });
+            }
+
+            if (! blank($codigoGeneracion)) {
+                $method = $supplierId === null ? 'where' : 'orWhere';
+                $query->{$method}('extracted_document_body', 'like', '%'.$codigoGeneracion.'%');
+            }
+        })
             ->exists();
+    }
+
+    private function configuredTaxIdentifier(): string
+    {
+        $settings = BillingSetting::allAsArray();
+        $identifier = data_get($settings, 'emisor.nit')
+            ?: data_get($settings, 'emisor.dui')
+            ?: data_get($settings, 'firma.nit')
+            ?: data_get($settings, 'firma.dui')
+            ?: data_get($settings, 'electron_raw_config.nit')
+            ?: data_get($settings, 'electron_raw_config.firmador_usuario');
+
+        return $this->normalizeTaxIdentifier($identifier);
+    }
+
+    private function normalizeTaxIdentifier(mixed $identifier): string
+    {
+        return preg_replace('/\D+/', '', (string) $identifier);
     }
 
     private function inspectJson(string $content, string $filename, array &$details): void
@@ -210,8 +247,9 @@ class PurchaseInvoiceMailboxImporter
                 return;
             }
 
-            $supplier = $this->supplierFromIssuer($issuer);
-            $isDuplicate = $this->hasDuplicateInvoice($supplier->id, $invoiceNumber);
+            $isDuplicate = $this->hasDuplicateInvoice(null, $invoiceNumber, $codigoGeneracion);
+            $supplier = $isDuplicate ? null : $this->supplierFromIssuer($issuer);
+            $isDuplicate = $isDuplicate || $this->hasDuplicateInvoice($supplier?->id, $invoiceNumber, $codigoGeneracion);
 
             $details['files'][] = [
                 'filename' => $filename,
@@ -219,7 +257,7 @@ class PurchaseInvoiceMailboxImporter
                 'numeroControl' => $numeroControl,
                 'codigoGeneracion' => $codigoGeneracion,
                 'status' => $isDuplicate ? 'duplicate' : 'ok',
-                'message' => $isDuplicate ? "Ya existe en sistema (proveedor: {$supplier->name})" : null,
+                'message' => $isDuplicate ? 'Ya existe en el sistema.' : null,
             ];
         } catch (\Throwable $exception) {
             $details['files'][] = [
@@ -233,11 +271,12 @@ class PurchaseInvoiceMailboxImporter
         }
     }
 
-    private function importJson(string $content, string $filename, string $uid, array &$summary): string
+    private function importJson(string $content, string $filename, string $uid, string $configuredTaxIdentifier, array &$summary): string
     {
         $data = json_decode($this->cleanJsonContent($content), true, 512, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE);
         $identification = $data['identificacion'] ?? [];
         $issuer = $data['emisor'] ?? [];
+        $receiver = $data['receptor'] ?? [];
         $summary_data = $data['resumen'] ?? [];
 
         $numeroControl = $identification['numeroControl'] ?? null;
@@ -249,10 +288,42 @@ class PurchaseInvoiceMailboxImporter
             throw new RuntimeException("El adjunto {$filename} no contiene identificacion.numeroControl o emisor.nombre.");
         }
 
+        $receiverIdentifier = $this->normalizeTaxIdentifier(
+            $receiver['numDocumento'] ?? $receiver['nit'] ?? $receiver['dui'] ?? null
+        );
+
+        if (blank($receiverIdentifier) || ! hash_equals($configuredTaxIdentifier, $receiverIdentifier)) {
+            $summary['details'][] = [
+                'filename' => $filename,
+                'supplier' => $supplierName,
+                'numeroControl' => $numeroControl,
+                'codigoGeneracion' => $codigoGeneracion,
+                'status' => 'FILTRADA',
+                'razon' => blank($receiverIdentifier)
+                    ? 'El DTE no incluye identificador del receptor.'
+                    : 'El NIT/DUI del receptor no coincide con el contribuyente configurado.',
+            ];
+
+            return 'filtered';
+        }
+
+        if ($this->hasDuplicateInvoice(null, $invoiceNumber, $codigoGeneracion)) {
+            $summary['details'][] = [
+                'filename' => $filename,
+                'supplier' => $supplierName,
+                'numeroControl' => $numeroControl,
+                'codigoGeneracion' => $codigoGeneracion,
+                'status' => 'DUPLICADA',
+                'razon' => 'El código de generación ya existe en otra factura.',
+            ];
+
+            return 'duplicates';
+        }
+
         return DB::transaction(function () use ($data, $identification, $issuer, $summary_data, $invoiceNumber, $numeroControl, $codigoGeneracion, $supplierName, $filename, $uid, &$summary) {
             $supplier = $this->supplierFromIssuer($issuer);
 
-            if ($this->hasDuplicateInvoice($supplier->id, $invoiceNumber)) {
+            if ($this->hasDuplicateInvoice($supplier->id, $invoiceNumber, $codigoGeneracion)) {
                 $summary['details'][] = [
                     'filename' => $filename,
                     'supplier' => $supplierName,
@@ -452,6 +523,10 @@ class PurchaseInvoiceMailboxImporter
 
         $decoded = $this->decodeBody($body, strtolower($headers['content-transfer-encoding'] ?? ''));
 
+        if (str_starts_with($contentType, 'message/rfc822')) {
+            return $this->extractParts($decoded);
+        }
+
         return [[
             'filename' => $filename ? $this->decodeMimeHeader($filename) : null,
             'content_type' => $contentType,
@@ -496,7 +571,7 @@ class PurchaseInvoiceMailboxImporter
 
     private function splitMultipart(string $body, string $boundary): array
     {
-        $chunks = preg_split('/\r?\n--'.preg_quote($boundary, '/').'(--)?\r?\n/', "\r\n".$body);
+        $chunks = preg_split('/\r?\n--'.preg_quote($boundary, '/').'(--)?(?:\r?\n|$)/', "\r\n".$body);
 
         return array_values(array_filter($chunks, fn ($chunk) => trim($chunk) !== ''));
     }

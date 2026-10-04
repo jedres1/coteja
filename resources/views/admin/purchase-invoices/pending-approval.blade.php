@@ -86,10 +86,10 @@
             <p class="muted" style="margin:4px 0 0">Facturas extraídas del correo que requieren aprobación antes de pasar a Cuentas por pagar.</p>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <form method="post" action="{{ route('admin.purchase-invoices.extract') }}" data-confirm-extract="Se leerán los correos no leídos de facturacioncoteja@gmail.com con adjuntos JSON." style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <form method="post" action="{{ route('admin.purchase-invoices.extract') }}" data-confirm-extract="Se revisarán los correos del rango seleccionado y se procesarán sus adjuntos JSON; las facturas duplicadas se omitirán." style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 @csrf
-                <label style="font-size:13px">Desde <input type="date" name="from" value="{{ $today }}"></label>
-                <label style="font-size:13px">Hasta <input type="date" name="to" value="{{ $today }}"></label>
+                <label style="font-size:13px">Desde <input type="date" name="from" value="{{ old('from', now()->subMonthNoOverflow()->startOfMonth()->toDateString()) }}"></label>
+                <label style="font-size:13px">Hasta <input type="date" name="to" value="{{ old('to', now()->subMonthNoOverflow()->endOfMonth()->toDateString()) }}"></label>
                 <button class="btn" type="submit">Extraer</button>
             </form>
             @if($showAll)
@@ -212,6 +212,7 @@
                                                 }
                                                 $ident   = $decoded['identificacion'] ?? [];
                                                 $emisor  = $decoded['emisor'] ?? [];
+                                                $receptor = $decoded['receptor'] ?? [];
                                                 $resumen = $decoded['resumen'] ?? [];
                                             @endphp
                                             @if($decoded)
@@ -248,6 +249,23 @@
                                                         <span>Total</span>
                                                         <strong>{{ $money(data_get($resumen, 'montoTotalOperacion') ?? data_get($resumen, 'totalPagar') ?? 0) }}</strong>
                                                     </div>
+                                                </div>
+                                                <div style="margin-top:16px">
+                                                    <h4 style="margin:0 0 10px;font-size:14px">Receptor</h4>
+                                                    @if($receptor)
+                                                        <div class="document-summary-card">
+                                                            <div class="detail-item"><span>Nombre</span><strong>{{ data_get($receptor, 'nombre') ?: '—' }}</strong></div>
+                                                            <div class="detail-item"><span>Tipo de documento</span><strong>{{ data_get($receptor, 'tipoDocumento') ?: '—' }}</strong></div>
+                                                            <div class="detail-item"><span>NIT / DUI</span><strong>{{ data_get($receptor, 'numDocumento') ?: data_get($receptor, 'nit') ?: '—' }}</strong></div>
+                                                            <div class="detail-item"><span>NRC</span><strong>{{ data_get($receptor, 'nrc') ?: '—' }}</strong></div>
+                                                            <div class="detail-item"><span>Correo</span><strong>{{ data_get($receptor, 'correo') ?: '—' }}</strong></div>
+                                                            <div class="detail-item"><span>Teléfono</span><strong>{{ data_get($receptor, 'telefono') ?: '—' }}</strong></div>
+                                                            <div class="detail-item"><span>Actividad</span><strong>{{ data_get($receptor, 'descActividad') ?: data_get($receptor, 'codActividad') ?: '—' }}</strong></div>
+                                                            <div class="detail-item"><span>Dirección</span><strong>{{ data_get($receptor, 'direccion.complemento') ?: '—' }}</strong></div>
+                                                        </div>
+                                                    @else
+                                                        <p class="muted">El JSON de esta factura no incluye datos del receptor.</p>
+                                                    @endif
                                                 </div>
                                             @else
                                                 <p class="muted">No hay cuerpo de documento extraído disponible.</p>

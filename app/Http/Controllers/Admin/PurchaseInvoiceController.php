@@ -270,10 +270,12 @@ class PurchaseInvoiceController extends Controller
         }
 
         $message = sprintf(
-            'Extraccion finalizada: %d factura(s) importada(s), %d duplicada(s), %d adjunto(s) JSON revisado(s).',
+            'Extracción finalizada: %d correo(s) revisado(s), %d adjunto(s) JSON, %d factura(s) importada(s), %d duplicada(s) y %d filtrada(s) por NIT/DUI.',
+            $summary['messages'],
+            $summary['attachments'],
             $summary['imported'],
             $summary['duplicates'],
-            $summary['attachments']
+            $summary['filtered']
         );
 
         if (!empty($summary['details'])) {

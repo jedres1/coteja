@@ -50,7 +50,7 @@ return [
         'username' => env('PURCHASE_INVOICE_MAIL_USERNAME', 'facturacioncoteja@gmail.com'),
         'password' => env('PURCHASE_INVOICE_MAIL_PASSWORD'),
         'mailbox' => env('PURCHASE_INVOICE_MAILBOX', 'INBOX'),
-        'only_unseen' => (bool) env('PURCHASE_INVOICE_MAIL_ONLY_UNSEEN', true),
+        'only_unseen' => (bool) env('PURCHASE_INVOICE_MAIL_ONLY_UNSEEN', false),
         'limit' => (int) env('PURCHASE_INVOICE_MAIL_LIMIT', 25),
     ],
 
