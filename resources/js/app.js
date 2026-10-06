@@ -1,21 +1,20 @@
 import './bootstrap';
-import { createApp } from 'vue';
-import FacturaElectronicaSV from './views/admin/FacturaElectronicaSV.vue';
 import { showToast, postJson, putJson, deleteJson } from './utils';
 
 window.coteja = { showToast, postJson, putJson, deleteJson };
 
 window.vueApps = {};
 
-function mountVueComponent(selector, component) {
-	const el = document.querySelector(selector);
-	if (el) {
-		window.vueApps[selector]?.unmount?.();
-		window.vueApps[selector] = createApp(component).mount(el);
-	}
+async function mountFacturaSv() {
+	const el = document.querySelector('#factura-electronica-sv');
+	if (!el) return;
+	const [{ createApp }, { default: FacturaElectronicaSV }] = await Promise.all([
+		import('vue'),
+		import('./views/admin/FacturaElectronicaSV.vue'),
+	]);
+	window.vueApps['#factura-electronica-sv']?.unmount?.();
+	window.vueApps['#factura-electronica-sv'] = createApp(FacturaElectronicaSV).mount(el);
 }
-
-window.mountVueComponent = mountVueComponent;
 
 function unmountVueComponents() {
 	Object.values(window.vueApps).forEach((app) => app?.unmount?.());
@@ -110,7 +109,7 @@ async function navigateWithPjax(url, push = true) {
 		}
 
 		updateNavigationState(url);
-		mountVueComponent('#factura-electronica-sv', FacturaElectronicaSV);
+		mountFacturaSv();
 		currentMain.scrollTo?.({ top: 0, behavior: 'auto' });
 		window.scrollTo?.({ top: 0, behavior: 'auto' });
 	} catch (error) {
