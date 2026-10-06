@@ -180,13 +180,13 @@ function ProgressOverlay({ overlay }) {
                     </span>
                 </div>
                 <p style={{ margin: '8px 0 12px', color: 'var(--muted)' }}>{overlay.subtitle}</p>
-                <div style={{ background: 'var(--border)', borderRadius: 4, height: 6, marginBottom: 16 }}>
-                    <div style={{ background: 'var(--accent)', borderRadius: 4, height: 6, width: pct, transition: 'width .3s' }} />
+                <div style={{ background: 'var(--line)', borderRadius: 4, height: 6, marginBottom: 16 }}>
+                    <div style={{ background: 'var(--brand)', borderRadius: 4, height: 6, width: pct, transition: 'width .3s' }} />
                 </div>
                 <ol style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                     {overlay.steps.map((step, i) => (
                         <li key={i} style={{ display: 'flex', gap: 8, padding: '4px 0', alignItems: 'flex-start' }}>
-                            <span style={{ minWidth: 20, textAlign: 'center', color: step.status === 'done' ? 'var(--success)' : step.status === 'error' ? 'var(--danger)' : 'var(--muted)' }}>
+                            <span style={{ minWidth: 20, textAlign: 'center', color: step.status === 'done' ? 'var(--ok)' : step.status === 'error' ? 'var(--bad)' : 'var(--muted)' }}>
                                 {STEP_ICON[step.status] ?? (i === overlay.current ? '…' : '○')}
                             </span>
                             <span>{step.label}{step.message ? ` — ${step.message}` : ''}</span>
@@ -605,17 +605,20 @@ export default function NuevaFactura({ customers, products, settings, correlativ
     // ── Render ──
     return (
         <AppLayout title="Nueva Factura">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <h2 style={{ margin: 0 }}>Nueva Factura</h2>
+            <div className="section-top">
+                <div>
+                    <h1>Nueva Factura</h1>
+                    <p className="muted">Emisión de documentos tributarios electrónicos</p>
+                </div>
             </div>
 
             {result && (
-                <div className={`notice${result.success ? '' : ' errors'}`} style={{ marginBottom: 16 }}>
-                    <strong>{result.success ? 'Factura generada.' : 'Proceso con advertencias.'}</strong>
-                    {' '}
-                    <a href={route('admin.factura-sv.billing.facturas')}>Ver listado de facturas →</a>
-                    {' '}
-                    <button className="btn secondary" type="button" onClick={resetForm} style={{ marginLeft: 12 }}>Nueva factura</button>
+                <div className={result.success ? 'notice' : 'errors'} style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                    <span><strong>{result.success ? '✓ Factura generada exitosamente.' : '⚠ Proceso completado con advertencias.'}</strong></span>
+                    <div style={{ display: 'flex', gap: 10, marginLeft: 'auto', flexWrap: 'wrap' }}>
+                        <a href={route('admin.factura-sv.billing.facturas')} className="btn secondary" style={{ textDecoration: 'none', fontSize: 13 }}>Ver facturas →</a>
+                        <button className="btn" type="button" onClick={resetForm}>+ Nueva factura</button>
+                    </div>
                 </div>
             )}
 
@@ -902,10 +905,13 @@ export default function NuevaFactura({ customers, products, settings, correlativ
                 )}
 
                 {/* ── Actions ── */}
-                <div className="card">
-                    <div className="actions wrap">
+                <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                    <span className="muted" style={{ fontSize: 13 }}>
+                        {items.length > 0 ? `${items.length} ítem${items.length !== 1 ? 's' : ''} · Total: ${money(totals.totalEstimado)}` : 'Sin ítems aún'}
+                    </span>
+                    <div className="actions">
                         <button className="btn secondary" type="button" onClick={resetForm}>Cancelar</button>
-                        <button className="btn" type="submit">Generar Factura</button>
+                        <button className="btn" type="submit" style={{ minWidth: 160 }}>Generar Factura →</button>
                     </div>
                 </div>
             </form>
