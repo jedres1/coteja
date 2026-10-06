@@ -120,7 +120,7 @@ async function navigateWithPjax(url, push = true) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    mountVueComponent('#factura-electronica-sv', FacturaElectronicaSV);
+    mountFacturaSv();
 
     document.querySelectorAll('[data-overlay-close]').forEach((button) => {
         button.addEventListener('click', () => {
