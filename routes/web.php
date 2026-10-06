@@ -158,6 +158,9 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:inventory']
 // Módulo Facturación: admin, consultant o customer con acceso a billing
 Route::middleware(['auth', 'role:admin,consultant,customer', 'module:billing'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('factura-sv', function () {
+        return redirect()->route('admin.factura-sv.billing.dashboard');
+    })->name('factura-sv');
+    Route::get('factura-sv-legacy', function () {
         return view('admin.factura-electronica-sv', [
             'billingSettings' => BillingSetting::allAsArray(),
             'billingCorrelatives' => BillingDteCorrelative::query()
@@ -177,7 +180,7 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:billing'])-
                     'isClientesVarios' => $customer->email === 'clientes.varios@coteja.internal',
                 ]),
         ]);
-    })->name('factura-sv');
+    });
     Route::prefix('factura-sv')->name('factura-sv.')->controller(FacturaElectronicaSVController::class)->group(function () {
         Route::post('procesar', 'procesarFactura')->name('procesar');
         Route::get('dashboard', 'dashboard')->name('dashboard');
@@ -188,6 +191,12 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:billing'])-
         Route::post('facturas/{invoice}/anular', 'anularFacturaGuardada')->name('facturas.anular');
         Route::post('facturas/{invoice}/pagar', 'registerPayment')->name('facturas.pagar');
         Route::get('cuentas-por-cobrar', 'accountsReceivable')->name('cuentas-por-cobrar');
+        Route::get('billing/productos', 'productosPage')->name('billing.productos');
+        Route::get('billing/cuentas-por-cobrar', 'accountsReceivablePage')->name('billing.cuentas-por-cobrar');
+        Route::get('billing/facturas', 'facturasPage')->name('billing.facturas');
+        Route::get('billing/configuracion', 'configuracionPage')->name('billing.configuracion');
+        Route::get('billing/nueva-factura', 'nuevaFacturaPage')->name('billing.nueva-factura');
+        Route::get('billing/dashboard', 'billingDashboardPage')->name('billing.dashboard');
         Route::get('productos', 'productos')->name('productos');
         Route::post('productos', 'guardarProducto')->name('productos.guardar');
         Route::post('configuracion', 'guardarConfiguracion')->name('configuracion.guardar');

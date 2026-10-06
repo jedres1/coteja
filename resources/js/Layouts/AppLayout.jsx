@@ -133,21 +133,22 @@ export default function AppLayout({ title, children }) {
                                         <NavLink href={route('admin.payroll.settings.index')} routePattern="admin.payroll.settings.*">Configuración</NavLink>
                                     </NavGroup>
 
-                                    <NavGroup label="Inventarios" routePatterns={['admin.inventory.*']}>
+                                    <NavGroup label="Inventarios" routePatterns={['admin.inventory.*','admin.factura-sv.billing.productos']}>
                                         <NavLink href={route('admin.inventory.movements')} routePattern="admin.inventory.movements">Movimientos</NavLink>
-                                        <a href={route('admin.factura-sv', { view: 'productos' })}>Productos</a>
+                                        <NavLink href={route('admin.factura-sv.billing.productos')} routePattern="admin.factura-sv.billing.productos">Productos</NavLink>
                                         <NavLink href={route('admin.inventory.product-types')} routePattern="admin.inventory.product-types">Tipos de producto</NavLink>
                                         <NavLink href={route('admin.inventory.warehouses')} routePattern="admin.inventory.warehouses">Bodegas</NavLink>
                                         <NavLink href={route('admin.inventory.parameters')} routePattern="admin.inventory.parameters">Parámetros</NavLink>
                                     </NavGroup>
 
-                                    <NavGroup label="Facturación" routePatterns={['admin.customers.*']}>
-                                        <a href={route('admin.factura-sv', { view: 'dashboard' })}>Dashboard</a>
+                                    <NavGroup label="Facturación" routePatterns={['admin.customers.*','admin.factura-sv.billing.*']}>
+                                        <NavLink href={route('admin.factura-sv.billing.dashboard')} routePattern="admin.factura-sv.billing.dashboard">Dashboard</NavLink>
+                                        <NavLink href={route('admin.factura-sv.billing.facturas')} routePattern="admin.factura-sv.billing.facturas">Facturas</NavLink>
                                         <NavLink href={route('admin.customers.index')} routePattern="admin.customers.*">Clientes</NavLink>
-                                        <a href={route('admin.factura-sv', { view: 'nueva-factura' })}>Nueva Factura</a>
-                                        <a href={route('admin.factura-sv', { view: 'cuentas-por-cobrar' })}>Cuentas por cobrar</a>
-                                        <a href={route('admin.factura-sv', { view: 'productos-facturacion' })}>Servicios</a>
-                                        <a href={route('admin.factura-sv', { view: 'configuracion' })}>Configuración</a>
+                                        <NavLink href={route('admin.factura-sv.billing.nueva-factura')} routePattern="admin.factura-sv.billing.nueva-factura">Nueva Factura</NavLink>
+                                        <NavLink href={route('admin.factura-sv.billing.cuentas-por-cobrar')} routePattern="admin.factura-sv.billing.cuentas-por-cobrar">Cuentas por cobrar</NavLink>
+                                        <NavLink href={route('admin.factura-sv.billing.productos')} routePattern="admin.factura-sv.billing.productos">Servicios</NavLink>
+                                        <NavLink href={route('admin.factura-sv.billing.configuracion')} routePattern="admin.factura-sv.billing.configuracion">Configuración</NavLink>
                                     </NavGroup>
                                 </>
                             )}
@@ -186,20 +187,21 @@ export default function AppLayout({ title, children }) {
                             {mod.billing && (
                                 <>
                                     {mod.inventory && (
-                                        <NavGroup label="Inventarios" routePatterns={['admin.inventory.*']}>
+                                        <NavGroup label="Inventarios" routePatterns={['admin.inventory.*','admin.factura-sv.billing.productos']}>
                                             <NavLink href={route('admin.inventory.movements')} routePattern="admin.inventory.movements">Movimientos</NavLink>
-                                            <a href={route('admin.factura-sv', { view: 'productos' })}>Productos</a>
+                                            <NavLink href={route('admin.factura-sv.billing.productos')} routePattern="admin.factura-sv.billing.productos">Productos</NavLink>
                                             <NavLink href={route('admin.inventory.product-types')} routePattern="admin.inventory.product-types">Tipos de producto</NavLink>
                                             <NavLink href={route('admin.inventory.warehouses')} routePattern="admin.inventory.warehouses">Bodegas</NavLink>
                                             <NavLink href={route('admin.inventory.parameters')} routePattern="admin.inventory.parameters">Parámetros</NavLink>
                                         </NavGroup>
                                     )}
-                                    <NavGroup label="Facturación" routePatterns={[]}>
-                                        <a href={route('admin.factura-sv', { view: 'dashboard' })}>Dashboard</a>
-                                        <a href={route('admin.factura-sv', { view: 'nueva-factura' })}>Nueva Factura</a>
-                                        <a href={route('admin.factura-sv', { view: 'cuentas-por-cobrar' })}>Cuentas por cobrar</a>
-                                        <a href={route('admin.factura-sv', { view: 'productos-facturacion' })}>Servicios</a>
-                                        <a href={route('admin.factura-sv', { view: 'configuracion' })}>Configuración</a>
+                                    <NavGroup label="Facturación" routePatterns={['admin.factura-sv.billing.*']}>
+                                        <NavLink href={route('admin.factura-sv.billing.dashboard')} routePattern="admin.factura-sv.billing.dashboard">Dashboard</NavLink>
+                                        <NavLink href={route('admin.factura-sv.billing.facturas')} routePattern="admin.factura-sv.billing.facturas">Facturas</NavLink>
+                                        <NavLink href={route('admin.factura-sv.billing.nueva-factura')} routePattern="admin.factura-sv.billing.nueva-factura">Nueva Factura</NavLink>
+                                        <NavLink href={route('admin.factura-sv.billing.cuentas-por-cobrar')} routePattern="admin.factura-sv.billing.cuentas-por-cobrar">Cuentas por cobrar</NavLink>
+                                        <NavLink href={route('admin.factura-sv.billing.productos')} routePattern="admin.factura-sv.billing.productos">Servicios</NavLink>
+                                        <NavLink href={route('admin.factura-sv.billing.configuracion')} routePattern="admin.factura-sv.billing.configuracion">Configuración</NavLink>
                                     </NavGroup>
                                 </>
                             )}
@@ -224,6 +226,7 @@ export default function AppLayout({ title, children }) {
 
             <main className="main">
                 {flash?.status && <div className="notice">{flash.status}</div>}
+                {flash?.error && <div className="errors">{flash.error}</div>}
                 {children}
             </main>
         </div>

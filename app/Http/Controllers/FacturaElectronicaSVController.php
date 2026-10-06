@@ -21,6 +21,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Inertia\Inertia;
 
 class FacturaElectronicaSVController extends Controller
 {
@@ -29,6 +30,59 @@ class FacturaElectronicaSVController extends Controller
         private readonly CorrelativeService $correlatives,
         private readonly InvoiceVoidService $voids,
     ) {}
+
+    public function accountsReceivablePage(Request $request)
+    {
+        $paymentStatus = $request->query('payment_status', '');
+        $search = trim((string) $request->query('search', ''));
+
+        $query = BillingInvoice::query()
+            ->whereIn('status', ['ENVIADO', 'ACEPTADO'])
+            ->where('document_type', '!=', '05')
+            ->when($paymentStatus !== '', fn ($q) => $q->where('payment_status', $paymentStatus))
+            ->when($search !== '', fn ($q) => $q->where(function ($q) use ($search) {
+                $q->where('number_control', 'like', "%{$search}%")
+                    ->orWhere('customer_name', 'like', "%{$search}%");
+            }))
+            ->when($request->query('from'), fn ($q, $from) => $q->whereDate('issued_at', '>=', $from))
+            ->when($request->query('to'), fn ($q, $to) => $q->whereDate('issued_at', '<=', $to))
+            ->latest('issued_at')
+            ->latest('id');
+
+        $all = BillingInvoice::query()
+            ->whereIn('status', ['ENVIADO', 'ACEPTADO'])
+            ->where('document_type', '!=', '05');
+
+        $stats = [
+            'totalPorCobrar' => (float) (clone $all)->where('payment_status', '!=', 'pagado')->sum(DB::raw('total - amount_paid')),
+            'totalCobrado'   => (float) (clone $all)->sum('amount_paid'),
+            'countPendiente' => (clone $all)->where('payment_status', 'pendiente')->count(),
+            'countParcial'   => (clone $all)->where('payment_status', 'parcial')->count(),
+            'countPagado'    => (clone $all)->where('payment_status', 'pagado')->count(),
+        ];
+
+        return Inertia::render('Admin/Billing/CuentasPorCobrar', [
+            'stats'   => $stats,
+            'invoices' => $query->paginate(15)->through(fn (BillingInvoice $invoice) => [
+                'id'            => $invoice->id,
+                'date'          => optional($invoice->issued_at)->format('Y-m-d'),
+                'numberControl' => $invoice->number_control,
+                'documentType'  => $invoice->document_type,
+                'customerName'  => $invoice->customer_name,
+                'total'         => (float) $invoice->total,
+                'amountPaid'    => (float) $invoice->amount_paid,
+                'balance'       => (float) $invoice->balance,
+                'paymentStatus' => $invoice->payment_status,
+                'paidAt'        => optional($invoice->paid_at)->format('Y-m-d'),
+            ]),
+            'filters' => [
+                'search'         => $search,
+                'from'           => $request->query('from', ''),
+                'to'             => $request->query('to', ''),
+                'payment_status' => $paymentStatus,
+            ],
+        ]);
+    }
 
     public function accountsReceivable(Request $request)
     {
@@ -83,54 +137,93 @@ class FacturaElectronicaSVController extends Controller
 
     public function registerPayment(Request $request, BillingInvoice $invoice)
     {
+        $isInertia = (bool) $request->header('X-Inertia');
+
         if (! in_array($invoice->status, ['ENVIADO', 'ACEPTADO'])) {
+            if ($isInertia) return back()->withErrors(['amount' => 'Solo se pueden registrar pagos en facturas aceptadas o enviadas.']);
             return response()->json(['success' => false, 'message' => 'Solo se pueden registrar pagos en facturas aceptadas o enviadas.'], 422);
         }
 
         if ($invoice->payment_status === 'pagado') {
+            if ($isInertia) return back()->withErrors(['amount' => 'Esta factura ya está completamente pagada.']);
             return response()->json(['success' => false, 'message' => 'Esta factura ya está completamente pagada.'], 422);
         }
 
         $data = $request->validate([
-            'amount' => 'required|numeric|min:0.01',
-            'method' => 'nullable|string|max:100',
+            'amount'    => 'required|numeric|min:0.01',
+            'method'    => 'nullable|string|max:100',
             'reference' => 'nullable|string|max:200',
-            'notes' => 'nullable|string|max:500',
+            'notes'     => 'nullable|string|max:500',
         ]);
 
         $maxAllowed = $invoice->balance;
         if ((float) $data['amount'] > $maxAllowed + 0.001) {
-            return response()->json(['success' => false, 'message' => "El monto ingresado (\${$data['amount']}) supera el saldo pendiente (\${$maxAllowed})."], 422);
+            $msg = "El monto ingresado (\${$data['amount']}) supera el saldo pendiente (\${$maxAllowed}).";
+            if ($isInertia) return back()->withErrors(['amount' => $msg]);
+            return response()->json(['success' => false, 'message' => $msg], 422);
         }
 
         BillingInvoicePayment::create([
             'billing_invoice_id' => $invoice->id,
-            'amount' => $data['amount'],
-            'method' => $data['method'] ?? null,
+            'amount'    => $data['amount'],
+            'method'    => $data['method'] ?? null,
             'reference' => $data['reference'] ?? null,
-            'notes' => $data['notes'] ?? null,
+            'notes'     => $data['notes'] ?? null,
         ]);
 
         $newAmountPaid = round((float) $invoice->amount_paid + (float) $data['amount'], 2);
         $newStatus = $newAmountPaid >= (float) $invoice->total - 0.001 ? 'pagado' : ($newAmountPaid > 0 ? 'parcial' : 'pendiente');
 
         $invoice->update([
-            'amount_paid' => $newAmountPaid,
+            'amount_paid'    => $newAmountPaid,
             'payment_status' => $newStatus,
-            'paid_at' => $newStatus === 'pagado' ? now() : $invoice->paid_at,
+            'paid_at'        => $newStatus === 'pagado' ? now() : $invoice->paid_at,
         ]);
+
+        $message = $newStatus === 'pagado' ? 'Pago registrado. Factura marcada como pagada.' : 'Pago parcial registrado.';
+
+        if ($isInertia) {
+            return back()->with('status', $message);
+        }
 
         return response()->json([
             'success' => true,
-            'message' => $newStatus === 'pagado' ? 'Pago registrado. Factura marcada como pagada.' : 'Pago parcial registrado.',
+            'message' => $message,
             'invoice' => [
-                'id' => $invoice->id,
-                'total' => (float) $invoice->total,
-                'amountPaid' => (float) $newAmountPaid,
-                'balance' => max(0, (float) $invoice->total - $newAmountPaid),
+                'id'            => $invoice->id,
+                'total'         => (float) $invoice->total,
+                'amountPaid'    => (float) $newAmountPaid,
+                'balance'       => max(0, (float) $invoice->total - $newAmountPaid),
                 'paymentStatus' => $newStatus,
-                'paidAt' => $newStatus === 'pagado' ? now()->format('Y-m-d') : null,
+                'paidAt'        => $newStatus === 'pagado' ? now()->format('Y-m-d') : null,
             ],
+        ]);
+    }
+
+    public function productosPage(Request $request)
+    {
+        $hasInventory = $request->user()?->hasModuleAccess('inventory') ?? false;
+
+        return Inertia::render('Admin/Billing/Productos', [
+            'hasInventory' => $hasInventory,
+            'productTypes' => ProductType::orderBy('name')->get()
+                ->map(fn (ProductType $t) => ['id' => $t->id, 'name' => $t->name, 'controlsInventory' => $t->controls_inventory]),
+            'products' => BillingProduct::with('productType')->orderBy('description')->get()
+                ->map(fn (BillingProduct $product) => [
+                    'id'               => $product->id,
+                    'code'             => $product->code,
+                    'description'      => $product->description,
+                    'type'             => $product->type,
+                    'price'            => (float) $product->price,
+                    'unit'             => $product->unit,
+                    'isExempt'         => $product->is_exempt,
+                    'notes'            => $product->notes,
+                    'stockQuantity'    => $product->stock_quantity,
+                    'minStock'         => $product->min_stock,
+                    'productTypeId'    => $product->product_type_id,
+                    'productTypeName'  => $product->productType?->name,
+                    'controlsInventory' => $product->productType?->controls_inventory ?? false,
+                ]),
         ]);
     }
 
@@ -160,6 +253,64 @@ class FacturaElectronicaSVController extends Controller
                     'controlsInventory' => $product->productType?->controls_inventory ?? false,
                     'invoiceItem'     => $product->toInvoiceItem(),
                 ]),
+        ]);
+    }
+
+    public function facturasPage(Request $request)
+    {
+        $today  = now()->toDateString();
+        $search = trim((string) $request->query('search', ''));
+
+        $invoices = BillingInvoice::query()
+            ->when($search !== '', fn ($q) => $q->where(function ($q) use ($search) {
+                $q->where('number_control', 'like', "%{$search}%")
+                    ->orWhere('generation_code', 'like', "%{$search}%")
+                    ->orWhere('customer_name', 'like', "%{$search}%")
+                    ->orWhere('status', 'like', "%{$search}%")
+                    ->orWhere('reception_stamp', 'like', "%{$search}%");
+            }))
+            ->when($request->query('from'), fn ($q, $from) => $q->whereDate('issued_at', '>=', $from))
+            ->when($request->query('to'), fn ($q, $to) => $q->whereDate('issued_at', '<=', $to))
+            ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
+            ->when($request->query('type'), fn ($q, $type) => $q->where('document_type', $type))
+            ->latest('issued_at')
+            ->latest('id')
+            ->paginate(15);
+
+        return Inertia::render('Admin/Billing/Facturas', [
+            'stats' => [
+                'todayCount'     => BillingInvoice::whereDate('issued_at', $today)->count(),
+                'todaySentTotal' => (float) BillingInvoice::whereDate('issued_at', $today)
+                    ->whereIn('status', ['ENVIADO', 'ACEPTADO'])->sum('total'),
+                'sentCount'      => BillingInvoice::whereIn('status', ['ENVIADO', 'ACEPTADO'])->count(),
+                'pendingCount'   => BillingInvoice::whereIn('status', ['PENDIENTE', 'FIRMADO', 'CONTINGENCIA'])->count(),
+                'voidedCount'    => BillingInvoice::where('status', 'ANULADO')->count(),
+            ],
+            'invoices' => $invoices->through(fn (BillingInvoice $invoice) => [
+                'id'             => $invoice->id,
+                'date'           => optional($invoice->issued_at)->format('Y-m-d'),
+                'numberControl'  => $invoice->number_control,
+                'generationCode' => $invoice->generation_code,
+                'documentType'   => $invoice->document_type,
+                'customerName'   => $invoice->customer_name,
+                'total'          => (float) $invoice->total,
+                'status'         => $invoice->status,
+                'hasError'       => $invoice->has_error,
+                'accepted'       => $invoice->accepted,
+                'emailSent'      => $invoice->email_sent,
+                'receptionStamp' => $invoice->reception_stamp,
+                'voidStamp'      => $invoice->void_stamp,
+                'voidedAt'       => optional($invoice->voided_at)->format('Y-m-d H:i:s'),
+                'voidReason'     => $invoice->void_reason,
+                'observations'   => $invoice->observations,
+            ]),
+            'filters' => [
+                'search' => $search,
+                'from'   => $request->query('from', ''),
+                'to'     => $request->query('to', ''),
+                'status' => $request->query('status', ''),
+                'type'   => $request->query('type', ''),
+            ],
         ]);
     }
 
@@ -264,33 +415,36 @@ class FacturaElectronicaSVController extends Controller
 
     public function anularFacturaGuardada(Request $request, BillingInvoice $invoice)
     {
+        $isInertia = (bool) $request->header('X-Inertia');
+
         $data = $request->validate([
-            'tipoAnulacion' => 'required|integer|in:1,2,3',
-            'motivo' => 'required|string|min:5|max:250',
+            'tipoAnulacion'     => 'required|integer|in:1,2,3',
+            'motivo'            => 'required|string|min:5|max:250',
             'codigoGeneracionR' => 'nullable|string|max:36',
         ]);
 
         try {
             $result = $this->voids->process($invoice, BillingSetting::allAsArray(), $data);
         } catch (\Throwable $e) {
-            $invoice->update([
-                'has_error' => true,
-                'observations' => $e->getMessage(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 422);
+            $invoice->update(['has_error' => true, 'observations' => $e->getMessage()]);
+            if ($isInertia) return back()->withErrors(['motivo' => $e->getMessage()]);
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
 
         if (! ($result['success'] ?? false)) {
             $invoice->update([
-                'has_error' => true,
+                'has_error'    => true,
                 'observations' => json_encode($result['response'] ?? $result, JSON_UNESCAPED_UNICODE),
             ]);
-
+            if ($isInertia) {
+                $msg = $result['message'] ?? json_encode($result['response'] ?? $result, JSON_UNESCAPED_UNICODE);
+                return back()->withErrors(['motivo' => $msg]);
+            }
             return response()->json($result, 422);
+        }
+
+        if ($isInertia) {
+            return back()->with('status', 'Factura anulada exitosamente.');
         }
 
         return response()->json($result);
@@ -340,6 +494,11 @@ class FacturaElectronicaSVController extends Controller
 
         $product->load('productType');
 
+        if ($request->header('X-Inertia')) {
+            return redirect()->route('admin.factura-sv.billing.productos')
+                ->with('status', 'Producto guardado correctamente.');
+        }
+
         return response()->json([
             'success' => true,
             'product' => [
@@ -361,15 +520,143 @@ class FacturaElectronicaSVController extends Controller
         ]);
     }
 
+    public function configuracionPage()
+    {
+        $settings = BillingSetting::allAsArray();
+        $emisor   = $settings['emisor']   ?? [];
+        $hacienda = $settings['hacienda'] ?? [];
+        $firma    = $settings['firma']    ?? [];
+        $correo   = $settings['correo']   ?? [];
+        $backup   = $settings['backup']   ?? [];
+
+        $correlativos = BillingDteCorrelative::query()
+            ->where('year', now()->year)
+            ->get()
+            ->mapWithKeys(fn (BillingDteCorrelative $r) => [$r->document_type => $r->next_number])
+            ->all();
+
+        return Inertia::render('Admin/Billing/Configuracion', [
+            'settings' => [
+                'emisor'   => $emisor,
+                'hacienda' => $hacienda,
+                'firma'    => $firma,
+                'correo'   => $correo,
+                'backup'   => $backup,
+                'documentos' => $settings['documentos'] ?? [],
+            ],
+            'correlativos'  => $correlativos,
+            'currentYear'   => now()->year,
+        ]);
+    }
+
+    public function billingDashboardPage()
+    {
+        $today = now()->toDateString();
+
+        $stats = [
+            'todayCount'     => BillingInvoice::whereDate('issued_at', $today)->count(),
+            'todaySentTotal' => (float) BillingInvoice::whereDate('issued_at', $today)
+                ->whereIn('status', ['ENVIADO', 'ACEPTADO'])->sum('total'),
+            'sentCount'      => BillingInvoice::whereIn('status', ['ENVIADO', 'ACEPTADO'])->count(),
+            'pendingCount'   => BillingInvoice::whereIn('status', ['PENDIENTE', 'FIRMADO', 'CONTINGENCIA'])->count(),
+            'voidedCount'    => BillingInvoice::where('status', 'ANULADO')->count(),
+        ];
+
+        $recent = BillingInvoice::query()
+            ->latest('issued_at')
+            ->latest('id')
+            ->take(15)
+            ->get()
+            ->map(fn (BillingInvoice $invoice) => [
+                'id'            => $invoice->id,
+                'date'          => optional($invoice->issued_at)->format('Y-m-d'),
+                'numberControl' => $invoice->number_control,
+                'generationCode'=> $invoice->generation_code,
+                'documentType'  => $invoice->document_type,
+                'customerName'  => $invoice->customer_name,
+                'total'         => (float) $invoice->total,
+                'status'        => $invoice->status,
+                'hasError'      => $invoice->has_error,
+                'accepted'      => $invoice->accepted,
+                'emailSent'     => $invoice->email_sent,
+                'receptionStamp'=> $invoice->reception_stamp,
+                'voidStamp'     => $invoice->void_stamp,
+                'voidReason'    => $invoice->void_reason,
+            ]);
+
+        return Inertia::render('Admin/Billing/Dashboard', [
+            'stats'  => $stats,
+            'recent' => $recent,
+        ]);
+    }
+
+    public function nuevaFacturaPage(Request $request)
+    {
+        $settings  = BillingSetting::allAsArray();
+        $emisor    = $settings['emisor']   ?? [];
+        $hacienda  = $settings['hacienda'] ?? [];
+        $firma     = $settings['firma']    ?? [];
+        $correo    = $settings['correo']   ?? [];
+
+        $correlativos = BillingDteCorrelative::query()
+            ->where('year', now()->year)
+            ->get()
+            ->mapWithKeys(fn (BillingDteCorrelative $r) => [$r->document_type => $r->next_number])
+            ->all();
+
+        $hasInventory = $request->user()?->hasModuleAccess('inventory') ?? false;
+
+        $customers = Customer::where('status', 'active')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (Customer $customer) => [
+                'id'               => $customer->id,
+                'name'             => $customer->name,
+                'preferredDteType' => $customer->preferred_dte_type,
+                'receptor'         => $customer->toDteReceptor(),
+                'isClientesVarios' => $customer->email === 'clientes.varios@coteja.internal',
+            ]);
+
+        $products = BillingProduct::with('productType')
+            ->orderBy('description')
+            ->get()
+            ->map(fn ($p) => [
+                'id'          => $p->id,
+                'code'        => $p->code,
+                'description' => $p->description,
+                'type'        => $p->type,
+                'price'       => $p->price,
+                'unit'        => $p->unit,
+                'isExempt'    => (bool) $p->is_exempt,
+                'notes'       => $p->notes,
+            ]);
+
+        return Inertia::render('Admin/Billing/NuevaFactura', [
+            'customers'       => $customers,
+            'products'        => $products,
+            'settings'        => [
+                'emisor'    => $emisor,
+                'hacienda'  => $hacienda,
+                'firma'     => $firma,
+                'correo'    => $correo,
+                'documentos' => $settings['documentos'] ?? [],
+            ],
+            'correlativos'    => $correlativos,
+            'clientesVariosId' => Customer::where('email', 'clientes.varios@coteja.internal')->value('id'),
+            'hasInventory'    => $hasInventory,
+            'currentYear'     => now()->year,
+        ]);
+    }
+
     public function guardarConfiguracion(Request $request)
     {
         $data = $request->validate([
-            'emisor' => 'required|array',
-            'hacienda' => 'required|array',
-            'firma' => 'required|array',
-            'correo' => 'required|array',
-            'backup' => 'nullable|array',
-            'documentos' => 'array',
+            'emisor'       => 'required|array',
+            'hacienda'     => 'required|array',
+            'firma'        => 'required|array',
+            'correo'       => 'required|array',
+            'backup'       => 'nullable|array',
+            'documentos'   => 'array',
             'correlativos' => 'array',
         ]);
 
@@ -381,12 +668,16 @@ class FacturaElectronicaSVController extends Controller
             BillingDteCorrelative::updateOrCreate(
                 [
                     'document_type' => $documentType,
-                    'year' => now()->year,
+                    'year'          => now()->year,
                     'establishment' => $data['emisor']['codigo_establecimiento'] ?? 'M001',
-                    'point_of_sale' => $data['emisor']['punto_venta'] ?? 'P001',
+                    'point_of_sale' => $data['emisor']['punto_venta']            ?? 'P001',
                 ],
                 ['next_number' => max(1, (int) $nextNumber)]
             );
+        }
+
+        if ($request->header('X-Inertia')) {
+            return back()->with('status', 'Configuración guardada correctamente.');
         }
 
         return response()->json(['success' => true, 'message' => 'Configuración guardada.']);
@@ -582,8 +873,9 @@ class FacturaElectronicaSVController extends Controller
         ]);
     }
 
-    public function enviarFacturaGuardada(BillingInvoice $invoice)
+    public function enviarFacturaGuardada(Request $request, BillingInvoice $invoice)
     {
+        $isInertia = (bool) $request->header('X-Inertia');
         $settings = BillingSetting::allAsArray();
         $hacienda = $this->normalizarHacienda($settings['hacienda'] ?? []);
         $correo = $this->normalizarCorreo($settings['correo'] ?? []);
@@ -593,11 +885,13 @@ class FacturaElectronicaSVController extends Controller
         $steps = [];
 
         if (! $dte) {
+            if ($isInertia) return back()->with('error', 'La factura no tiene JSON DTE guardado.');
             return response()->json(['success' => false, 'message' => 'La factura no tiene JSON DTE guardado.'], 422);
         }
 
         if (! $invoice->signed_dte) {
             if (empty($firma['certificado_path']) || empty($firma['password'])) {
+                if ($isInertia) return back()->with('error', 'La factura no está firmada y falta certificado/contraseña para firmar.');
                 return response()->json(['success' => false, 'message' => 'La factura no está firmada y falta certificado/contraseña para firmar.'], 422);
             }
 
@@ -610,10 +904,9 @@ class FacturaElectronicaSVController extends Controller
             $dte = $this->normalizarDocumentoFirmado($signed);
 
             if (! $dte) {
-                return response()->json([
-                    'success' => false,
-                    'message' => $signed['error'] ?? 'El firmador no devolvió un documento con firmaMh.',
-                ], 422);
+                $msg = $signed['error'] ?? 'El firmador no devolvió un documento con firmaMh.';
+                if ($isInertia) return back()->with('error', $msg);
+                return response()->json(['success' => false, 'message' => $msg], 422);
             }
 
             $invoice->update(['status' => 'FIRMADO', 'signed_dte' => $dte, 'has_error' => false]);
@@ -621,6 +914,7 @@ class FacturaElectronicaSVController extends Controller
         }
 
         if (empty($hacienda['usuario']) || empty($hacienda['password'])) {
+            if ($isInertia) return back()->with('error', 'Faltan credenciales de Hacienda para enviar.');
             return response()->json(['success' => false, 'message' => 'Faltan credenciales de Hacienda para enviar.'], 422);
         }
 
@@ -639,6 +933,7 @@ class FacturaElectronicaSVController extends Controller
             ]);
             $steps[] = ['key' => 'send', 'status' => 'error', 'message' => 'No se pudo enviar a Hacienda: '.$e->getMessage()];
 
+            if ($isInertia) return back()->with('error', 'No se pudo enviar a Hacienda: '.$e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'No se pudo enviar a Hacienda: '.$e->getMessage(),
@@ -666,6 +961,11 @@ class FacturaElectronicaSVController extends Controller
             $steps[] = $this->enviarCorreoDte($invoice->fresh(), $dte, $emisor, $correo, $cliente, $sent);
         } else {
             $steps[] = ['key' => 'email', 'status' => 'warning', 'message' => 'No se envió correo porque Hacienda no devolvió sello de aprobación.'];
+        }
+
+        if ($isInertia) {
+            $msg = $accepted ? 'Factura enviada y correo procesado.' : 'Hacienda no aceptó el documento.';
+            return back()->with($accepted ? 'status' : 'error', $msg);
         }
 
         return response()->json([
