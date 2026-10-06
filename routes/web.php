@@ -160,27 +160,6 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:billing'])-
     Route::get('factura-sv', function () {
         return redirect()->route('admin.factura-sv.billing.dashboard');
     })->name('factura-sv');
-    Route::get('factura-sv-legacy', function () {
-        return view('admin.factura-electronica-sv', [
-            'billingSettings' => BillingSetting::allAsArray(),
-            'billingCorrelatives' => BillingDteCorrelative::query()
-                ->where('year', now()->year)
-                ->get()
-                ->mapWithKeys(fn (BillingDteCorrelative $row) => [$row->document_type => $row->next_number])
-                ->all(),
-            'clientesVariosId' => Customer::where('email', 'clientes.varios@coteja.internal')->value('id'),
-            'billingCustomers' => Customer::where('status', 'active')
-                ->orderBy('name')
-                ->get()
-                ->map(fn (Customer $customer) => [
-                    'id' => $customer->id,
-                    'name' => $customer->name,
-                    'preferredDteType' => $customer->preferred_dte_type,
-                    'receptor' => $customer->toDteReceptor(),
-                    'isClientesVarios' => $customer->email === 'clientes.varios@coteja.internal',
-                ]),
-        ]);
-    });
     Route::prefix('factura-sv')->name('factura-sv.')->controller(FacturaElectronicaSVController::class)->group(function () {
         Route::post('procesar', 'procesarFactura')->name('procesar');
         Route::get('dashboard', 'dashboard')->name('dashboard');
