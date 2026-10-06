@@ -5,12 +5,15 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class JournalEntry extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'entry_number', 'entry_date', 'description', 'reference',
-        'status', 'created_by', 'approved_by', 'approved_at', 'notes',
+        'status', 'created_by', 'updated_by', 'approved_by', 'approved_at', 'notes',
         'accounting_package_id', 'source_type', 'source_id', 'source_document',
     ];
 

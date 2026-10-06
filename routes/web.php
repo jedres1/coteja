@@ -39,7 +39,8 @@ Route::middleware(['auth', 'role:admin,consultant'])->prefix('admin')->name('adm
 
     Route::middleware('role:admin')->group(function () {
         Route::resource('users', UserController::class)->only(['index', 'store', 'update', 'destroy']);
-        Route::resource('customers', CustomerController::class)->only(['index', 'store', 'update']);
+        Route::get('customers/export', [CustomerController::class, 'export'])->name('customers.export');
+        Route::resource('customers', CustomerController::class)->only(['index', 'store', 'update', 'destroy']);
         Route::resource('companies', CompanyController::class)->only(['index', 'store', 'update']);
         Route::resource('plans', PlanController::class)->only(['index', 'store', 'update']);
         Route::resource('licenses', LicenseController::class)->only(['index', 'store', 'update']);
@@ -52,6 +53,7 @@ Route::middleware(['auth', 'role:admin,consultant'])->prefix('admin')->name('adm
 
 // Módulo Compras
 Route::middleware(['auth', 'role:admin,consultant,customer', 'module:purchases'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('suppliers/export', [SupplierController::class, 'export'])->name('suppliers.export');
     Route::resource('suppliers', SupplierController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::get('purchase-invoices/settings', [PurchaseInvoiceController::class, 'settingsIndex'])->name('purchase-invoices.settings');
     Route::post('purchase-invoices/settings', [PurchaseInvoiceController::class, 'settingsUpdate'])->name('purchase-invoices.settings.update');
@@ -65,6 +67,7 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:purchases']
     Route::post('purchase-invoices/{purchaseInvoice}/rechazar', [PurchaseInvoiceController::class, 'reject'])->name('purchase-invoices.reject');
     Route::get('cuentas-por-pagar', [PurchaseInvoiceController::class, 'accountsPayable'])->name('purchase-invoices.accounts-payable');
     Route::post('purchase-invoices/{purchaseInvoice}/pay', [PurchaseInvoiceController::class, 'markPaid'])->name('purchase-invoices.pay');
+    Route::get('purchase-invoices/export', [PurchaseInvoiceController::class, 'export'])->name('purchase-invoices.export');
     Route::resource('purchase-invoices', PurchaseInvoiceController::class)->only(['index', 'store', 'update', 'destroy']);
 });
 
@@ -82,6 +85,7 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:banking'])-
     // Transactions
     Route::get('control-bancario/transacciones', [BankTransactionController::class, 'transactions'])->name('bank-transactions.transactions');
     Route::post('control-bancario/transacciones', [BankTransactionController::class, 'storeTransaction'])->name('bank-transactions.transactions.store');
+    Route::get('control-bancario/transacciones/exportar', [BankTransactionController::class, 'exportTransactions'])->name('bank-transactions.transactions.export');
 
     // Reconciliations
     Route::get('control-bancario/conciliacion', [BankTransactionController::class, 'reconciliations'])->name('bank-transactions.reconciliations');
@@ -126,6 +130,7 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:accounting'
     // Diario
     Route::prefix('contabilidad/diario')->name('accounting.diario.')->controller(JournalController::class)->group(function () {
         Route::get('',                    'index')  ->name('index');
+        Route::get('exportar',            'export') ->name('export');
         Route::get('nuevo',               'create') ->name('create');
         Route::post('',                   'store')  ->name('store');
         Route::get('{entry}',             'show')   ->name('show');
@@ -200,11 +205,13 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:payroll'])-
         Route::get('', 'index')->name('index');
         Route::get('conceptos', 'conceptsIndex')->name('concepts.index');
         Route::get('configuracion', 'settingsIndex')->name('settings.index');
+        Route::get('empleados/exportar', 'exportEmployees')->name('employees.export');
         Route::post('empleados', 'storeEmployee')->name('employees.store');
         Route::put('empleados/{employee}', 'updateEmployee')->name('employees.update');
         Route::delete('empleados/{employee}', 'destroyEmployee')->name('employees.destroy');
         Route::post('periodos', 'storePeriod')->name('periods.store');
         Route::get('periodos/{period}', 'showPeriod')->name('periods.show');
+        Route::get('periodos/{period}/exportar', 'exportPeriod')->name('periods.export');
         Route::put('lineas/{line}', 'updateLine')->name('lines.update');
         Route::post('periodos/{period}/aplicar', 'applyPeriod')->name('periods.apply');
         Route::delete('periodos/{period}', 'destroyPeriod')->name('periods.destroy');

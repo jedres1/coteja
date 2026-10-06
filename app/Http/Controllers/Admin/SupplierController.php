@@ -3,11 +3,15 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\SaveSupplierRequest;
 use App\Models\Supplier;
+use App\Traits\ExportsCsv;
 use Illuminate\Http\Request;
 
 class SupplierController extends Controller
 {
+    use ExportsCsv;
+
     public function index(Request $request)
     {
         $search = trim((string) $request->query('search', ''));
@@ -37,16 +41,16 @@ class SupplierController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(SaveSupplierRequest $request)
     {
-        Supplier::create($this->validatedData($request));
+        Supplier::create($request->validated());
 
         return back()->with('status', 'Proveedor creado.');
     }
 
-    public function update(Request $request, Supplier $supplier)
+    public function update(SaveSupplierRequest $request, Supplier $supplier)
     {
-        $supplier->update($this->validatedData($request));
+        $supplier->update($request->validated());
 
         return back()->with('status', 'Proveedor actualizado.');
     }
@@ -62,25 +66,37 @@ class SupplierController extends Controller
         return back()->with('status', 'Proveedor eliminado.');
     }
 
-    private function validatedData(Request $request): array
+    public function export(Request $request)
     {
-        return $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['nullable', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:50'],
-            'document_type' => ['required', 'in:13,36,37,03,02'],
-            'document_number' => ['required', 'string', 'max:50'],
-            'nrc' => ['nullable', 'string', 'max:50'],
-            'trade_name' => ['nullable', 'string', 'max:255'],
-            'business_activity' => ['nullable', 'string', 'max:10'],
-            'activity_description' => ['nullable', 'string', 'max:255'],
-            'address_department' => ['required', 'string', 'size:2'],
-            'address_municipality' => ['required', 'string', 'between:2,4'],
-            'address' => ['required', 'string', 'max:500'],
-            'billing_email' => ['nullable', 'email', 'max:255'],
-            'billing_phone' => ['nullable', 'string', 'max:50'],
-            'status' => ['required', 'in:active,suspended,prospect'],
-            'notes' => ['nullable', 'string', 'max:2000'],
-        ]);
+        $search = trim((string) $request->query('search', ''));
+
+        $rows = Supplier::withCount('purchaseInvoices')
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($query) use ($search) {
+                    $query->where('name', 'like', "%{$search}%")
+                        ->orWhere('trade_name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('phone', 'like', "%{$search}%")
+                        ->orWhere('document_number', 'like', "%{$search}%")
+                        ->orWhere('nrc', 'like', "%{$search}%");
+                });
+            })
+            ->latest()
+            ->get()
+            ->map(fn ($s) => [
+                $s->name,
+                $s->trade_name,
+                $s->email,
+                $s->phone,
+                $s->document_number,
+                $s->nrc,
+                $s->purchase_invoices_count,
+            ]);
+
+        return $this->streamCsv(
+            'proveedores-' . now()->format('Ymd') . '.csv',
+            ['Nombre', 'Nombre Comercial', 'Email', 'Teléfono', 'NIT/DUI', 'NRC', 'Facturas de Compra'],
+            $rows
+        );
     }
 }

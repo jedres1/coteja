@@ -3,6 +3,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\BankAccount;
+use App\Traits\ExportsCsv;
 use App\Models\BankReconciliation;
 use App\Models\BankTransaction;
 use App\Models\BillingInvoicePayment;
@@ -13,6 +14,8 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Storage;
 
 class BankTransactionController extends Controller {
+
+    use ExportsCsv;
 
     // ── Legacy index (keep for backward compat) ──────────────────────────────
     public function index() {
@@ -281,5 +284,51 @@ class BankTransactionController extends Controller {
     public function completeReconciliation(BankReconciliation $reconciliation) {
         $reconciliation->update(['status' => 'completado', 'completed_at' => now()]);
         return back()->with('status', 'Conciliación marcada como completada.');
+    }
+
+    public function exportTransactions(Request $request) {
+        $from = $request->input('from', today()->toDateString());
+        $to   = $request->input('to', today()->toDateString());
+        $bankAccountId = $request->input('bank_account_id');
+
+        $btQuery = BankTransaction::with(['bankAccount', 'purchaseInvoices.supplier'])
+            ->whereBetween('transaction_date', [$from, $to]);
+        if ($bankAccountId) {
+            $btQuery->where('bank_account_id', $bankAccountId);
+        }
+
+        $bankTxs = $btQuery->get()->map(fn ($tx) => [
+            $tx->transaction_date->format('Y-m-d'),
+            $tx->purchaseInvoices->isNotEmpty() ? 'compras' : 'manual',
+            $tx->type ?? 'pago',
+            $tx->bankAccount?->name ?? ($tx->bank_account ?? ''),
+            $tx->reference,
+            $tx->purchaseInvoices->map(fn ($inv) => $inv->invoice_number)->join(', '),
+            number_format($tx->amount, 2),
+        ]);
+
+        $bipQuery = BillingInvoicePayment::with(['invoice', 'bankAccount'])
+            ->whereBetween(\DB::raw('DATE(registered_at)'), [$from, $to]);
+        if ($bankAccountId) {
+            $bipQuery->where('bank_account_id', $bankAccountId);
+        }
+
+        $billingPayments = $bipQuery->get()->map(fn ($payment) => [
+            $payment->registered_at->format('Y-m-d'),
+            'facturacion',
+            $payment->method ?? 'pago',
+            $payment->bankAccount?->name ?? '',
+            $payment->reference,
+            $payment->invoice?->number_control,
+            number_format($payment->amount, 2),
+        ]);
+
+        $rows = $bankTxs->concat($billingPayments)->sortByDesc(fn ($r) => $r[0]);
+
+        return $this->streamCsv(
+            'transacciones-' . $from . '-' . $to . '.csv',
+            ['Fecha', 'Origen', 'Tipo', 'Cuenta Bancaria', 'Referencia', 'Documento', 'Monto'],
+            $rows
+        );
     }
 }

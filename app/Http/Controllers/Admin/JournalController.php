@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Exceptions\AccountingPeriodException;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\SaveJournalEntryRequest;
+use App\Traits\ExportsCsv;
 use App\Models\AccountingAccount;
 use App\Models\AccountingPackage;
 use App\Models\CostCenter;
@@ -15,6 +17,8 @@ use Illuminate\Support\Facades\DB;
 
 class JournalController extends Controller
 {
+    use ExportsCsv;
+
     public function __construct(private readonly AccountingPeriodService $periods) {}
 
     public function index(Request $request)
@@ -67,23 +71,9 @@ class JournalController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(SaveJournalEntryRequest $request)
     {
-        $data = $request->validate([
-            'entry_date'          => 'required|date',
-            'description'         => 'required|string|max:300',
-            'reference'           => 'nullable|string|max:100',
-            'notes'               => 'nullable|string|max:2000',
-            'action'              => 'required|in:borrador,aprobado',
-            'lines'               => 'required|array|min:2',
-            'lines.*.account_id'  => 'required|exists:accounting_accounts,id',
-            'lines.*.cost_center_id' => 'nullable|exists:cost_centers,id',
-            'lines.*.description' => 'nullable|string|max:255',
-            'lines.*.debit'       => 'required|numeric|min:0',
-            'lines.*.credit'      => 'required|numeric|min:0',
-        ]);
-
-        $this->validateBalance($data['lines']);
+        $data = $request->validated();
 
         try {
             $this->periods->validateDateOrFail($data['entry_date']);
@@ -161,27 +151,15 @@ class JournalController extends Controller
         ]);
     }
 
-    public function update(Request $request, JournalEntry $entry)
+    public function update(SaveJournalEntryRequest $request, JournalEntry $entry)
     {
+        $this->authorize('update', $entry);
+
         if (! $entry->isEditable()) {
             return response()->json(['success' => false, 'message' => 'Solo se pueden editar asientos en borrador.'], 422);
         }
 
-        $data = $request->validate([
-            'entry_date'          => 'required|date',
-            'description'         => 'required|string|max:300',
-            'reference'           => 'nullable|string|max:100',
-            'notes'               => 'nullable|string|max:2000',
-            'action'              => 'required|in:borrador,aprobado',
-            'lines'               => 'required|array|min:2',
-            'lines.*.account_id'  => 'required|exists:accounting_accounts,id',
-            'lines.*.cost_center_id' => 'nullable|exists:cost_centers,id',
-            'lines.*.description' => 'nullable|string|max:255',
-            'lines.*.debit'       => 'required|numeric|min:0',
-            'lines.*.credit'      => 'required|numeric|min:0',
-        ]);
-
-        $this->validateBalance($data['lines']);
+        $data = $request->validated();
 
         try {
             $this->periods->validateDateOrFail($data['entry_date']);
@@ -225,6 +203,8 @@ class JournalController extends Controller
 
     public function approve(Request $request, JournalEntry $entry)
     {
+        $this->authorize('approve', $entry);
+
         if ($entry->status !== 'borrador') {
             return response()->json(['success' => false, 'message' => 'Solo se pueden aprobar asientos en borrador.'], 422);
         }
@@ -240,6 +220,8 @@ class JournalController extends Controller
 
     public function annul(Request $request, JournalEntry $entry)
     {
+        $this->authorize('annul', $entry);
+
         if ($entry->status !== 'aprobado') {
             return response()->json(['success' => false, 'message' => 'Solo se pueden anular asientos aprobados.'], 422);
         }
@@ -291,6 +273,8 @@ class JournalController extends Controller
 
     public function destroy(JournalEntry $entry)
     {
+        $this->authorize('delete', $entry);
+
         if (! $entry->isEditable()) {
             return response()->json(['success' => false, 'message' => 'Solo se pueden eliminar borradores.'], 422);
         }
@@ -300,28 +284,40 @@ class JournalController extends Controller
         return response()->json(['success' => true, 'message' => 'Borrador eliminado.']);
     }
 
-    private function validateBalance(array $lines): void
+    public function export(Request $request)
     {
-        $totalDebit  = round(array_sum(array_column($lines, 'debit')), 2);
-        $totalCredit = round(array_sum(array_column($lines, 'credit')), 2);
+        $search = trim((string) $request->query('search', ''));
+        $status = $request->query('status', '');
+        $from   = $request->query('from', now()->startOfMonth()->toDateString());
+        $to     = $request->query('to', now()->toDateString());
 
-        if (abs($totalDebit - $totalCredit) > 0.01) {
-            abort(422, "El asiento no cuadra: Debe \${$totalDebit} ≠ Haber \${$totalCredit}. Diferencia: $" . number_format(abs($totalDebit - $totalCredit), 2));
-        }
+        $rows = JournalEntry::with(['lines', 'creator'])
+            ->when($from,   fn ($q) => $q->whereDate('entry_date', '>=', $from))
+            ->when($to,     fn ($q) => $q->whereDate('entry_date', '<=', $to))
+            ->when($status, fn ($q) => $q->where('status', $status))
+            ->when($search, fn ($q) => $q->where(function ($q) use ($search) {
+                $q->where('entry_number', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%")
+                  ->orWhere('reference',   'like', "%{$search}%");
+            }))
+            ->orderBy('entry_date', 'desc')
+            ->orderBy('id', 'desc')
+            ->get()
+            ->map(fn ($e) => [
+                $e->entry_number,
+                $e->entry_date?->format('Y-m-d'),
+                $e->description,
+                $e->reference,
+                number_format($e->lines->sum('debit'), 2),
+                $e->status,
+                $e->creator?->name,
+            ]);
 
-        if ($totalDebit <= 0) {
-            abort(422, 'El asiento debe tener al menos un monto en Debe y uno en Haber.');
-        }
-
-        foreach ($lines as $i => $line) {
-            $d = (float) $line['debit'];
-            $c = (float) $line['credit'];
-            if ($d > 0 && $c > 0) {
-                abort(422, 'Partida ' . ($i + 1) . ': una línea no puede tener monto simultáneo en Debe y Haber.');
-            }
-            if ($d == 0 && $c == 0) {
-                abort(422, 'Partida ' . ($i + 1) . ': debe ingresar monto en Debe o Haber.');
-            }
-        }
+        return $this->streamCsv(
+            'diario-' . now()->format('Ymd') . '.csv',
+            ['No. Asiento', 'Fecha', 'Descripción', 'Referencia', 'Débito Total', 'Estado', 'Creado por'],
+            $rows
+        );
     }
+
 }

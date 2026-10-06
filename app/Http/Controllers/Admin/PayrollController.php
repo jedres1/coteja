@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AccountingAccount;
+use App\Traits\ExportsCsv;
 use App\Models\AccountingPackage;
 use App\Models\Employee;
 use App\Models\JournalEntry;
@@ -18,6 +19,8 @@ use Illuminate\Support\Facades\DB;
 
 class PayrollController extends Controller
 {
+    use ExportsCsv;
+
     public function index()
     {
         return view('admin.payroll.index', [
@@ -360,6 +363,63 @@ class PayrollController extends Controller
         $data['is_active'] = true;
 
         return $data;
+    }
+
+    public function exportEmployees()
+    {
+        $rows = Employee::orderBy('name')
+            ->get()
+            ->map(fn ($e) => [
+                $e->code,
+                $e->name,
+                $e->position,
+                $e->department,
+                number_format($e->salary, 2),
+                $e->dui,
+                $e->isss_number,
+                $e->afp,
+                $e->hire_date?->format('Y-m-d'),
+                $e->is_active ? 'Activo' : 'Inactivo',
+            ]);
+
+        return $this->streamCsv(
+            'empleados-' . now()->format('Ymd') . '.csv',
+            ['Código', 'Nombre', 'Cargo', 'Departamento', 'Salario', 'DUI', 'ISSS', 'AFP', 'Fecha Ingreso', 'Estado'],
+            $rows
+        );
+    }
+
+    public function exportPeriod(PayrollPeriod $period)
+    {
+        $period->load('lines.employee');
+
+        $rows = $period->lines->map(fn ($l) => [
+            $l->employee?->code,
+            $l->employee?->name,
+            number_format($l->salary, 2),
+            number_format($l->overtime_hours, 2),
+            number_format($l->overtime_amount, 2),
+            number_format($l->bonuses, 2),
+            number_format($l->gross_salary, 2),
+            number_format($l->isss_employee, 2),
+            number_format($l->afp_employee, 2),
+            number_format($l->isr, 2),
+            number_format($l->total_deductions, 2),
+            number_format($l->net_salary, 2),
+            number_format($l->isss_employer, 2),
+            number_format($l->afp_employer, 2),
+            number_format($l->total_employer_cost, 2),
+        ]);
+
+        return $this->streamCsv(
+            'nomina-' . str($period->name)->slug() . '-' . now()->format('Ymd') . '.csv',
+            [
+                'Código', 'Nombre', 'Salario', 'Horas Extra', 'Monto Extra', 'Bonos', 'Salario Bruto',
+                'ISSS Empleado', 'AFP Empleado', 'ISR', 'Total Deducciones', 'Salario Neto',
+                'ISSS Patronal', 'AFP Patronal', 'Costo Total Patronal',
+            ],
+            $rows
+        );
     }
 
     public function saveSettings(Request $request)

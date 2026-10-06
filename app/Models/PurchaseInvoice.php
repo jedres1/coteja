@@ -3,10 +3,15 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PurchaseInvoice extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
+        'created_by',
+        'updated_by',
         'supplier_id',
         'customer_id',
         'document_type',

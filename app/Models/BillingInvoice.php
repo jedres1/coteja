@@ -3,10 +3,15 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class BillingInvoice extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
+        'created_by',
+        'updated_by',
         'number_control',
         'generation_code',
         'document_type',

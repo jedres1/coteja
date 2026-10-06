@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\AccountingPeriodException;
 use App\Http\Controllers\Admin\InventoryController;
+use App\Jobs\SendInvoiceEmailJob;
 use App\Models\BillingDteCorrelative;
 use App\Models\BillingInvoice;
 use App\Models\BillingInvoicePayment;
@@ -252,32 +253,13 @@ class FacturaElectronicaSVController extends Controller
             return response()->json(['success' => false, 'message' => 'Solo se puede enviar por correo un documento aprobado por Hacienda.'], 422);
         }
 
-        $settings = BillingSetting::allAsArray();
-        $dte = $invoice->signed_dte ?: $invoice->json_dte;
-        $cliente = $invoice->customer?->toDteReceptor() ?: [
-            'nombre' => $invoice->customer_name,
-            'email' => data_get($invoice->json_dte, 'receptor.correo') ?: data_get($invoice->json_dte, 'sujetoExcluido.correo'),
-        ];
-        $response = json_decode((string) $invoice->observations, true) ?: [
-            'estado' => $invoice->status,
-            'selloRecibido' => $invoice->reception_stamp,
-        ];
-
-        $step = $this->enviarCorreoDte(
-            $invoice,
-            $dte,
-            $settings['emisor'] ?? [],
-            $this->normalizarCorreo($settings['correo'] ?? []),
-            $cliente,
-            $response,
-        );
+        SendInvoiceEmailJob::dispatch($invoice->id);
 
         return response()->json([
-            'success' => $step['status'] === 'done',
-            'message' => $step['message'],
-            'step' => $step,
-            'invoice' => $this->invoiceDetail($invoice->fresh()),
-        ], $step['status'] === 'done' ? 200 : 422);
+            'success' => true,
+            'message' => 'El correo fue encolado y se enviará en breve.',
+            'invoice' => $this->invoiceDetail($invoice),
+        ]);
     }
 
     public function anularFacturaGuardada(Request $request, BillingInvoice $invoice)

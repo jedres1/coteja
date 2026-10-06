@@ -18,5 +18,24 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\NotFoundHttpException $e, $request) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Recurso no encontrado.'], 404);
+            }
+            return response()->view('errors.404', [], 404);
+        });
+
+        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException $e, $request) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Acceso denegado.'], 403);
+            }
+            return response()->view('errors.403', [], 403);
+        });
+
+        $exceptions->render(function (\Throwable $e, $request) {
+            if ($request->expectsJson()) {
+                $status = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500;
+                return response()->json(['message' => 'Error interno del servidor.'], $status);
+            }
+        });
     })->create();

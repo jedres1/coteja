@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Exceptions\AccountingPeriodException;
 use App\Http\Controllers\Controller;
 use App\Models\BillingSetting;
+use App\Traits\ExportsCsv;
 use App\Models\Customer;
 use App\Models\AccountingAccount;
 use App\Models\AccountingPackage;
@@ -23,6 +24,8 @@ use RuntimeException;
 
 class PurchaseInvoiceController extends Controller
 {
+    use ExportsCsv;
+
     public function settingsIndex()
     {
         $settings = BillingSetting::allAsArray();
@@ -163,9 +166,11 @@ class PurchaseInvoiceController extends Controller
     public function accountsPayable(Request $request)
     {
         $search = trim((string) $request->query('search', ''));
+        $customerIds = $this->accessibleCustomerIds($request);
 
         $baseQuery = fn () => PurchaseInvoice::whereIn('payment_status', ['pending', 'partial'])
             ->whereNotIn('status', ['extracted', 'rejected'])
+            ->when($customerIds !== null, fn ($q) => $q->whereIn('customer_id', $customerIds))
             ->when($search !== '', function ($q) use ($search) {
                 $q->where(function ($q) use ($search) {
                     $q->where('total', 'like', "%{$search}%")
@@ -253,21 +258,26 @@ class PurchaseInvoiceController extends Controller
     public function pendingApproval(Request $request)
     {
         $showAll = $request->boolean('ver_todas');
+        $customerIds = $this->accessibleCustomerIds($request);
 
         $invoices = PurchaseInvoice::with('supplier')
+            ->when($customerIds !== null, fn ($q) => $q->whereIn('customer_id', $customerIds))
             ->when(!$showAll, fn ($q) => $q->where('status', 'extracted'))
             ->latest('purchase_date')
             ->latest()
             ->paginate(25)
             ->withQueryString();
 
-        $total = PurchaseInvoice::where('status', 'extracted')->count();
+        $total = PurchaseInvoice::when($customerIds !== null, fn ($q) => $q->whereIn('customer_id', $customerIds))
+            ->where('status', 'extracted')->count();
 
         return view('admin.purchase-invoices.pending-approval', compact('invoices', 'total', 'showAll'));
     }
 
     public function approve(PurchaseInvoice $purchaseInvoice, Request $request, AccountingEntryService $accounting, AccountingPeriodService $periods)
     {
+        $this->authorize('approve', $purchaseInvoice);
+
         try {
             $periods->validateDateOrFail($purchaseInvoice->purchase_date ?? now());
         } catch (AccountingPeriodException $e) {
@@ -350,10 +360,12 @@ class PurchaseInvoiceController extends Controller
     {
         $search = trim((string) $request->query('search', ''));
         $supplierId = $request->query('supplier_id');
+        $customerIds = $this->accessibleCustomerIds($request);
 
         return view('admin.purchase-invoices.index', [
             'invoices' => PurchaseInvoice::with(['supplier', 'customer'])
                 ->whereNotIn('status', ['extracted', 'rejected'])
+                ->when($customerIds !== null, fn ($q) => $q->whereIn('customer_id', $customerIds))
                 ->when($supplierId, fn ($query) => $query->where('supplier_id', $supplierId))
                 ->when($search !== '', function ($query) use ($search) {
                     $query->where(function ($query) use ($search) {
@@ -446,9 +458,62 @@ class PurchaseInvoiceController extends Controller
 
     public function destroy(PurchaseInvoice $purchaseInvoice)
     {
+        $this->authorize('delete', $purchaseInvoice);
         $purchaseInvoice->delete();
 
         return back()->with('status', 'Factura de compra eliminada.');
+    }
+
+    public function export(Request $request)
+    {
+        $search = trim((string) $request->query('search', ''));
+        $supplierId = $request->query('supplier_id');
+        $customerIds = $this->accessibleCustomerIds($request);
+
+        $rows = PurchaseInvoice::with(['supplier', 'customer'])
+            ->whereNotIn('status', ['extracted', 'rejected'])
+            ->when($customerIds !== null, fn ($q) => $q->whereIn('customer_id', $customerIds))
+            ->when($supplierId, fn ($query) => $query->where('supplier_id', $supplierId))
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($query) use ($search) {
+                    $query->where('invoice_number', 'like', "%{$search}%")
+                        ->orWhereHas('supplier', function ($query) use ($search) {
+                            $query->where('name', 'like', "%{$search}%")
+                                ->orWhere('document_number', 'like', "%{$search}%");
+                        });
+                });
+            })
+            ->latest('purchase_date')
+            ->latest()
+            ->get()
+            ->map(fn ($inv) => [
+                $inv->invoice_number,
+                $inv->supplier?->name,
+                $inv->customer?->name,
+                $inv->purchase_date?->format('Y-m-d'),
+                $inv->due_date?->format('Y-m-d'),
+                number_format($inv->subtotal, 2),
+                number_format($inv->iva, 2),
+                number_format($inv->total, 2),
+                $inv->status,
+                $inv->payment_status,
+            ]);
+
+        return $this->streamCsv(
+            'facturas-compra-' . now()->format('Ymd') . '.csv',
+            ['No. Factura', 'Proveedor', 'Cliente', 'Fecha', 'Vencimiento', 'Subtotal', 'IVA', 'Total', 'Estado', 'Estado Pago'],
+            $rows
+        );
+    }
+
+    /** Devuelve los customer_ids accesibles para el usuario. Null significa sin restricción (admin). */
+    private function accessibleCustomerIds(Request $request): ?array
+    {
+        $user = $request->user();
+        if (! $user || $user->isAdmin()) {
+            return null;
+        }
+        return $user->accessibleCompanies()->pluck('customer_id')->unique()->values()->all();
     }
 
     private function validatedData(Request $request, ?PurchaseInvoice $purchaseInvoice = null): array
