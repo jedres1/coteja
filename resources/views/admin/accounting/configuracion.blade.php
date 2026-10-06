@@ -354,8 +354,6 @@
     </div>
 </details>
 
-<div id="cfg-toast" style="display:none;position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;
-    background:#1f2937;color:#fff;padding:.75rem 1.25rem;border-radius:.5rem;font-size:.875rem;box-shadow:0 4px 12px rgba(0,0,0,.3)"></div>
 
 <style>
 .form-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
@@ -373,7 +371,6 @@
 const ACCOUNTS = {!! $accountsJson !!};
 const ALL_COST_CENTERS = {!! $allCostCentersJson !!};
 const PACKAGES = {!! $packagesJson !!};
-const CSRF     = document.querySelector('meta[name=csrf-token]')?.content || '';
 
 let editingId     = null;
 let deleteUrl     = null;
@@ -446,11 +443,10 @@ async function savePackage() {
     const name  = document.getElementById('p-name').value.trim();
     const type  = document.getElementById('p-type').value;
 
-    if (!name) { showToast('Ingrese el nombre del paquete.', false); return; }
-    if (!editingId && !code) { showToast('Ingrese el código del paquete.', false); return; }
+    if (!name) { coteja.showToast('Ingrese el nombre del paquete.', false); return; }
+    if (!editingId && !code) { coteja.showToast('Ingrese el código del paquete.', false); return; }
 
     const payload = {
-        _token:                        CSRF,
         name,
         description:                   document.getElementById('p-description').value.trim(),
         type,
@@ -462,29 +458,16 @@ async function savePackage() {
         is_active:                     document.getElementById('p-active').checked,
     };
 
-    let url, method;
-    if (editingId) {
-        url     = '{{ url("admin/contabilidad/paquetes") }}/' + editingId;
-        method  = 'PUT';
-        payload._method = 'PUT';
-    } else {
-        url    = '{{ route("admin.accounting.paquetes.store") }}';
-        method = 'POST';
-        payload.code = code;
-    }
-
     const btn = document.getElementById('btn-save-package');
     btn.disabled = true;
     try {
-        const res  = await fetch(url, {
-            method: 'POST',
-            headers: {'Content-Type':'application/json','X-CSRF-TOKEN':CSRF,'X-Requested-With':'XMLHttpRequest','Accept':'application/json'},
-            body: JSON.stringify(payload),
-        });
-        const json = await res.json();
-        showToast(json.message, res.ok);
-        if (res.ok) setTimeout(() => window.location.reload(), 700);
-    } catch { showToast('Error de red.', false); } finally { btn.disabled = false; }
+        if (editingId) {
+            await coteja.putJson('{{ url("admin/contabilidad/paquetes") }}/' + editingId, payload);
+        } else {
+            payload.code = code;
+            await coteja.postJson('{{ route("admin.accounting.paquetes.store") }}', payload);
+        }
+    } finally { btn.disabled = false; }
 }
 
 function deletePackage(url, code) {
@@ -497,15 +480,8 @@ async function confirmDelete() {
     const btn = document.getElementById('btn-confirm-delete');
     btn.disabled = true;
     try {
-        const res  = await fetch(deleteUrl, {
-            method: 'POST',
-            headers: {'Content-Type':'application/json','X-CSRF-TOKEN':CSRF,'X-Requested-With':'XMLHttpRequest','Accept':'application/json'},
-            body: JSON.stringify({_method:'DELETE'}),
-        });
-        const json = await res.json();
-        showToast(json.message, res.ok);
-        if (res.ok) setTimeout(() => window.location.reload(), 700);
-    } catch { showToast('Error de red.', false); } finally { btn.disabled = false; }
+        await coteja.deleteJson(deleteUrl);
+    } finally { btn.disabled = false; }
 }
 
 function openCostCenterModal(center = null) {
@@ -531,34 +507,25 @@ function editCostCenter(id) {
 async function saveCostCenter() {
     const code = document.getElementById('cc-code').value.trim().toUpperCase();
     const name = document.getElementById('cc-name').value.trim();
-    if (!code) { showToast('Ingrese el código del centro.', false); return; }
-    if (!name) { showToast('Ingrese el nombre del centro.', false); return; }
+    if (!code) { coteja.showToast('Ingrese el código del centro.', false); return; }
+    if (!name) { coteja.showToast('Ingrese el nombre del centro.', false); return; }
 
     const payload = {
-        _token: CSRF,
         code,
         name,
         description: document.getElementById('cc-description').value.trim(),
         is_active: document.getElementById('cc-active').checked,
     };
-    let url = '{{ route("admin.accounting.centros-costo.store") }}';
-    if (editingCostCenterId) {
-        url = '{{ url("admin/contabilidad/centros-costo") }}/' + editingCostCenterId;
-        payload._method = 'PUT';
-    }
 
     const btn = document.getElementById('btn-save-cost-center');
     btn.disabled = true;
     try {
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: {'Content-Type':'application/json','X-CSRF-TOKEN':CSRF,'X-Requested-With':'XMLHttpRequest','Accept':'application/json'},
-            body: JSON.stringify(payload),
-        });
-        const json = await res.json();
-        showToast(json.message, res.ok);
-        if (res.ok) setTimeout(() => window.location.reload(), 700);
-    } catch { showToast('Error de red.', false); } finally { btn.disabled = false; }
+        if (editingCostCenterId) {
+            await coteja.putJson('{{ url("admin/contabilidad/centros-costo") }}/' + editingCostCenterId, payload);
+        } else {
+            await coteja.postJson('{{ route("admin.accounting.centros-costo.store") }}', payload);
+        }
+    } finally { btn.disabled = false; }
 }
 
 function deleteCostCenter(url, code) {
@@ -571,24 +538,8 @@ async function confirmDeleteCostCenter() {
     const btn = document.getElementById('btn-confirm-delete-cost-center');
     btn.disabled = true;
     try {
-        const res = await fetch(deleteCostCenterUrl, {
-            method: 'POST',
-            headers: {'Content-Type':'application/json','X-CSRF-TOKEN':CSRF,'X-Requested-With':'XMLHttpRequest','Accept':'application/json'},
-            body: JSON.stringify({_method:'DELETE'}),
-        });
-        const json = await res.json();
-        showToast(json.message, res.ok);
-        if (res.ok) setTimeout(() => window.location.reload(), 700);
-    } catch { showToast('Error de red.', false); } finally { btn.disabled = false; }
-}
-
-function showToast(msg, ok) {
-    const t = document.getElementById('cfg-toast');
-    t.textContent = msg;
-    t.style.background = ok ? '#166534' : '#991b1b';
-    t.style.display = 'block';
-    clearTimeout(t._timer);
-    t._timer = setTimeout(() => t.style.display = 'none', 3500);
+        await coteja.deleteJson(deleteCostCenterUrl);
+    } finally { btn.disabled = false; }
 }
 </script>
 </x-layouts.app>

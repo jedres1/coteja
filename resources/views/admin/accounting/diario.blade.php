@@ -177,8 +177,6 @@
     </div>
 </details>
 
-<div id="journal-toast" style="display:none;position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;
-    background:#1f2937;color:#fff;padding:.75rem 1.25rem;border-radius:.5rem;font-size:.875rem;box-shadow:0 4px 12px rgba(0,0,0,.3)"></div>
 
 <style>
 .filter-bar{display:flex;gap:.75rem;flex-wrap:wrap;align-items:flex-end}
@@ -212,24 +210,8 @@ document.getElementById('form-delete')?.addEventListener('submit', async functio
     const btn = this.querySelector('[type=submit]');
     btn.disabled = true;
     try {
-        const res = await fetch(this.action, {
-            method: 'POST',
-            headers: {'X-Requested-With':'XMLHttpRequest','Accept':'application/json'},
-            body: new FormData(this)
-        });
-        const json = await res.json();
-        showToast(json.message, res.ok);
-        if (res.ok) setTimeout(() => window.location.reload(), 700);
-    } catch { showToast('Error de red.', false); } finally { btn.disabled = false; }
+        await coteja.deleteJson(this.action);
+    } finally { btn.disabled = false; }
 });
-
-function showToast(msg, ok) {
-    const t = document.getElementById('journal-toast');
-    t.textContent = msg;
-    t.style.background = ok ? '#166534' : '#991b1b';
-    t.style.display = 'block';
-    clearTimeout(t._timer);
-    t._timer = setTimeout(() => t.style.display = 'none', 3500);
-}
 </script>
 </x-layouts.app>

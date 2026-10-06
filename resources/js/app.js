@@ -1,6 +1,9 @@
 import './bootstrap';
 import { createApp } from 'vue';
 import FacturaElectronicaSV from './views/admin/FacturaElectronicaSV.vue';
+import { showToast, postJson, putJson, deleteJson } from './utils';
+
+window.coteja = { showToast, postJson, putJson, deleteJson };
 
 window.vueApps = {};
 

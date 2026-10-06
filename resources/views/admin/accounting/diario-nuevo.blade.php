@@ -129,8 +129,6 @@
     </div>
 </div>
 
-<div id="journal-toast" style="display:none;position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;
-    background:#1f2937;color:#fff;padding:.75rem 1.25rem;border-radius:.5rem;font-size:.875rem;box-shadow:0 4px 12px rgba(0,0,0,.3)"></div>
 
 <style>
 .back-link{font-size:.875rem;color:#2563eb;text-decoration:none}
@@ -237,7 +235,7 @@ function addLine(data = {}) {
 
 function removeLine(idx) {
     const rows = document.querySelectorAll('#lines-body tr');
-    if (rows.length <= 2) { showToast('El asiento debe tener al menos 2 líneas.', false); return; }
+    if (rows.length <= 2) { coteja.showToast('El asiento debe tener al menos 2 líneas.', false); return; }
     document.getElementById('line-' + idx)?.remove();
     renumberLines();
     updateTotals();
@@ -308,46 +306,34 @@ function collectLines() {
 async function submitForm(action) {
     const description = document.getElementById('f-description').value.trim();
     const date        = document.getElementById('f-date').value;
-    if (!description) { showToast('Ingrese la descripción del asiento.', false); return; }
-    if (!date)        { showToast('Seleccione la fecha.', false); return; }
-
-    const lines = collectLines();
+    if (!description) { coteja.showToast('Ingrese la descripción del asiento.', false); return; }
+    if (!date)        { coteja.showToast('Seleccione la fecha.', false); return; }
 
     const payload = {
-        _token:      document.querySelector('meta[name=csrf-token]')?.content || '',
         entry_date:  date,
         description,
         reference:   document.getElementById('f-reference').value.trim(),
         notes:       document.getElementById('f-notes').value.trim(),
         action,
-        lines,
+        lines: collectLines(),
     };
-    if (IS_EDIT) payload._method = 'PUT';
 
     const btn = action === 'aprobado' ? document.getElementById('btn-approve') : document.getElementById('btn-draft');
     btn.disabled = true;
     btn.textContent = 'Guardando…';
 
     try {
-        const res = await fetch(ACTION_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': payload._token,
-                'X-Requested-With': 'XMLHttpRequest',
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify(payload),
-        });
-        const json = await res.json();
-        if (res.ok && json.redirect) {
-            showToast(json.message, true);
-            setTimeout(() => window.location.href = json.redirect, 700);
+        const res = IS_EDIT
+            ? await window.axios.put(ACTION_URL, payload)
+            : await window.axios.post(ACTION_URL, payload);
+        if (res.data.redirect) {
+            coteja.showToast(res.data.message, true);
+            setTimeout(() => window.location.href = res.data.redirect, 700);
         } else {
-            showToast(json.message || json.error || 'Error al guardar.', false);
+            coteja.showToast(res.data.message || res.data.error || 'Error al guardar.', false);
         }
     } catch (e) {
-        showToast('Error de red.', false);
+        coteja.showToast(e.response?.data?.message || 'Error de red.', false);
     } finally {
         btn.disabled = false;
         btn.textContent = action === 'aprobado' ? 'Aprobar y publicar' : 'Guardar borrador';
@@ -356,15 +342,6 @@ async function submitForm(action) {
 
 function escHtml(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-function showToast(msg, ok) {
-    const t = document.getElementById('journal-toast');
-    t.textContent = msg;
-    t.style.background = ok ? '#166534' : '#991b1b';
-    t.style.display = 'block';
-    clearTimeout(t._timer);
-    t._timer = setTimeout(() => t.style.display = 'none', 4000);
 }
 
 // Init: load existing lines or add 2 blank lines

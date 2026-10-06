@@ -217,8 +217,6 @@
     </div>
 </details>
 
-<div id="period-toast" style="display:none;position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;
-    background:#1f2937;color:#fff;padding:.75rem 1.25rem;border-radius:.5rem;font-size:.875rem;box-shadow:0 4px 12px rgba(0,0,0,.3)"></div>
 
 <style>
 .input-sm{padding:.3rem .6rem;font-size:.875rem}
@@ -244,7 +242,6 @@ button:disabled{opacity:.45;cursor:not-allowed}
 </style>
 
 <script>
-const CSRF = document.querySelector('meta[name=csrf-token]')?.content || '';
 let closingMonthId = null;
 let closingYearId = null;
 
@@ -254,11 +251,11 @@ function openGenerate(year) {
 }
 
 async function toggleMonth(id, action) {
-    await postJson(`{{ url('admin/contabilidad/periodos') }}/${id}/${action}`, {});
+    await coteja.postJson(`{{ url('admin/contabilidad/periodos') }}/${id}/${action}`, {});
 }
 
 async function toggleYear(id, action) {
-    await postJson(`{{ url('admin/contabilidad/periodos/anios') }}/${id}/${action}`, {});
+    await coteja.postJson(`{{ url('admin/contabilidad/periodos/anios') }}/${id}/${action}`, {});
 }
 
 function openCloseMonthModal(id, name) {
@@ -272,7 +269,7 @@ async function confirmCloseMonth() {
     if (!closingMonthId) return;
     const btn = document.getElementById('btn-confirm-close-month');
     btn.disabled = true;
-    await postJson(`{{ url('admin/contabilidad/periodos') }}/${closingMonthId}/cerrar`, {
+    await coteja.postJson(`{{ url('admin/contabilidad/periodos') }}/${closingMonthId}/cerrar`, {
         notes: document.getElementById('close-month-notes').value.trim(),
     });
     btn.disabled = false;
@@ -289,7 +286,7 @@ async function confirmCloseYear() {
     if (!closingYearId) return;
     const btn = document.getElementById('btn-confirm-close-year');
     btn.disabled = true;
-    await postJson(`{{ url('admin/contabilidad/periodos/anios') }}/${closingYearId}/cerrar`, {
+    await coteja.postJson(`{{ url('admin/contabilidad/periodos/anios') }}/${closingYearId}/cerrar`, {
         notes: document.getElementById('close-year-notes').value.trim(),
     });
     btn.disabled = false;
@@ -297,37 +294,13 @@ async function confirmCloseYear() {
 
 async function generatePeriods() {
     const year = parseInt(document.getElementById('gen-year').value);
-    if (!year || year < 2020 || year > 2099) { showToast('Año inválido.', false); return; }
+    if (!year || year < 2020 || year > 2099) { coteja.showToast('Año inválido.', false); return; }
     const btn = document.getElementById('btn-gen');
     btn.disabled = true;
-    await postJson('{{ route("admin.accounting.periodos.generar") }}', {year}, () => {
+    await coteja.postJson('{{ route("admin.accounting.periodos.generar") }}', {year}, () => {
         window.location.href = `?year=${year}`;
     });
     btn.disabled = false;
-}
-
-async function postJson(url, payload, onOk = null) {
-    try {
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: {'Content-Type':'application/json','X-CSRF-TOKEN':CSRF,'X-Requested-With':'XMLHttpRequest','Accept':'application/json'},
-            body: JSON.stringify(payload),
-        });
-        const json = await res.json();
-        showToast(json.message, res.ok);
-        if (res.ok) setTimeout(() => onOk ? onOk() : window.location.reload(), 700);
-    } catch {
-        showToast('Error de red.', false);
-    }
-}
-
-function showToast(msg, ok) {
-    const t = document.getElementById('period-toast');
-    t.textContent = msg;
-    t.style.background = ok ? '#166534' : '#991b1b';
-    t.style.display = 'block';
-    clearTimeout(t._timer);
-    t._timer = setTimeout(() => t.style.display = 'none', 4000);
 }
 </script>
 </x-layouts.app>

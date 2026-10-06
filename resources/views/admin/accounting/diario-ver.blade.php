@@ -226,55 +226,27 @@
 </details>
 @endif
 
-<div id="journal-toast" style="display:none;position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;
-    background:#1f2937;color:#fff;padding:.75rem 1.25rem;border-radius:.5rem;font-size:.875rem;box-shadow:0 4px 12px rgba(0,0,0,.3)"></div>
-
 <style>
 .overlay-panel-sm{max-width:480px}
 </style>
 
 <script>
-const CSRF = document.querySelector('meta[name=csrf-token]')?.content || '';
-
 async function doApprove() {
     const btn = event.target;
     btn.disabled = true;
     try {
-        const res = await fetch('{{ route("admin.accounting.diario.approve", $entry) }}', {
-            method: 'POST',
-            headers: {'Content-Type':'application/json','X-CSRF-TOKEN':CSRF,'X-Requested-With':'XMLHttpRequest','Accept':'application/json'},
-            body: JSON.stringify({})
-        });
-        const json = await res.json();
-        showToast(json.message, res.ok);
-        if (res.ok) setTimeout(() => window.location.reload(), 800);
-    } catch { showToast('Error de red.', false); } finally { btn.disabled = false; }
+        await coteja.postJson('{{ route("admin.accounting.diario.approve", $entry) }}', {});
+    } finally { btn.disabled = false; }
 }
 
 async function doAnnul() {
     const motivo = document.getElementById('annul-motivo')?.value.trim();
-    if (!motivo || motivo.length < 5) { showToast('Ingrese el motivo de anulación.', false); return; }
+    if (!motivo || motivo.length < 5) { coteja.showToast('Ingrese el motivo de anulación.', false); return; }
     const btn = event.target;
     btn.disabled = true;
     try {
-        const res = await fetch('{{ route("admin.accounting.diario.annul", $entry) }}', {
-            method: 'POST',
-            headers: {'Content-Type':'application/json','X-CSRF-TOKEN':CSRF,'X-Requested-With':'XMLHttpRequest','Accept':'application/json'},
-            body: JSON.stringify({motivo})
-        });
-        const json = await res.json();
-        showToast(json.message, res.ok);
-        if (res.ok) setTimeout(() => window.location.reload(), 800);
-    } catch { showToast('Error de red.', false); } finally { btn.disabled = false; }
-}
-
-function showToast(msg, ok) {
-    const t = document.getElementById('journal-toast');
-    t.textContent = msg;
-    t.style.background = ok ? '#166534' : '#991b1b';
-    t.style.display = 'block';
-    clearTimeout(t._timer);
-    t._timer = setTimeout(() => t.style.display = 'none', 4000);
+        await coteja.postJson('{{ route("admin.accounting.diario.annul", $entry) }}', {motivo});
+    } finally { btn.disabled = false; }
 }
 </script>
 </x-layouts.app>

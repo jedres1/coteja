@@ -189,10 +189,6 @@
     </table>
 </div>
 
-{{-- Edit/Delete ajax responses --}}
-<div id="accounting-toast" style="display:none;position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;
-    background:#1f2937;color:#fff;padding:.75rem 1.25rem;border-radius:.5rem;font-size:.875rem;box-shadow:0 4px 12px rgba(0,0,0,.3)">
-</div>
 
 <style>
 .row-level-1 td { background:#f8fafc; }
@@ -217,32 +213,23 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // Ajax form handler for edit/delete inside overlays
     document.querySelectorAll('form[data-ajax]').forEach(function (form) {
         form.addEventListener('submit', async function (e) {
             e.preventDefault();
             const btn = form.querySelector('[type=submit]');
             if (btn) btn.disabled = true;
             try {
-                const res = await fetch(form.action, {
-                    method: form.method.toUpperCase() === 'GET' ? 'POST' : form.method.toUpperCase(),
-                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
-                    body: new FormData(form)
-                });
-                const json = await res.json();
-                showToast(json.message || (res.ok ? 'Listo.' : 'Error.'), res.ok);
-                if (res.ok && form.dataset.reload) {
-                    setTimeout(() => window.location.reload(), 600);
-                }
+                const res = await window.axios.post(form.action, new FormData(form));
+                coteja.showToast(res.data.message || 'Listo.', true);
+                if (form.dataset.reload) setTimeout(() => window.location.reload(), 600);
             } catch (err) {
-                showToast('Error de red.', false);
+                coteja.showToast(err.response?.data?.message || 'Error de red.', false);
             } finally {
                 if (btn) btn.disabled = false;
             }
         });
     });
 
-    // Nueva cuenta form (full page reload on success)
     const formNueva = document.getElementById('form-nueva-cuenta');
     if (formNueva) {
         formNueva.addEventListener('submit', async function (e) {
@@ -250,31 +237,11 @@ document.addEventListener('DOMContentLoaded', function () {
             const btn = formNueva.querySelector('[type=submit]');
             if (btn) btn.disabled = true;
             try {
-                const res = await fetch(formNueva.action, {
-                    method: 'POST',
-                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
-                    body: new FormData(formNueva)
-                });
-                const json = await res.json();
-                showToast(json.message || (res.ok ? 'Cuenta guardada.' : 'Error.'), res.ok);
-                if (res.ok) {
-                    setTimeout(() => window.location.reload(), 700);
-                }
-            } catch (err) {
-                showToast('Error de red.', false);
-            } finally {
+                await coteja.postJson(formNueva.action, new FormData(formNueva));
+            } catch { /* coteja.postJson already showed error toast */ } finally {
                 if (btn) btn.disabled = false;
             }
         });
-    }
-
-    function showToast(msg, ok) {
-        const t = document.getElementById('accounting-toast');
-        t.textContent = msg;
-        t.style.background = ok ? '#166534' : '#991b1b';
-        t.style.display = 'block';
-        clearTimeout(t._timer);
-        t._timer = setTimeout(() => { t.style.display = 'none'; }, 3000);
     }
 });
 </script>
