@@ -143,7 +143,8 @@ function MovementForm({ products, warehouses, onCancel }) {
     );
 }
 
-export default function Movements({ movements, products, warehouses }) {
+export default function Movements({ movements, inventoryProducts, warehouses }) {
+    const products = inventoryProducts ?? [];
     const [showForm, setShowForm] = useState(false);
 
     return (

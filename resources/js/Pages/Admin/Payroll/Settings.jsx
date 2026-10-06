@@ -2,7 +2,8 @@ import { Head, useForm } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 
-export default function PayrollSettings({ settings, bankAccounts }) {
+export default function PayrollSettings({ settings, accounts }) {
+    const bankAccounts = accounts ?? [];
     const { data, setData, post, processing, errors, recentlySuccessful } = useForm({
         igss_employee_rate: settings?.igss_employee_rate ?? '',
         igss_employer_rate: settings?.igss_employer_rate ?? '',
@@ -115,9 +116,9 @@ export default function PayrollSettings({ settings, bankAccounts }) {
                                 onChange={(e) => setData('bank_account_id', e.target.value)}
                             >
                                 <option value="">— Sin cuenta vinculada —</option>
-                                {bankAccounts && bankAccounts.map((ba) => (
+                                {bankAccounts.map((ba) => (
                                     <option key={ba.id} value={ba.id}>
-                                        {ba.name} — {ba.bank_name}
+                                        {ba.code} — {ba.name}
                                     </option>
                                 ))}
                             </select>

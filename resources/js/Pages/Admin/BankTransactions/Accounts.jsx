@@ -37,7 +37,7 @@ function AccountForm({ account, onSuccess, onCancel }) {
         account_number:  account?.account_number ?? '',
         account_type:    account?.account_type ?? 'corriente',
         currency:        account?.currency ?? 'USD',
-        initial_balance: account?.initial_balance ?? '',
+        opening_balance: account?.opening_balance ?? '',
         is_active:       account?.is_active !== undefined ? String(Number(account.is_active)) : '1',
     });
 
@@ -90,7 +90,8 @@ function AccountForm({ account, onSuccess, onCancel }) {
                     Tipo de cuenta
                     <select value={data.account_type} onChange={(e) => setData('account_type', e.target.value)}>
                         <option value="corriente">Corriente</option>
-                        <option value="ahorro">Ahorro</option>
+                        <option value="ahorros">Ahorro</option>
+                        <option value="otro">Otro</option>
                     </select>
                     {errors.account_type && <p className="field-error">{errors.account_type}</p>}
                 </label>
@@ -109,10 +110,10 @@ function AccountForm({ account, onSuccess, onCancel }) {
                     <input
                         type="number"
                         step="0.01"
-                        value={data.initial_balance}
-                        onChange={(e) => setData('initial_balance', e.target.value)}
+                        value={data.opening_balance}
+                        onChange={(e) => setData('opening_balance', e.target.value)}
                     />
-                    {errors.initial_balance && <p className="field-error">{errors.initial_balance}</p>}
+                    {errors.opening_balance && <p className="field-error">{errors.opening_balance}</p>}
                 </label>
 
                 <label>
@@ -171,7 +172,6 @@ export default function Accounts({ accounts }) {
                             <th>Tipo</th>
                             <th>Moneda</th>
                             <th>Saldo inicial</th>
-                            <th>Saldo actual</th>
                             <th>Estado</th>
                             <th></th>
                         </tr>
@@ -179,7 +179,7 @@ export default function Accounts({ accounts }) {
                     <tbody>
                         {accounts.length === 0 && (
                             <tr>
-                                <td colSpan={8} className="empty">Sin registros</td>
+                                <td colSpan={7} className="empty">Sin registros</td>
                             </tr>
                         )}
                         {accounts.map((account) => (
@@ -192,8 +192,7 @@ export default function Accounts({ accounts }) {
                                 <td>{account.account_number || <span className="muted">—</span>}</td>
                                 <td style={{ textTransform: 'capitalize' }}>{account.account_type}</td>
                                 <td>{account.currency}</td>
-                                <td>{fmt(account.initial_balance)}</td>
-                                <td>{fmt(account.current_balance)}</td>
+                                <td>{fmt(account.opening_balance)}</td>
                                 <td>
                                     <span className={`badge ${account.is_active ? 'active' : 'suspended'}`}>
                                         {account.is_active ? 'Activa' : 'Inactiva'}

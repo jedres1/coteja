@@ -196,7 +196,8 @@ const STATUS_COLORS = {
     aplicado: { background: '#f0fdf4', color: '#15803d' },
 };
 
-export default function PayrollIndex({ employees, payrollPeriods, activeTab }) {
+export default function PayrollIndex({ employees, periods, activeTab }) {
+    const payrollPeriods = periods ?? [];
     const tab = activeTab || 'empleados';
     const [showEmployeeForm, setShowEmployeeForm] = useState(false);
     const [editingEmployee, setEditingEmployee] = useState(null);
@@ -388,12 +389,12 @@ export default function PayrollIndex({ employees, payrollPeriods, activeTab }) {
                                 </tr>
                             </thead>
                             <tbody>
-                                {(!payrollPeriods?.data || payrollPeriods.data.length === 0) && (
+                                {payrollPeriods.length === 0 && (
                                     <tr>
                                         <td colSpan={7} className="empty">Sin períodos de nómina</td>
                                     </tr>
                                 )}
-                                {payrollPeriods?.data?.map((period) => {
+                                {payrollPeriods.map((period) => {
                                     const statusStyle = STATUS_COLORS[period.status] || STATUS_COLORS.draft;
                                     return (
                                         <tr key={period.id}>
@@ -433,7 +434,6 @@ export default function PayrollIndex({ employees, payrollPeriods, activeTab }) {
                         </table>
                     </div>
 
-                    {payrollPeriods?.links && <Pagination links={payrollPeriods.links} />}
                 </>
             )}
         </AppLayout>
