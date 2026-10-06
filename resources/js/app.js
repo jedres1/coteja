@@ -1,19 +1,19 @@
 import './bootstrap';
+import { createApp } from 'vue';
+import FacturaElectronicaSV from './views/admin/FacturaElectronicaSV.vue';
 import { showToast, postJson, putJson, deleteJson } from './utils';
 
 window.coteja = { showToast, postJson, putJson, deleteJson };
 
 window.vueApps = {};
 
-async function mountFacturaSv() {
+function mountFacturaSv() {
 	const el = document.querySelector('#factura-electronica-sv');
 	if (!el) return;
-	const [{ createApp }, { default: FacturaElectronicaSV }] = await Promise.all([
-		import('vue'),
-		import('./views/admin/FacturaElectronicaSV.vue'),
-	]);
 	window.vueApps['#factura-electronica-sv']?.unmount?.();
-	window.vueApps['#factura-electronica-sv'] = createApp(FacturaElectronicaSV).mount(el);
+	const app = createApp(FacturaElectronicaSV);
+	window.vueApps['#factura-electronica-sv'] = app;
+	app.mount(el);
 }
 
 function unmountVueComponents() {
