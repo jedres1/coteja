@@ -6,12 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\Customer;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class CompanyController extends Controller
 {
     public function index()
     {
-        return view('admin.companies.index', [
+        return Inertia::render('Admin/Companies/Index', [
             'companies' => Company::with('customer')->latest()->paginate(15),
             'customers' => Customer::orderBy('name')->get(),
         ]);

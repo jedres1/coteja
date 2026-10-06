@@ -12,6 +12,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Storage;
+use Inertia\Inertia;
 
 class BankTransactionController extends Controller {
 
@@ -48,7 +49,7 @@ class BankTransactionController extends Controller {
     public function accounts() {
         $accounts = BankAccount::withCount(['bankTransactions', 'billingPayments'])
             ->orderBy('name')->get();
-        return view('admin.bank-transactions.accounts', compact('accounts'));
+        return Inertia::render('Admin/BankTransactions/Accounts', compact('accounts'));
     }
 
     public function storeAccount(Request $request) {
@@ -148,7 +149,7 @@ class BankTransactionController extends Controller {
         $transactions = $bankTxs->concat($billingPayments)->sortByDesc('date')->values();
         $bankAccounts = BankAccount::where('is_active', true)->orderBy('name')->get();
 
-        return view('admin.bank-transactions.transactions', compact('transactions', 'bankAccounts', 'from', 'to', 'bankAccountId'));
+        return Inertia::render('Admin/BankTransactions/Transactions', compact('transactions', 'bankAccounts', 'from', 'to', 'bankAccountId'));
     }
 
     public function storeTransaction(Request $request) {
@@ -169,7 +170,7 @@ class BankTransactionController extends Controller {
         $bankAccounts    = BankAccount::where('is_active', true)->orderBy('name')->get();
         $reconciliations = BankReconciliation::with('bankAccount')
             ->orderByDesc('period_year')->orderByDesc('period_month')->get();
-        return view('admin.bank-transactions.reconciliations', compact('bankAccounts', 'reconciliations'));
+        return Inertia::render('Admin/BankTransactions/Reconciliations', compact('bankAccounts', 'reconciliations'));
     }
 
     public function storeReconciliation(Request $request) {
@@ -238,7 +239,7 @@ class BankTransactionController extends Controller {
 
         $transactions = $bankTxs->concat($billingPayments)->sortByDesc('date')->values();
 
-        return view('admin.bank-transactions.reconciliation-detail', compact('reconciliation', 'transactions'));
+        return Inertia::render('Admin/BankTransactions/ReconciliationDetail', compact('reconciliation', 'transactions'));
     }
 
     public function uploadStatement(Request $request, BankReconciliation $reconciliation) {

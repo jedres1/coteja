@@ -13,6 +13,7 @@ use App\Models\Warehouse;
 use App\Services\Accounting\AccountingEntryService;
 use App\Services\Accounting\AccountingPeriodService;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class InventoryController extends Controller
 {
@@ -20,8 +21,8 @@ class InventoryController extends Controller
 
     public function productTypes()
     {
-        $types = ProductType::withCount('products')->orderBy('name')->get();
-        return view('admin.inventory.product-types', compact('types'));
+        $productTypes = ProductType::withCount('products')->orderBy('name')->get();
+        return Inertia::render('Admin/Inventory/ProductTypes', compact('productTypes'));
     }
 
     public function storeProductType(Request $request)
@@ -54,7 +55,7 @@ class InventoryController extends Controller
     public function warehouses()
     {
         $warehouses = Warehouse::withCount('movements')->orderBy('name')->get();
-        return view('admin.inventory.warehouses', compact('warehouses'));
+        return Inertia::render('Admin/Inventory/Warehouses', compact('warehouses'));
     }
 
     public function storeWarehouse(Request $request)
@@ -78,9 +79,10 @@ class InventoryController extends Controller
 
     public function parameters()
     {
-        $warehouses      = Warehouse::orderBy('name')->get();
+        $warehouses = Warehouse::orderBy('name')->get();
+        $productTypes = ProductType::orderBy('name')->get();
         $salesWarehouseId = (int) BillingSetting::get('inventory_sales_warehouse_id');
-        return view('admin.inventory.parameters', compact('warehouses', 'salesWarehouseId'));
+        return Inertia::render('Admin/Inventory/Parameters', compact('warehouses', 'productTypes', 'salesWarehouseId'));
     }
 
     public function saveParameters(Request $request)
@@ -126,7 +128,7 @@ class InventoryController extends Controller
             ->orderBy('description')
             ->get();
 
-        return view('admin.inventory.movements', compact(
+        return Inertia::render('Admin/Inventory/Movements', compact(
             'movements', 'warehouses', 'approvedPurchases',
             'inventoryProducts', 'search', 'type', 'warehouseId'
         ));

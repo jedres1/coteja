@@ -20,6 +20,7 @@ use App\Services\PurchaseInvoiceMailboxImporter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Inertia\Inertia;
 use RuntimeException;
 
 class PurchaseInvoiceController extends Controller
@@ -31,7 +32,7 @@ class PurchaseInvoiceController extends Controller
         $settings = BillingSetting::allAsArray();
         $env = config('services.purchase_invoice_mailbox');
 
-        return view('admin.purchase-invoices.settings', [
+        return Inertia::render('Admin/PurchaseInvoices/Settings', [
             'host'       => $settings['mailbox_host']        ?? $env['host'],
             'port'       => $settings['mailbox_port']        ?? $env['port'],
             'username'   => $settings['mailbox_username']    ?? $env['username'],
@@ -196,7 +197,7 @@ class PurchaseInvoiceController extends Controller
 
         $bankAccounts = BankAccount::where('is_active', true)->orderBy('bank_name')->orderBy('name')->get();
 
-        return view('admin.purchase-invoices.accounts-payable', compact('invoices', 'totals', 'search', 'bankAccounts'));
+        return Inertia::render('Admin/PurchaseInvoices/AccountsPayable', compact('invoices', 'totals', 'search', 'bankAccounts'));
     }
 
     public function markPaid(Request $request, PurchaseInvoice $purchaseInvoice, AccountingEntryService $accounting)
@@ -271,7 +272,7 @@ class PurchaseInvoiceController extends Controller
         $total = PurchaseInvoice::when($customerIds !== null, fn ($q) => $q->whereIn('customer_id', $customerIds))
             ->where('status', 'extracted')->count();
 
-        return view('admin.purchase-invoices.pending-approval', compact('invoices', 'total', 'showAll'));
+        return Inertia::render('Admin/PurchaseInvoices/PendingApproval', compact('invoices', 'total', 'showAll'));
     }
 
     public function approve(PurchaseInvoice $purchaseInvoice, Request $request, AccountingEntryService $accounting, AccountingPeriodService $periods)
@@ -362,7 +363,7 @@ class PurchaseInvoiceController extends Controller
         $supplierId = $request->query('supplier_id');
         $customerIds = $this->accessibleCustomerIds($request);
 
-        return view('admin.purchase-invoices.index', [
+        return Inertia::render('Admin/PurchaseInvoices/Index', [
             'invoices' => PurchaseInvoice::with(['supplier', 'customer'])
                 ->whereNotIn('status', ['extracted', 'rejected'])
                 ->when($customerIds !== null, fn ($q) => $q->whereIn('customer_id', $customerIds))

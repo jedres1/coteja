@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title ?? 'Coteja' }}</title>
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @vite(['resources/css/app.css', 'resources/js/app.jsx'])
     <style>
         :root { --bg:#f6f7fb; --panel:#fff; --ink:#172033; --muted:#6b7280; --line:#e5e7eb; --brand:#2563eb; --ok:#059669; --warn:#d97706; --bad:#dc2626; }
         * { box-sizing:border-box; }

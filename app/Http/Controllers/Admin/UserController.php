@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use Inertia\Inertia;
 
 class UserController extends Controller
 {
@@ -17,7 +18,7 @@ class UserController extends Controller
         $search = trim((string) $request->query('search', ''));
         $role = $request->query('role');
 
-        return view('admin.users.index', [
+        return Inertia::render('Admin/Users/Index', [
             'users' => User::with(['customer', 'accessibleCompanies'])
                 ->when($role, fn ($query) => $query->where('role', $role))
                 ->when($search !== '', function ($query) use ($search) {

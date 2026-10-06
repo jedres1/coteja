@@ -11,6 +11,7 @@ use App\Models\CostCenter;
 use App\Services\Accounting\AccountingPeriodService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 
 class AccountingController extends Controller
 {
@@ -53,7 +54,7 @@ class AccountingController extends Controller
             'total'      => AccountingAccount::count(),
         ];
 
-        return view('admin.accounting.catalogo', compact('accounts', 'parents', 'stats', 'filter', 'search'));
+        return Inertia::render('Admin/Accounting/Catalogo', compact('accounts', 'parents', 'stats', 'filter', 'search'));
     }
 
     public function store(Request $request)
@@ -127,7 +128,7 @@ class AccountingController extends Controller
 
         $costCenters = CostCenter::orderBy('code')->get();
 
-        return view('admin.accounting.configuracion', compact('packages', 'accounts', 'costCenters'));
+        return Inertia::render('Admin/Accounting/Configuracion', compact('packages', 'accounts', 'costCenters'));
     }
 
     public function storePackage(Request $request)
@@ -253,7 +254,7 @@ class AccountingController extends Controller
 
         rsort($availableYears);
 
-        return view('admin.accounting.periodos', compact('yearPeriod', 'periods', 'year', 'availableYears'));
+        return Inertia::render('Admin/Accounting/Periodos', compact('yearPeriod', 'periods', 'year', 'availableYears'));
     }
 
     public function generarPeriodos(Request $request)
@@ -391,7 +392,7 @@ class AccountingController extends Controller
 
         $allPeriods = AccountingPeriod::where('year', $year)->orderBy('month')->get();
 
-        return view('admin.accounting.saldos', compact(
+        return Inertia::render('Admin/Accounting/Saldos', compact(
             'balances', 'summaryByType', 'accounts',
             'period', 'year', 'month', 'accountId', 'acumulado', 'allPeriods'
         ));
@@ -472,7 +473,7 @@ class AccountingController extends Controller
             rsort($availableYears);
         }
 
-        return view('admin.accounting.balanza-comprobacion', compact(
+        return Inertia::render('Admin/Accounting/BalanzaComprobacion', compact(
             'rows', 'period', 'year', 'month', 'acumulado', 'tipo', 'soloConMovimiento',
             'totalSumaDebe', 'totalSumaHaber', 'totalSaldoDeudor', 'totalSaldoAcreedor',
             'availableYears'
@@ -606,7 +607,7 @@ class AccountingController extends Controller
             rsort($availableYears);
         }
 
-        return view('admin.accounting.libro-mayor', compact(
+        return Inertia::render('Admin/Accounting/LibroMayor', compact(
             'ledger', 'allAccounts', 'period',
             'year', 'month', 'acumulado', 'accountId',
             'startDate', 'endDate', 'availableYears'
@@ -667,7 +668,7 @@ class AccountingController extends Controller
             rsort($availableYears);
         }
 
-        return view('admin.accounting.balance-general', compact(
+        return Inertia::render('Admin/Accounting/BalanceGeneral', compact(
             'rows', 'bySection', 'sections', 'period', 'year', 'month', 'availableYears'
         ));
     }
@@ -731,7 +732,7 @@ class AccountingController extends Controller
             rsort($availableYears);
         }
 
-        return view('admin.accounting.estado-resultados', compact(
+        return Inertia::render('Admin/Accounting/EstadoResultados', compact(
             'rows', 'bySection', 'sections', 'period', 'year', 'month',
             'acumulado', 'totalIngresos', 'totalGastos', 'utilidad', 'availableYears'
         ));

@@ -6,14 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Models\License;
 use App\Models\Payment;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class PaymentController extends Controller
 {
     public function index()
     {
-        return view('admin.payments.index', [
+        return Inertia::render('Admin/Payments/Index', [
             'payments' => Payment::with(['license.customer', 'company'])->latest()->paginate(15),
             'licenses' => License::with(['customer', 'company'])->orderByDesc('created_at')->get(),
+            'periods' => ['monthly' => 'Mensual', 'annual' => 'Anual', 'implementation' => 'Implementación', 'additional' => 'Usuario adicional'],
+            'paymentStatuses' => ['paid' => 'Pagado', 'pending' => 'Pendiente', 'void' => 'Anulado'],
         ]);
     }
 

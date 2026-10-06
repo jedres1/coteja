@@ -7,12 +7,13 @@ use App\Models\Backup;
 use App\Models\Customer;
 use App\Models\License;
 use App\Models\Payment;
+use Inertia\Inertia;
 
 class DashboardController extends Controller
 {
     public function __invoke()
     {
-        return view('admin.dashboard', [
+        return Inertia::render('Admin/Dashboard', [
             'customersCount' => Customer::count(),
             'activeLicensesCount' => License::where('status', 'active')->count(),
             'expiredLicensesCount' => License::whereDate('expires_at', '<', now())->count(),

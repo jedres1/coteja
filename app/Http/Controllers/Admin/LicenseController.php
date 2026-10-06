@@ -8,15 +8,17 @@ use App\Models\License;
 use App\Models\Plan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Inertia\Inertia;
 
 class LicenseController extends Controller
 {
     public function index()
     {
-        return view('admin.licenses.index', [
+        return Inertia::render('Admin/Licenses/Index', [
             'licenses' => License::with(['customer', 'company', 'plan'])->latest()->paginate(15),
             'companies' => Company::with('customer')->orderBy('business_name')->get(),
             'plans' => Plan::where('is_active', true)->orderBy('name')->get(),
+            'licenseStatuses' => ['active' => 'Activa', 'expired' => 'Vencida', 'suspended' => 'Suspendida'],
         ]);
     }
 

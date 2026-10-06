@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Traits\ExportsCsv;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Inertia\Inertia;
 
 class CustomerController extends Controller
 {
@@ -20,7 +21,7 @@ class CustomerController extends Controller
         $search = trim((string) $request->query('search', ''));
         $geography = json_decode(file_get_contents(public_path('catalogs/division-geografica.json')), true) ?: [];
 
-        return view('admin.customers.index', [
+        return Inertia::render('Admin/Customers/Index', [
             'customers' => Customer::withCount(['companies', 'licenses'])
                 ->when($search !== '', function ($query) use ($search) {
                     $query->where(function ($query) use ($search) {
@@ -41,6 +42,9 @@ class CustomerController extends Controller
                 ->withQueryString(),
             'search' => $search,
             'geography' => $geography,
+            'documentTypes' => ['13' => 'DUI', '36' => 'NIT', '37' => 'Otro / extranjero', '03' => 'Pasaporte', '02' => 'Carnet residente'],
+            'dteTypes' => ['01' => 'Factura', '03' => 'CCF', '05' => 'Nota crédito', '06' => 'Nota débito', '07' => 'Retención', '11' => 'Exportación', '14' => 'Sujeto excluido'],
+            'statuses' => ['active' => 'Activo', 'suspended' => 'Suspendido'],
         ]);
     }
 

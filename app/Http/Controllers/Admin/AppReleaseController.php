@@ -5,12 +5,13 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AppRelease;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class AppReleaseController extends Controller
 {
     public function index()
     {
-        return view('admin.releases.index', ['releases' => AppRelease::latest()->get()]);
+        return Inertia::render('Admin/Releases/Index', ['releases' => AppRelease::latest()->get()]);
     }
 
     public function store(Request $request)

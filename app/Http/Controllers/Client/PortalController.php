@@ -9,6 +9,7 @@ use App\Models\BillingInvoice;
 use App\Models\PurchaseInvoice;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Inertia\Inertia;
 
 class PortalController extends Controller
 {
@@ -41,7 +42,7 @@ class PortalController extends Controller
                 ->get()
             : collect();
 
-        return view('client.dashboard', [
+        return Inertia::render('Client/Dashboard', [
             'customer' => $customer,
             'companies' => $companies,
             'activeCompany' => $activeCompany,
@@ -75,7 +76,7 @@ class PortalController extends Controller
 
         $search = trim((string) $request->query('search', ''));
 
-        return view('client.billing', [
+        return Inertia::render('Client/Billing', [
             'customer' => $customer,
             'activeCompany' => $activeCompany,
             'search' => $search,
@@ -106,7 +107,7 @@ class PortalController extends Controller
 
         $search = trim((string) $request->query('search', ''));
 
-        return view('client.purchases', [
+        return Inertia::render('Client/Purchases', [
             'customer' => $customer,
             'activeCompany' => $activeCompany,
             'search' => $search,

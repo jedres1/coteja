@@ -5,12 +5,13 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Plan;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class PlanController extends Controller
 {
     public function index()
     {
-        return view('admin.plans.index', ['plans' => Plan::orderBy('monthly_price')->get()]);
+        return Inertia::render('Admin/Plans/Index', ['plans' => Plan::orderBy('monthly_price')->get()]);
     }
 
     public function store(Request $request)

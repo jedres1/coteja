@@ -16,6 +16,7 @@ use App\Services\Payroll\PayrollCalculatorService;
 use App\Services\Payroll\PayrollEntryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 
 class PayrollController extends Controller
 {
@@ -23,7 +24,7 @@ class PayrollController extends Controller
 
     public function index()
     {
-        return view('admin.payroll.index', [
+        return Inertia::render('Admin/Payroll/Index', [
             'employees' => Employee::orderBy('name')->get(),
             'activeTab' => request()->query('tab') === 'nominas' ? 'nominas' : 'empleados',
             'periods'   => PayrollPeriod::withCount('lines')
@@ -36,7 +37,7 @@ class PayrollController extends Controller
 
     public function conceptsIndex()
     {
-        return view('admin.payroll.concepts', [
+        return Inertia::render('Admin/Payroll/Concepts', [
             'employees' => Employee::orderBy('name')->get(),
             'concepts' => PayrollConcept::whereNull('system_key')->with(['account', 'employees'])->orderBy('name')->get(),
             'legalConcepts' => PayrollConcept::whereNotNull('system_key')->with(['account', 'payableAccount'])->orderBy('id')->get(),
@@ -46,7 +47,7 @@ class PayrollController extends Controller
 
     public function settingsIndex()
     {
-        return view('admin.payroll.settings', [
+        return Inertia::render('Admin/Payroll/Settings', [
             'settings' => $this->payrollSettings(),
             'accounts' => AccountingAccount::where('level', 3)->orderBy('code')->get(),
         ]);
@@ -153,7 +154,7 @@ class PayrollController extends Controller
     {
         $period->load(['lines.employee', 'journalEntry']);
 
-        return view('admin.payroll.period', [
+        return Inertia::render('Admin/Payroll/Period', [
             'period'   => $period,
             'settings' => PayrollSetting::current(),
         ]);

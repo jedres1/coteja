@@ -14,6 +14,7 @@ use App\Models\JournalEntryLine;
 use App\Services\Accounting\AccountingPeriodService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 
 class JournalController extends Controller
 {
@@ -50,7 +51,7 @@ class JournalController extends Controller
             'total'    => JournalEntry::count(),
         ];
 
-        return view('admin.accounting.diario', compact('entries', 'stats', 'search', 'status', 'from', 'to'));
+        return Inertia::render('Admin/Accounting/Diario', compact('entries', 'stats', 'search', 'status', 'from', 'to'));
     }
 
     public function create()
@@ -62,7 +63,7 @@ class JournalController extends Controller
         $cgPackage = AccountingPackage::where('code', 'CG')->first();
         $costCenters = CostCenter::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
 
-        return view('admin.accounting.diario-nuevo', [
+        return Inertia::render('Admin/Accounting/DiarioNuevo', [
             'accounts'  => $accounts,
             'costCenters' => $costCenters,
             'entry'     => null,
@@ -127,7 +128,7 @@ class JournalController extends Controller
     public function show(JournalEntry $entry)
     {
         $entry->load(['lines.account', 'lines.costCenter', 'creator', 'approver', 'accountingPackage.costCenter']);
-        return view('admin.accounting.diario-ver', compact('entry'));
+        return Inertia::render('Admin/Accounting/DiarioVer', compact('entry'));
     }
 
     public function edit(JournalEntry $entry)
@@ -142,7 +143,7 @@ class JournalController extends Controller
         $costCenters = CostCenter::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
         $entry->load('lines');
 
-        return view('admin.accounting.diario-nuevo', [
+        return Inertia::render('Admin/Accounting/DiarioNuevo', [
             'accounts'  => $accounts,
             'costCenters' => $costCenters,
             'entry'     => $entry,

@@ -7,6 +7,7 @@ use App\Http\Requests\SaveSupplierRequest;
 use App\Models\Supplier;
 use App\Traits\ExportsCsv;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class SupplierController extends Controller
 {
@@ -17,7 +18,7 @@ class SupplierController extends Controller
         $search = trim((string) $request->query('search', ''));
         $geography = json_decode(file_get_contents(public_path('catalogs/division-geografica.json')), true) ?: [];
 
-        return view('admin.suppliers.index', [
+        return Inertia::render('Admin/Suppliers/Index', [
             'suppliers' => Supplier::withCount('purchaseInvoices')
                 ->when($search !== '', function ($query) use ($search) {
                     $query->where(function ($query) use ($search) {
