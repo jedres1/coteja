@@ -101,7 +101,7 @@ async function navigateWithPjax(url, push = true) {
 		}
 
 		unmountVueComponents();
-		currentMain.innerHTML = nextMain.innerHTML;
+		currentMain.replaceChildren(...Array.from(nextMain.childNodes));
 		executeEmbeddedScripts(currentMain);
 		document.title = nextDocument.title;
 
