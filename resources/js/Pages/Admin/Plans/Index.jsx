@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Head, useForm, router } from '@inertiajs/react';
 import AppLayout from '@/Layouts/AppLayout';
+import Modal from '@/Components/Modal';
 import { route } from 'ziggy-js';
 
 function PlanForm({ plan, onSuccess }) {
@@ -154,7 +155,7 @@ function PlanForm({ plan, onSuccess }) {
                 </select>
                 {form.errors.is_active && <p className="field-error">{form.errors.is_active}</p>}
             </div>
-            <div className="modal-footer">
+            <div className="form-actions" style={{ marginTop: 16 }}>
                 <button type="submit" className="btn" disabled={form.processing}>
                     {form.processing ? 'Guardando…' : 'Guardar'}
                 </button>
@@ -251,27 +252,15 @@ export default function PlansIndex({ plans }) {
             </div>
 
             {showCreate && (
-                <div className="overlay-layer">
-                    <div className="modal">
-                        <div className="modal-header">
-                            <h2>Nuevo plan</h2>
-                            <button className="modal-close" onClick={() => setShowCreate(false)}>✕</button>
-                        </div>
-                        <PlanForm onSuccess={() => setShowCreate(false)} />
-                    </div>
-                </div>
+                <Modal title="Nuevo plan" onClose={() => setShowCreate(false)}>
+                    <PlanForm onSuccess={() => setShowCreate(false)} />
+                </Modal>
             )}
 
             {editItem && (
-                <div className="overlay-layer">
-                    <div className="modal">
-                        <div className="modal-header">
-                            <h2>Editar plan</h2>
-                            <button className="modal-close" onClick={() => setEditItem(null)}>✕</button>
-                        </div>
-                        <PlanForm plan={editItem} onSuccess={() => setEditItem(null)} />
-                    </div>
-                </div>
+                <Modal title="Editar plan" onClose={() => setEditItem(null)}>
+                    <PlanForm plan={editItem} onSuccess={() => setEditItem(null)} />
+                </Modal>
             )}
         </AppLayout>
     );

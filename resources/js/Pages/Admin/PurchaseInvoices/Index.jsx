@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Head, router, Link } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
+import Modal from '@/Components/Modal';
 
 const DOC_LABELS = {
     ccf: 'CCF',
@@ -34,49 +35,35 @@ const badge = (map, key) => {
     );
 };
 
-function InvoiceDetailModal({ invoice, onClose }) {
-    useEffect(() => {
-        const handler = (e) => { if (e.key === 'Escape') onClose(); };
-        window.addEventListener('keydown', handler);
-        return () => window.removeEventListener('keydown', handler);
-    }, [onClose]);
-
+function InvoiceDetail({ invoice }) {
     const fmt = (n) => n != null ? Number(n).toLocaleString('es-SV', { minimumFractionDigits: 2 }) : '—';
 
     return (
-        <div className="overlay-layer" role="dialog" aria-modal="true">
-            <button className="overlay-backdrop" type="button" aria-label="Cerrar" onClick={onClose} />
-            <div className="overlay-panel card" style={{ maxWidth: 560 }}>
-                <div className="overlay-header">
-                    <h3 style={{ margin: 0 }}>Factura {invoice.invoice_number}</h3>
-                    <button type="button" className="btn secondary" onClick={onClose}>✕</button>
+        <>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                <div><span style={{ fontSize: 12, color: '#6b7280' }}>Proveedor</span><br /><strong>{invoice.supplier?.name ?? '—'}</strong></div>
+                <div><span style={{ fontSize: 12, color: '#6b7280' }}>NIT / NRC</span><br /><span style={{ fontSize: 13 }}>{invoice.supplier?.document_number ?? '—'}</span></div>
+                <div><span style={{ fontSize: 12, color: '#6b7280' }}>Fecha de compra</span><br /><span style={{ fontSize: 13 }}>{invoice.purchase_date ?? '—'}</span></div>
+                <div><span style={{ fontSize: 12, color: '#6b7280' }}>Vencimiento</span><br /><span style={{ fontSize: 13 }}>{invoice.due_date ?? '—'}</span></div>
+                <div><span style={{ fontSize: 12, color: '#6b7280' }}>Tipo</span><br /><span style={{ fontSize: 13 }}>{DOC_LABELS[invoice.document_type] ?? invoice.document_type ?? '—'}</span></div>
+                <div><span style={{ fontSize: 12, color: '#6b7280' }}>Método de pago</span><br /><span style={{ fontSize: 13 }}>{invoice.payment_method ?? '—'}</span></div>
+                <div><span style={{ fontSize: 12, color: '#6b7280' }}>Subtotal</span><br /><span style={{ fontFamily: 'monospace' }}>{fmt(invoice.subtotal)}</span></div>
+                <div><span style={{ fontSize: 12, color: '#6b7280' }}>IVA</span><br /><span style={{ fontFamily: 'monospace' }}>{fmt(invoice.iva)}</span></div>
+                <div><span style={{ fontSize: 12, color: '#6b7280' }}>Total</span><br /><strong style={{ fontFamily: 'monospace', fontSize: 15 }}>{fmt(invoice.total)}</strong></div>
+                <div><span style={{ fontSize: 12, color: '#6b7280' }}>Estado de pago</span><br />
+                    <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, ...(PAYMENT_COLOR[invoice.payment_status] ?? {}) }}>
+                        {PAYMENT_LABEL[invoice.payment_status] ?? invoice.payment_status}
+                    </span>
                 </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-                    <div><span style={{ fontSize: 12, color: '#6b7280' }}>Proveedor</span><br /><strong>{invoice.supplier?.name ?? '—'}</strong></div>
-                    <div><span style={{ fontSize: 12, color: '#6b7280' }}>NIT / NRC</span><br /><span style={{ fontSize: 13 }}>{invoice.supplier?.document_number ?? '—'}</span></div>
-                    <div><span style={{ fontSize: 12, color: '#6b7280' }}>Fecha de compra</span><br /><span style={{ fontSize: 13 }}>{invoice.purchase_date ?? '—'}</span></div>
-                    <div><span style={{ fontSize: 12, color: '#6b7280' }}>Vencimiento</span><br /><span style={{ fontSize: 13 }}>{invoice.due_date ?? '—'}</span></div>
-                    <div><span style={{ fontSize: 12, color: '#6b7280' }}>Tipo</span><br /><span style={{ fontSize: 13 }}>{DOC_LABELS[invoice.document_type] ?? invoice.document_type ?? '—'}</span></div>
-                    <div><span style={{ fontSize: 12, color: '#6b7280' }}>Método de pago</span><br /><span style={{ fontSize: 13 }}>{invoice.payment_method ?? '—'}</span></div>
-                    <div><span style={{ fontSize: 12, color: '#6b7280' }}>Subtotal</span><br /><span style={{ fontFamily: 'monospace' }}>{fmt(invoice.subtotal)}</span></div>
-                    <div><span style={{ fontSize: 12, color: '#6b7280' }}>IVA</span><br /><span style={{ fontFamily: 'monospace' }}>{fmt(invoice.iva)}</span></div>
-                    <div><span style={{ fontSize: 12, color: '#6b7280' }}>Total</span><br /><strong style={{ fontFamily: 'monospace', fontSize: 15 }}>{fmt(invoice.total)}</strong></div>
-                    <div><span style={{ fontSize: 12, color: '#6b7280' }}>Estado de pago</span><br />
-                        <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, ...(PAYMENT_COLOR[invoice.payment_status] ?? {}) }}>
-                            {PAYMENT_LABEL[invoice.payment_status] ?? invoice.payment_status}
-                        </span>
-                    </div>
-                </div>
-
-                {invoice.notes && (
-                    <div style={{ marginBottom: 12 }}>
-                        <span style={{ fontSize: 12, color: '#6b7280' }}>Notas</span>
-                        <p style={{ margin: '4px 0 0', fontSize: 13 }}>{invoice.notes}</p>
-                    </div>
-                )}
             </div>
-        </div>
+
+            {invoice.notes && (
+                <div style={{ marginBottom: 12 }}>
+                    <span style={{ fontSize: 12, color: '#6b7280' }}>Notas</span>
+                    <p style={{ margin: '4px 0 0', fontSize: 13 }}>{invoice.notes}</p>
+                </div>
+            )}
+        </>
     );
 }
 
@@ -226,7 +213,9 @@ export default function PurchaseInvoicesIndex({ invoices, search, supplierId, su
             </div>
 
             {viewItem && (
-                <InvoiceDetailModal invoice={viewItem} onClose={() => setViewItem(null)} />
+                <Modal title={`Factura ${viewItem.invoice_number}`} onClose={() => setViewItem(null)} maxWidth={560}>
+                    <InvoiceDetail invoice={viewItem} />
+                </Modal>
             )}
         </AppLayout>
     );

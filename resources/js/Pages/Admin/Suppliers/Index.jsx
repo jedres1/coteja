@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Head, useForm, router, Link } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
+import Modal from '@/Components/Modal';
+import { useDepartmentMunicipality } from '@/hooks/useDepartmentMunicipality';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -25,18 +27,10 @@ const STATUSES = {
 function SupplierForm({ supplier, geography, onSuccess, onCancel }) {
     const isEdit = !!supplier;
 
-    // Resolve initial department from municipality on mount (edit only)
-    function resolveInitialDeptId() {
-        if (!supplier?.municipality_id || !geography?.departments) return '';
-        for (const dept of geography.departments) {
-            const found = (dept.municipalities ?? []).find((m) => m.id === supplier.municipality_id);
-            if (found) return String(dept.id);
-        }
-        return '';
-    }
-
-    const [departmentId, setDepartmentId] = useState(resolveInitialDeptId);
-    const [municipalities, setMunicipalities] = useState([]);
+    const { departmentId, setDepartmentId, municipalities } = useDepartmentMunicipality(
+        geography,
+        supplier?.municipality_id
+    );
 
     const { data, setData, post, put, processing, errors } = useForm({
         name:              supplier?.name ?? '',
@@ -50,22 +44,15 @@ function SupplierForm({ supplier, geography, onSuccess, onCancel }) {
         municipality_id:   supplier?.municipality_id ? String(supplier.municipality_id) : '',
     });
 
-    // Filter municipalities whenever department changes
-    useEffect(() => {
-        if (!departmentId) {
-            setMunicipalities([]);
-            setData('municipality_id', '');
-            return;
-        }
-        const dept = (geography?.departments ?? []).find((d) => String(d.id) === String(departmentId));
-        const munis = dept?.municipalities ?? [];
-        setMunicipalities(munis);
-        // Clear municipality if it no longer belongs to the selected department
-        const validIds = munis.map((m) => String(m.id));
+    function handleDeptChange(e) {
+        const newDeptId = e.target.value;
+        const dept = (geography?.departments ?? []).find((d) => String(d.id) === newDeptId);
+        const validIds = (dept?.municipalities ?? []).map((m) => String(m.id));
         if (data.municipality_id && !validIds.includes(data.municipality_id)) {
             setData('municipality_id', '');
         }
-    }, [departmentId]);
+        setDepartmentId(newDeptId);
+    }
 
     function handleSubmit(e) {
         e.preventDefault();
@@ -173,7 +160,7 @@ function SupplierForm({ supplier, geography, onSuccess, onCancel }) {
                 {/* Department (filter only – not saved) */}
                 <label>
                     Departamento
-                    <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
+                    <select value={departmentId} onChange={handleDeptChange}>
                         <option value="">— Seleccionar departamento —</option>
                         {(geography?.departments ?? []).map((d) => (
                             <option key={d.id} value={String(d.id)}>{d.name}</option>
@@ -207,33 +194,6 @@ function SupplierForm({ supplier, geography, onSuccess, onCancel }) {
                 </button>
             </div>
         </form>
-    );
-}
-
-// ─── Modal overlay ────────────────────────────────────────────────────────────
-
-function Modal({ title, onClose, children }) {
-    useEffect(() => {
-        const handler = (e) => { if (e.key === 'Escape') onClose(); };
-        window.addEventListener('keydown', handler);
-        return () => window.removeEventListener('keydown', handler);
-    }, [onClose]);
-
-    return (
-        <div className="overlay-layer" role="dialog" aria-modal="true" aria-label={title}>
-            <button className="overlay-backdrop" type="button" aria-label="Cerrar" onClick={onClose} />
-            <div className="overlay-panel card">
-                <div className="overlay-header">
-                    <div>
-                        <h3>{title}</h3>
-                    </div>
-                    <button type="button" className="btn secondary overlay-close" onClick={onClose}>
-                        ✕
-                    </button>
-                </div>
-                {children}
-            </div>
-        </div>
     );
 }
 

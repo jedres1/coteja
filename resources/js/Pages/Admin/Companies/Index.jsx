@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
+import Modal from '@/Components/Modal';
 import { route } from 'ziggy-js';
 
 const environments = {
@@ -112,7 +113,7 @@ function CompanyForm({ company, customers, onSuccess }) {
                 </select>
                 {form.errors.environment && <p className="field-error">{form.errors.environment}</p>}
             </div>
-            <div className="modal-footer">
+            <div className="form-actions" style={{ marginTop: 16 }}>
                 <button type="submit" className="btn" disabled={form.processing}>
                     {form.processing ? 'Guardando…' : 'Guardar'}
                 </button>
@@ -193,34 +194,22 @@ export default function CompaniesIndex({ companies, customers }) {
             </div>
 
             {showCreate && (
-                <div className="overlay-layer">
-                    <div className="modal">
-                        <div className="modal-header">
-                            <h2>Nueva empresa</h2>
-                            <button className="modal-close" onClick={() => setShowCreate(false)}>✕</button>
-                        </div>
-                        <CompanyForm
-                            customers={customers}
-                            onSuccess={() => setShowCreate(false)}
-                        />
-                    </div>
-                </div>
+                <Modal title="Nueva empresa" onClose={() => setShowCreate(false)}>
+                    <CompanyForm
+                        customers={customers}
+                        onSuccess={() => setShowCreate(false)}
+                    />
+                </Modal>
             )}
 
             {editItem && (
-                <div className="overlay-layer">
-                    <div className="modal">
-                        <div className="modal-header">
-                            <h2>Editar empresa</h2>
-                            <button className="modal-close" onClick={() => setEditItem(null)}>✕</button>
-                        </div>
-                        <CompanyForm
-                            company={editItem}
-                            customers={customers}
-                            onSuccess={() => setEditItem(null)}
-                        />
-                    </div>
-                </div>
+                <Modal title="Editar empresa" onClose={() => setEditItem(null)}>
+                    <CompanyForm
+                        company={editItem}
+                        customers={customers}
+                        onSuccess={() => setEditItem(null)}
+                    />
+                </Modal>
             )}
         </AppLayout>
     );

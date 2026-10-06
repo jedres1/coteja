@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
+import Modal from '@/Components/Modal';
 import { route } from 'ziggy-js';
 
 const licenseStatuses = {
@@ -117,7 +118,7 @@ function CreateLicenseForm({ companies, plans, onSuccess }) {
                 />
                 {form.errors.grace_days && <p className="field-error">{form.errors.grace_days}</p>}
             </div>
-            <div className="modal-footer">
+            <div className="form-actions" style={{ marginTop: 16 }}>
                 <button type="submit" className="btn" disabled={form.processing}>
                     {form.processing ? 'Guardando…' : 'Guardar'}
                 </button>
@@ -193,7 +194,7 @@ function EditLicenseForm({ license, onSuccess }) {
                 />
                 {form.errors.grace_days && <p className="field-error">{form.errors.grace_days}</p>}
             </div>
-            <div className="modal-footer">
+            <div className="form-actions" style={{ marginTop: 16 }}>
                 <button type="submit" className="btn" disabled={form.processing}>
                     {form.processing ? 'Guardando…' : 'Guardar'}
                 </button>
@@ -273,34 +274,22 @@ export default function LicensesIndex({ licenses, companies, plans }) {
             </div>
 
             {showCreate && (
-                <div className="overlay-layer">
-                    <div className="modal">
-                        <div className="modal-header">
-                            <h2>Nueva licencia</h2>
-                            <button className="modal-close" onClick={() => setShowCreate(false)}>✕</button>
-                        </div>
-                        <CreateLicenseForm
-                            companies={companies}
-                            plans={plans}
-                            onSuccess={() => setShowCreate(false)}
-                        />
-                    </div>
-                </div>
+                <Modal title="Nueva licencia" onClose={() => setShowCreate(false)}>
+                    <CreateLicenseForm
+                        companies={companies}
+                        plans={plans}
+                        onSuccess={() => setShowCreate(false)}
+                    />
+                </Modal>
             )}
 
             {editItem && (
-                <div className="overlay-layer">
-                    <div className="modal">
-                        <div className="modal-header">
-                            <h2>Editar licencia</h2>
-                            <button className="modal-close" onClick={() => setEditItem(null)}>✕</button>
-                        </div>
-                        <EditLicenseForm
-                            license={editItem}
-                            onSuccess={() => setEditItem(null)}
-                        />
-                    </div>
-                </div>
+                <Modal title="Editar licencia" onClose={() => setEditItem(null)}>
+                    <EditLicenseForm
+                        license={editItem}
+                        onSuccess={() => setEditItem(null)}
+                    />
+                </Modal>
             )}
         </AppLayout>
     );

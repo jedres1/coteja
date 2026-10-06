@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Head, useForm, router } from '@inertiajs/react';
 import AppLayout from '@/Layouts/AppLayout';
+import Modal from '@/Components/Modal';
 import { route } from 'ziggy-js';
 
 const platforms = {
@@ -89,7 +90,7 @@ function ReleaseForm({ onSuccess }) {
                 />
                 {form.errors.notes && <p className="field-error">{form.errors.notes}</p>}
             </div>
-            <div className="modal-footer">
+            <div className="form-actions" style={{ marginTop: 16 }}>
                 <button type="submit" className="btn" disabled={form.processing}>
                     {form.processing ? 'Guardando…' : 'Guardar'}
                 </button>
@@ -174,15 +175,9 @@ export default function ReleasesIndex({ releases }) {
             </div>
 
             {showCreate && (
-                <div className="overlay-layer">
-                    <div className="modal">
-                        <div className="modal-header">
-                            <h2>Nueva versión</h2>
-                            <button className="modal-close" onClick={() => setShowCreate(false)}>✕</button>
-                        </div>
-                        <ReleaseForm onSuccess={() => setShowCreate(false)} />
-                    </div>
-                </div>
+                <Modal title="Nueva versión" onClose={() => setShowCreate(false)}>
+                    <ReleaseForm onSuccess={() => setShowCreate(false)} />
+                </Modal>
             )}
         </AppLayout>
     );

@@ -3,6 +3,7 @@ import { Head, useForm, router, Link, usePage } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
+import Modal from '@/Components/Modal';
 
 const roles = { admin: 'Administrador', customer: 'Cliente', consultant: 'Consultor' };
 const roleBadges = { admin: 'role-admin', customer: 'role-customer', consultant: 'role-consultant' };
@@ -216,33 +217,6 @@ function UserForm({ user, modules, customers, companies, onSuccess, onCancel }) 
                 </button>
             </div>
         </form>
-    );
-}
-
-// ─── Modal overlay ────────────────────────────────────────────────────────────
-
-function Modal({ title, onClose, children }) {
-    useEffect(() => {
-        const handler = (e) => { if (e.key === 'Escape') onClose(); };
-        window.addEventListener('keydown', handler);
-        return () => window.removeEventListener('keydown', handler);
-    }, [onClose]);
-
-    return (
-        <div className="overlay-layer" role="dialog" aria-modal="true" aria-label={title}>
-            <button className="overlay-backdrop" type="button" aria-label="Cerrar" onClick={onClose} />
-            <div className="overlay-panel card">
-                <div className="overlay-header">
-                    <div>
-                        <h3>{title}</h3>
-                    </div>
-                    <button type="button" className="btn secondary overlay-close" onClick={onClose}>
-                        ✕
-                    </button>
-                </div>
-                {children}
-            </div>
-        </div>
     );
 }
 

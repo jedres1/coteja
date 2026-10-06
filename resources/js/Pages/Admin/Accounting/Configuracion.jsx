@@ -1,27 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Head, useForm, router } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
-
-function Modal({ title, onClose, children }) {
-    useEffect(() => {
-        const handler = (e) => { if (e.key === 'Escape') onClose(); };
-        window.addEventListener('keydown', handler);
-        return () => window.removeEventListener('keydown', handler);
-    }, [onClose]);
-    return (
-        <div className="overlay-layer" role="dialog" aria-modal="true" aria-label={title}>
-            <button className="overlay-backdrop" type="button" aria-label="Cerrar" onClick={onClose} />
-            <div className="overlay-panel card" style={{ maxWidth: 640 }}>
-                <div className="overlay-header">
-                    <h3>{title}</h3>
-                    <button type="button" className="btn secondary overlay-close" onClick={onClose}>✕</button>
-                </div>
-                {children}
-            </div>
-        </div>
-    );
-}
+import Modal from '@/Components/Modal';
 
 // accounts = [{id, label, type}]
 function AccountSelect({ value, onChange, accounts, label, required = false }) {
@@ -370,7 +351,7 @@ export default function Configuracion({ packages, accounts, costCenters }) {
 
             {/* Modales paquetes */}
             {showCreatePkg && (
-                <Modal title="Nuevo paquete contable" onClose={() => setShowCreatePkg(false)}>
+                <Modal title="Nuevo paquete contable" onClose={() => setShowCreatePkg(false)} maxWidth={640}>
                     <PackageForm
                         accounts={accounts ?? []}
                         costCenters={costCenters ?? []}
@@ -380,7 +361,7 @@ export default function Configuracion({ packages, accounts, costCenters }) {
             )}
 
             {editPkg && (
-                <Modal title={`Editar paquete — ${editPkg.code}`} onClose={() => setEditPkg(null)}>
+                <Modal title={`Editar paquete — ${editPkg.code}`} onClose={() => setEditPkg(null)} maxWidth={640}>
                     <PackageForm
                         pkg={editPkg}
                         accounts={accounts ?? []}
@@ -392,13 +373,13 @@ export default function Configuracion({ packages, accounts, costCenters }) {
 
             {/* Modales centros de costo */}
             {showCreateCC && (
-                <Modal title="Nuevo centro de costo" onClose={() => setShowCreateCC(false)}>
+                <Modal title="Nuevo centro de costo" onClose={() => setShowCreateCC(false)} maxWidth={640}>
                     <CostCenterForm onCancel={() => setShowCreateCC(false)} />
                 </Modal>
             )}
 
             {editCC && (
-                <Modal title={`Editar centro — ${editCC.name}`} onClose={() => setEditCC(null)}>
+                <Modal title={`Editar centro — ${editCC.name}`} onClose={() => setEditCC(null)} maxWidth={640}>
                     <CostCenterForm cc={editCC} onCancel={() => setEditCC(null)} />
                 </Modal>
             )}

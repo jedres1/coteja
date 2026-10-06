@@ -1,30 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Head, useForm, router } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
+import Modal from '@/Components/Modal';
 
 const ACCOUNT_TYPES = { activo: 'Activo', pasivo: 'Pasivo', patrimonio: 'Patrimonio', gasto: 'Gasto', ingreso: 'Ingreso' };
 const NATURE_TYPES  = { deudora: 'Deudora', acreedora: 'Acreedora' };
-
-function Modal({ title, onClose, children }) {
-    useEffect(() => {
-        const handler = (e) => { if (e.key === 'Escape') onClose(); };
-        window.addEventListener('keydown', handler);
-        return () => window.removeEventListener('keydown', handler);
-    }, [onClose]);
-    return (
-        <div className="overlay-layer" role="dialog" aria-modal="true" aria-label={title}>
-            <button className="overlay-backdrop" type="button" aria-label="Cerrar" onClick={onClose} />
-            <div className="overlay-panel card">
-                <div className="overlay-header">
-                    <h3>{title}</h3>
-                    <button type="button" className="btn secondary overlay-close" onClick={onClose}>✕</button>
-                </div>
-                {children}
-            </div>
-        </div>
-    );
-}
 
 function AccountForm({ account, parents, onCancel }) {
     const isEdit = !!account;

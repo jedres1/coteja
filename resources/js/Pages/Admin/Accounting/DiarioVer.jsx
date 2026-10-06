@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Head, router, Link } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
+import Modal from '@/Components/Modal';
 
 const fmt = (x) => Number(x ?? 0).toLocaleString('es-SV', { minimumFractionDigits: 2 });
 
@@ -169,43 +170,36 @@ export default function DiarioVer({ entry }) {
 
             {/* Modal anulación */}
             {annulModal && (
-                <div className="overlay-layer" role="dialog" aria-modal="true">
-                    <button className="overlay-backdrop" type="button" aria-label="Cerrar" onClick={() => setAnnulModal(false)} />
-                    <div className="overlay-panel card" style={{ maxWidth: 460 }}>
-                        <div className="overlay-header">
-                            <h3 style={{ margin: 0 }}>Anular asiento {entry.entry_number}</h3>
-                            <button type="button" className="btn secondary" onClick={() => setAnnulModal(false)}>✕</button>
+                <Modal title={`Anular asiento ${entry.entry_number}`} onClose={() => setAnnulModal(false)} maxWidth={460}>
+                    <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 12 }}>
+                        Se creará un asiento de reversión automático. Ingrese el motivo de anulación.
+                    </p>
+                    <form onSubmit={handleAnnul}>
+                        <label style={{ margin: 0 }}>
+                            Motivo <span style={{ color: '#ef4444' }}>*</span>
+                            <textarea
+                                value={motivo}
+                                onChange={(e) => setMotivo(e.target.value)}
+                                rows={3}
+                                minLength={5}
+                                maxLength={300}
+                                required
+                                style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', fontSize: 13 }}
+                                placeholder="Mínimo 5 caracteres…"
+                            />
+                        </label>
+                        <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+                            <button type="button" className="btn secondary" onClick={() => setAnnulModal(false)}>Cancelar</button>
+                            <button
+                                type="submit"
+                                disabled={submitting || motivo.trim().length < 5}
+                                style={{ padding: '8px 16px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+                            >
+                                {submitting ? 'Anulando…' : 'Confirmar anulación'}
+                            </button>
                         </div>
-                        <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 12 }}>
-                            Se creará un asiento de reversión automático. Ingrese el motivo de anulación.
-                        </p>
-                        <form onSubmit={handleAnnul}>
-                            <label style={{ margin: 0 }}>
-                                Motivo <span style={{ color: '#ef4444' }}>*</span>
-                                <textarea
-                                    value={motivo}
-                                    onChange={(e) => setMotivo(e.target.value)}
-                                    rows={3}
-                                    minLength={5}
-                                    maxLength={300}
-                                    required
-                                    style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', fontSize: 13 }}
-                                    placeholder="Mínimo 5 caracteres…"
-                                />
-                            </label>
-                            <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
-                                <button type="button" className="btn secondary" onClick={() => setAnnulModal(false)}>Cancelar</button>
-                                <button
-                                    type="submit"
-                                    disabled={submitting || motivo.trim().length < 5}
-                                    style={{ padding: '8px 16px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
-                                >
-                                    {submitting ? 'Anulando…' : 'Confirmar anulación'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+                    </form>
+                </Modal>
             )}
         </AppLayout>
     );

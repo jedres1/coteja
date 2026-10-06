@@ -3,29 +3,7 @@ import { Head, useForm, router } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
-
-// ─── Modal ────────────────────────────────────────────────────────────────────
-
-function Modal({ title, onClose, children }) {
-    useEffect(() => {
-        const handler = (e) => { if (e.key === 'Escape') onClose(); };
-        window.addEventListener('keydown', handler);
-        return () => window.removeEventListener('keydown', handler);
-    }, [onClose]);
-
-    return (
-        <div className="overlay-layer" role="dialog" aria-modal="true" aria-label={title}>
-            <button className="overlay-backdrop" type="button" aria-label="Cerrar" onClick={onClose} />
-            <div className="overlay-panel card" style={{ maxWidth: 700 }}>
-                <div className="overlay-header">
-                    <div><h3>{title}</h3></div>
-                    <button type="button" className="btn secondary overlay-close" onClick={onClose}>✕</button>
-                </div>
-                {children}
-            </div>
-        </div>
-    );
-}
+import Modal from '@/Components/Modal';
 
 // ─── DocumentDataView ─────────────────────────────────────────────────────────
 
@@ -338,6 +316,7 @@ export default function PendingApproval({ invoices, total, showAll }) {
                 <Modal
                     title={`Documento — ${viewItem.invoice_number}`}
                     onClose={() => setViewItem(null)}
+                    maxWidth={700}
                 >
                     <DocumentDataView data={viewItem.document_data} />
                 </Modal>
