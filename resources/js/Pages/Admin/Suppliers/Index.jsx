@@ -4,9 +4,25 @@ import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const DOCUMENT_TYPES = {
+    '13': 'DUI',
+    '36': 'NIT',
+    '03': 'Pasaporte',
+    '02': 'Carnet de residente',
+    '37': 'Otro',
+};
+
+const STATUSES = {
+    active:    'Activo',
+    suspended: 'Suspendido',
+    prospect:  'Prospecto',
+};
+
 // ─── SupplierForm ─────────────────────────────────────────────────────────────
 
-function SupplierForm({ supplier, geography, documentTypes, statuses, onSuccess, onCancel }) {
+function SupplierForm({ supplier, geography, onSuccess, onCancel }) {
     const isEdit = !!supplier;
 
     // Resolve initial department from municipality on mount (edit only)
@@ -102,7 +118,7 @@ function SupplierForm({ supplier, geography, documentTypes, statuses, onSuccess,
                 <label>
                     Estado
                     <select value={data.status} onChange={(e) => setData('status', e.target.value)}>
-                        {Object.entries(statuses).map(([k, v]) => (
+                        {Object.entries(STATUSES).map(([k, v]) => (
                             <option key={k} value={k}>{v}</option>
                         ))}
                     </select>
@@ -114,7 +130,7 @@ function SupplierForm({ supplier, geography, documentTypes, statuses, onSuccess,
                     Tipo de documento
                     <select value={data.document_type} onChange={(e) => setData('document_type', e.target.value)}>
                         <option value="">— Seleccionar —</option>
-                        {Object.entries(documentTypes).map(([k, v]) => (
+                        {Object.entries(DOCUMENT_TYPES).map(([k, v]) => (
                             <option key={k} value={k}>{v}</option>
                         ))}
                     </select>
@@ -223,7 +239,7 @@ function Modal({ title, onClose, children }) {
 
 // ─── Index page ───────────────────────────────────────────────────────────────
 
-export default function SuppliersIndex({ suppliers, search, geography, documentTypes, statuses }) {
+export default function SuppliersIndex({ suppliers, search, geography }) {
     const [showCreate, setShowCreate] = useState(false);
     const [editItem, setEditItem] = useState(null);
     const [searchVal, setSearchVal] = useState(search ?? '');
@@ -316,7 +332,7 @@ export default function SuppliersIndex({ suppliers, search, geography, documentT
                                 <td>
                                     {supplier.document_type && (
                                         <span style={{ fontWeight: 600 }}>
-                                            {documentTypes[supplier.document_type] ?? supplier.document_type}
+                                            {DOCUMENT_TYPES[supplier.document_type] ?? supplier.document_type}
                                         </span>
                                     )}
                                     {supplier.document_number && (
@@ -338,7 +354,7 @@ export default function SuppliersIndex({ suppliers, search, geography, documentT
                                 {/* Estado */}
                                 <td>
                                     <span className={`badge ${supplier.status === 'active' ? 'active' : 'suspended'}`}>
-                                        {statuses[supplier.status] ?? supplier.status}
+                                        {STATUSES[supplier.status] ?? supplier.status}
                                     </span>
                                 </td>
 
@@ -380,8 +396,6 @@ export default function SuppliersIndex({ suppliers, search, geography, documentT
                 <Modal title="Nuevo proveedor" onClose={() => setShowCreate(false)}>
                     <SupplierForm
                         geography={geography}
-                        documentTypes={documentTypes}
-                        statuses={statuses}
                         onSuccess={() => setShowCreate(false)}
                         onCancel={() => setShowCreate(false)}
                     />
@@ -394,8 +408,6 @@ export default function SuppliersIndex({ suppliers, search, geography, documentT
                     <SupplierForm
                         supplier={editItem}
                         geography={geography}
-                        documentTypes={documentTypes}
-                        statuses={statuses}
                         onSuccess={() => setEditItem(null)}
                         onCancel={() => setEditItem(null)}
                     />

@@ -103,9 +103,30 @@ function ExtractForm() {
     );
 }
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const documentTypes = {
+    '01': 'Fact. consumidor final',
+    '03': 'CCF',
+    '04': 'Nota de remisión',
+    '05': 'Nota de crédito',
+    '06': 'Nota de débito',
+    '07': 'Comp. de retención',
+    '08': 'Comp. de liquidación',
+    '09': 'Doc. contable de liquidación',
+    '11': 'Fact. sujeto excluido',
+    '14': 'Fact. de exportación',
+};
+
+const statusLabels = {
+    pending:  'Pendiente',
+    approved: 'Aprobado',
+    rejected: 'Rechazado',
+};
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function PendingApproval({ invoices, total, showAll, documentTypes, statusLabels }) {
+export default function PendingApproval({ invoices, total, showAll }) {
     const [selectedIds, setSelectedIds] = useState([]);
     const [selectAll, setSelectAll]     = useState(false);
     const [viewItem, setViewItem]       = useState(null);

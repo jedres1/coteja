@@ -5,9 +5,9 @@ import { route } from 'ziggy-js';
 
 const platforms = {
     windows: 'Windows',
-    iOS: 'iOS',
-    macOS: 'macOS',
-    linux: 'Linux',
+    ios:     'iOS',
+    macos:   'macOS',
+    linux:   'Linux',
 };
 
 function ReleaseForm({ onSuccess }) {
