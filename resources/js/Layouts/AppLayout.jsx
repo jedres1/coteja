@@ -29,10 +29,11 @@ function NavGroup({ label, children, routePatterns = [] }) {
     );
 }
 
-function NavLink({ href, children, routePattern }) {
-    const { url } = usePage();
-    let active = false;
-    try { active = route().current(routePattern); } catch { active = false; }
+function NavLink({ href, children, routePattern, isActive }) {
+    let active = isActive;
+    if (active === undefined) {
+        try { active = route().current(routePattern); } catch { active = false; }
+    }
 
     return (
         <Link href={href} className={active ? 'active-link' : ''}>
@@ -65,6 +66,10 @@ export default function AppLayout({ title, children }) {
     const isAdmin = user?.is_admin;
     const canAccessAdmin = user?.can_access_admin;
     const mod = user?.modules ?? {};
+    const { url } = usePage();
+    const onPayrollIndex = (() => { try { return route().current('admin.payroll.index'); } catch { return false; } })();
+    const isPayrollEmployees = onPayrollIndex && !url.includes('tab=nominas');
+    const isPayrollPeriods   = (onPayrollIndex && url.includes('tab=nominas')) || (() => { try { return route().current('admin.payroll.periods.*'); } catch { return false; } })();
 
     return (
         <div className="shell">
@@ -127,8 +132,8 @@ export default function AppLayout({ title, children }) {
                                     </NavGroup>
 
                                     <NavGroup label="Nómina" routePatterns={['admin.payroll.*']}>
-                                        <NavLink href={route('admin.payroll.index')} routePattern="admin.payroll.index">Empleados</NavLink>
-                                        <NavLink href={route('admin.payroll.index', { tab: 'nominas' })} routePattern="admin.payroll.periods.*">Períodos de Nómina</NavLink>
+                                        <NavLink href={route('admin.payroll.index')} isActive={isPayrollEmployees}>Empleados</NavLink>
+                                        <NavLink href={route('admin.payroll.index', { tab: 'nominas' })} isActive={isPayrollPeriods}>Períodos de Nómina</NavLink>
                                         <NavLink href={route('admin.payroll.concepts.index')} routePattern="admin.payroll.concepts.*">Gestión de conceptos</NavLink>
                                         <NavLink href={route('admin.payroll.settings.index')} routePattern="admin.payroll.settings.*">Configuración</NavLink>
                                     </NavGroup>
@@ -177,8 +182,8 @@ export default function AppLayout({ title, children }) {
 
                             {mod.payroll && (
                                 <NavGroup label="Nómina" routePatterns={['admin.payroll.*']}>
-                                    <NavLink href={route('admin.payroll.index')} routePattern="admin.payroll.index">Empleados</NavLink>
-                                    <NavLink href={route('admin.payroll.index', { tab: 'nominas' })} routePattern="admin.payroll.periods.*">Períodos de Nómina</NavLink>
+                                    <NavLink href={route('admin.payroll.index')} isActive={isPayrollEmployees}>Empleados</NavLink>
+                                    <NavLink href={route('admin.payroll.index', { tab: 'nominas' })} isActive={isPayrollPeriods}>Períodos de Nómina</NavLink>
                                     <NavLink href={route('admin.payroll.concepts.index')} routePattern="admin.payroll.concepts.*">Gestión de conceptos</NavLink>
                                     <NavLink href={route('admin.payroll.settings.index')} routePattern="admin.payroll.settings.*">Configuración</NavLink>
                                 </NavGroup>
