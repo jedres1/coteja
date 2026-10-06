@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\AccountingAccount;
 use App\Models\AccountingPackage;
 use App\Models\AccountingPeriod;
+use App\Models\AccountingYearPeriod;
+use App\Models\CostCenter;
 use App\Services\Accounting\AccountingPeriodService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -114,7 +116,7 @@ class AccountingController extends Controller
     {
         $packages = AccountingPackage::with([
             'debitAccount', 'creditAccount',
-            'secondaryDebitAccount', 'secondaryCreditAccount',
+            'secondaryDebitAccount', 'secondaryCreditAccount', 'costCenter',
         ])->orderBy('code')->get();
 
         $accounts = AccountingAccount::where('is_active', true)
@@ -123,7 +125,9 @@ class AccountingController extends Controller
             ->map(fn ($a) => ['id' => $a->id, 'label' => $a->code . ' — ' . $a->name, 'type' => $a->type])
             ->values();
 
-        return view('admin.accounting.configuracion', compact('packages', 'accounts'));
+        $costCenters = CostCenter::orderBy('code')->get();
+
+        return view('admin.accounting.configuracion', compact('packages', 'accounts', 'costCenters'));
     }
 
     public function storePackage(Request $request)
@@ -137,6 +141,7 @@ class AccountingController extends Controller
             'credit_account_id'           => 'nullable|exists:accounting_accounts,id',
             'secondary_debit_account_id'  => 'nullable|exists:accounting_accounts,id',
             'secondary_credit_account_id' => 'nullable|exists:accounting_accounts,id',
+            'cost_center_id'              => 'nullable|exists:cost_centers,id',
             'is_active'                   => 'boolean',
         ]);
 
@@ -157,6 +162,7 @@ class AccountingController extends Controller
             'credit_account_id'           => 'nullable|exists:accounting_accounts,id',
             'secondary_debit_account_id'  => 'nullable|exists:accounting_accounts,id',
             'secondary_credit_account_id' => 'nullable|exists:accounting_accounts,id',
+            'cost_center_id'              => 'nullable|exists:cost_centers,id',
             'is_active'                   => 'boolean',
         ]);
 
@@ -176,28 +182,78 @@ class AccountingController extends Controller
         return response()->json(['success' => true, 'message' => 'Paquete eliminado.']);
     }
 
+    // ── Centros de costo ────────────────────────────────────────────────────
+
+    public function storeCostCenter(Request $request)
+    {
+        $data = $request->validate([
+            'code' => 'required|string|max:20|unique:cost_centers,code',
+            'name' => 'required|string|max:120',
+            'description' => 'nullable|string|max:500',
+            'is_active' => 'boolean',
+        ]);
+
+        $data['code'] = strtoupper($data['code']);
+        $center = CostCenter::create($data);
+
+        return response()->json(['success' => true, 'message' => 'Centro de costo creado.', 'cost_center' => $center]);
+    }
+
+    public function updateCostCenter(Request $request, CostCenter $costCenter)
+    {
+        $data = $request->validate([
+            'code' => 'required|string|max:20|unique:cost_centers,code,'.$costCenter->id,
+            'name' => 'required|string|max:120',
+            'description' => 'nullable|string|max:500',
+            'is_active' => 'boolean',
+        ]);
+
+        $data['code'] = strtoupper($data['code']);
+        $costCenter->update($data);
+
+        return response()->json(['success' => true, 'message' => 'Centro de costo actualizado.', 'cost_center' => $costCenter->fresh()]);
+    }
+
+    public function destroyCostCenter(CostCenter $costCenter)
+    {
+        if ($costCenter->accountingPackages()->exists() || $costCenter->journalEntryLines()->exists()) {
+            return response()->json(['success' => false, 'message' => 'No se puede eliminar un centro de costo en uso. Puede desactivarlo.'], 422);
+        }
+
+        $costCenter->delete();
+
+        return response()->json(['success' => true, 'message' => 'Centro de costo eliminado.']);
+    }
+
     // ── Períodos Contables ──────────────────────────────────────────────────
 
     public function periodos(Request $request)
     {
         $year = (int) $request->query('year', now()->year);
 
+        $yearPeriod = AccountingYearPeriod::where('year', $year)->first();
         $periods = AccountingPeriod::where('year', $year)
             ->orderBy('month')
             ->get();
 
-        $availableYears = AccountingPeriod::distinct()
+        $availableYears = AccountingYearPeriod::distinct()
             ->orderByDesc('year')
             ->pluck('year')
             ->toArray();
 
-        if (! in_array(now()->year, $availableYears)) {
-            $availableYears[] = now()->year;
-            sort($availableYears);
-            $availableYears = array_reverse($availableYears);
+        foreach (AccountingPeriod::distinct()->pluck('year')->toArray() as $existingYear) {
+            if (! in_array($existingYear, $availableYears)) {
+                $availableYears[] = $existingYear;
+            }
         }
 
-        return view('admin.accounting.periodos', compact('periods', 'year', 'availableYears'));
+        if (! in_array(now()->year, $availableYears)) {
+            $availableYears[] = now()->year;
+        }
+
+        rsort($availableYears);
+
+        return view('admin.accounting.periodos', compact('yearPeriod', 'periods', 'year', 'availableYears'));
     }
 
     public function generarPeriodos(Request $request)
@@ -211,13 +267,44 @@ class AccountingController extends Controller
         return response()->json([
             'success' => true,
             'message' => $created > 0
-                ? "{$created} período(s) creado(s) para el año {$data['year']}."
-                : "Todos los períodos del año {$data['year']} ya existen.",
+                ? "Ejercicio {$data['year']} creado con {$created} mes(es)."
+                : "El ejercicio {$data['year']} y sus 12 meses ya existen.",
         ]);
+    }
+
+    public function abrirAnioPeriodo(Request $request, AccountingYearPeriod $yearPeriod)
+    {
+        if ($yearPeriod->isOpen()) {
+            return response()->json(['success' => false, 'message' => 'El año contable ya está abierto.'], 422);
+        }
+
+        $this->periods->openYear($yearPeriod);
+
+        return response()->json(['success' => true, 'message' => "Ejercicio {$yearPeriod->year} abierto."]);
+    }
+
+    public function cerrarAnioPeriodo(Request $request, AccountingYearPeriod $yearPeriod)
+    {
+        if (! $yearPeriod->isOpen()) {
+            return response()->json(['success' => false, 'message' => 'El año contable ya está cerrado.'], 422);
+        }
+
+        $data = $request->validate([
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $this->periods->closeYear($yearPeriod, $request->user()->id, $data['notes'] ?? null);
+
+        return response()->json(['success' => true, 'message' => "Ejercicio {$yearPeriod->year} cerrado junto con sus meses abiertos."]);
     }
 
     public function abrirPeriodo(Request $request, AccountingPeriod $period)
     {
+        $yearPeriod = AccountingYearPeriod::where('year', $period->year)->first();
+        if (! $yearPeriod || ! $yearPeriod->isOpen()) {
+            return response()->json(['success' => false, 'message' => 'Abra primero el año contable antes de abrir meses.'], 422);
+        }
+
         if ($period->isOpen()) {
             return response()->json(['success' => false, 'message' => 'El período ya está abierto.'], 422);
         }

@@ -9,6 +9,7 @@ use App\Models\JournalEntry;
 use App\Models\JournalEntryLine;
 use App\Models\PurchaseInvoice;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 class AccountingEntryService
 {
@@ -48,6 +49,7 @@ class AccountingEntryService
                 [
                     'journal_entry_id' => $entry->id,
                     'account_id'       => $package->debit_account_id,
+                    'cost_center_id'   => $package->cost_center_id,
                     'description'      => 'Factura ' . $invoice->number_control . ' — ' . $invoice->customer_name,
                     'debit'            => $total,
                     'credit'           => 0,
@@ -56,6 +58,7 @@ class AccountingEntryService
                 [
                     'journal_entry_id' => $entry->id,
                     'account_id'       => $package->credit_account_id,
+                    'cost_center_id'   => $package->cost_center_id,
                     'description'      => 'Ingresos venta: ' . $invoice->number_control,
                     'debit'            => 0,
                     'credit'           => $total,
@@ -70,6 +73,7 @@ class AccountingEntryService
                     $lines[] = [
                         'journal_entry_id' => $entry->id,
                         'account_id'       => $package->secondary_debit_account_id,
+                        'cost_center_id'   => $package->cost_center_id,
                         'description'      => 'Costo de ventas — ' . $invoice->number_control,
                         'debit'            => $costValue,
                         'credit'           => 0,
@@ -78,6 +82,7 @@ class AccountingEntryService
                     $lines[] = [
                         'journal_entry_id' => $entry->id,
                         'account_id'       => $package->secondary_credit_account_id,
+                        'cost_center_id'   => $package->cost_center_id,
                         'description'      => 'Salida inventario — ' . $invoice->number_control,
                         'debit'            => 0,
                         'credit'           => $costValue,
@@ -97,7 +102,7 @@ class AccountingEntryService
         $package = AccountingPackage::where('code', 'CP')->where('is_active', true)->first();
 
         if (! $package || ! $package->debit_account_id || ! $package->credit_account_id) {
-            return null;
+            throw new RuntimeException('Configure las cuentas de débito y crédito del paquete CP en Compras antes de aprobar facturas.');
         }
 
         if (JournalEntry::where('source_type', 'purchase')->where('source_id', $invoice->id)->exists()) {
@@ -129,6 +134,7 @@ class AccountingEntryService
                 [
                     'journal_entry_id' => $entry->id,
                     'account_id'       => $package->debit_account_id,
+                    'cost_center_id'   => $package->cost_center_id,
                     'description'      => 'Gasto compra: ' . $invoice->invoice_number . ' — ' . $supplierName,
                     'debit'            => $total,
                     'credit'           => 0,
@@ -137,6 +143,7 @@ class AccountingEntryService
                 [
                     'journal_entry_id' => $entry->id,
                     'account_id'       => $package->credit_account_id,
+                    'cost_center_id'   => $package->cost_center_id,
                     'description'      => 'CxP: ' . $supplierName . ' — ' . $invoice->invoice_number,
                     'debit'            => 0,
                     'credit'           => $total,
@@ -151,6 +158,7 @@ class AccountingEntryService
                     $lines[] = [
                         'journal_entry_id' => $entry->id,
                         'account_id'       => $package->secondary_debit_account_id,
+                        'cost_center_id'   => $package->cost_center_id,
                         'description'      => 'Ingreso inventario — ' . $invoice->invoice_number,
                         'debit'            => $inventoryValue,
                         'credit'           => 0,
@@ -159,6 +167,7 @@ class AccountingEntryService
                     $lines[] = [
                         'journal_entry_id' => $entry->id,
                         'account_id'       => $package->secondary_credit_account_id,
+                        'cost_center_id'   => $package->cost_center_id,
                         'description'      => 'Ajuste compra inventario — ' . $invoice->invoice_number,
                         'debit'            => 0,
                         'credit'           => $inventoryValue,
@@ -168,6 +177,66 @@ class AccountingEntryService
             }
 
             JournalEntryLine::insert($lines);
+
+            return $entry;
+        });
+    }
+
+    public function createFromPurchasePayment(
+        PurchaseInvoice $invoice,
+        ?int $userId = null,
+        ?string $paymentDate = null,
+        ?string $reference = null,
+    ): ?JournalEntry {
+        $package = AccountingPackage::where('code', 'CXP')->where('is_active', true)->first();
+
+        if (! $package || ! $package->debit_account_id || ! $package->credit_account_id) {
+            throw new RuntimeException('Configure las cuentas de débito y crédito del paquete CXP en Compras antes de registrar pagos.');
+        }
+
+        if (JournalEntry::where('source_type', 'purchase_payment')->where('source_id', $invoice->id)->exists()) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($invoice, $package, $userId, $paymentDate, $reference) {
+            $supplierName = $invoice->supplier?->name ?? 'Proveedor';
+            $entryNumber = $package->reserveNextNumber();
+            $entry = JournalEntry::create([
+                'entry_number' => $entryNumber,
+                'entry_date' => $paymentDate ?? now()->toDateString(),
+                'description' => 'Pago de compra: '.$supplierName.' — '.$invoice->invoice_number,
+                'reference' => $reference ?: $invoice->invoice_number,
+                'status' => 'aprobado',
+                'created_by' => $userId,
+                'approved_by' => $userId,
+                'approved_at' => now(),
+                'accounting_package_id' => $package->id,
+                'source_type' => 'purchase_payment',
+                'source_id' => $invoice->id,
+                'source_document' => $invoice->invoice_number,
+            ]);
+
+            $amount = round((float) $invoice->total, 2);
+            JournalEntryLine::insert([
+                [
+                    'journal_entry_id' => $entry->id,
+                    'account_id' => $package->debit_account_id,
+                    'cost_center_id' => $package->cost_center_id,
+                    'description' => 'Disminución de cuentas por pagar — '.$invoice->invoice_number,
+                    'debit' => $amount,
+                    'credit' => 0,
+                    'sort_order' => 0,
+                ],
+                [
+                    'journal_entry_id' => $entry->id,
+                    'account_id' => $package->credit_account_id,
+                    'cost_center_id' => $package->cost_center_id,
+                    'description' => 'Pago al proveedor: '.$supplierName,
+                    'debit' => 0,
+                    'credit' => $amount,
+                    'sort_order' => 1,
+                ],
+            ]);
 
             return $entry;
         });
@@ -230,8 +299,8 @@ class AccountingEntryService
             }
 
             JournalEntryLine::insert([
-                ['journal_entry_id' => $entry->id, 'account_id' => $package->debit_account_id,  'description' => $debitDesc,  'debit' => $amount, 'credit' => 0,       'sort_order' => 0],
-                ['journal_entry_id' => $entry->id, 'account_id' => $package->credit_account_id, 'description' => $creditDesc, 'debit' => 0,       'credit' => $amount, 'sort_order' => 1],
+                ['journal_entry_id' => $entry->id, 'account_id' => $package->debit_account_id,  'cost_center_id' => $package->cost_center_id, 'description' => $debitDesc,  'debit' => $amount, 'credit' => 0,       'sort_order' => 0],
+                ['journal_entry_id' => $entry->id, 'account_id' => $package->credit_account_id, 'cost_center_id' => $package->cost_center_id, 'description' => $creditDesc, 'debit' => 0,       'credit' => $amount, 'sort_order' => 1],
             ]);
 
             return $entry;

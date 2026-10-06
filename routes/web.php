@@ -55,6 +55,8 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:purchases']
     Route::resource('suppliers', SupplierController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::get('purchase-invoices/settings', [PurchaseInvoiceController::class, 'settingsIndex'])->name('purchase-invoices.settings');
     Route::post('purchase-invoices/settings', [PurchaseInvoiceController::class, 'settingsUpdate'])->name('purchase-invoices.settings.update');
+    Route::post('purchase-invoices/settings/accounting', [PurchaseInvoiceController::class, 'accountingSettingsUpdate'])->name('purchase-invoices.settings.accounting');
+    Route::post('purchase-invoices/settings/generate-missing-entries', [PurchaseInvoiceController::class, 'generateMissingEntries'])->name('purchase-invoices.settings.generate-missing-entries');
     Route::post('purchase-invoices/extract', [PurchaseInvoiceController::class, 'extract'])->name('purchase-invoices.extract');
     Route::get('extraccion-pendiente', [PurchaseInvoiceController::class, 'pendingApproval'])->name('purchase-invoices.pending-approval');
     Route::post('purchase-invoices/aprobar-masivo', [PurchaseInvoiceController::class, 'approveBulk'])->name('purchase-invoices.approve-bulk');
@@ -103,9 +105,14 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:accounting'
         Route::post('paquetes', 'storePackage')->name('paquetes.store');
         Route::put('paquetes/{package}', 'updatePackage')->name('paquetes.update');
         Route::delete('paquetes/{package}', 'destroyPackage')->name('paquetes.destroy');
+        Route::post('centros-costo', 'storeCostCenter')->name('centros-costo.store');
+        Route::put('centros-costo/{costCenter}', 'updateCostCenter')->name('centros-costo.update');
+        Route::delete('centros-costo/{costCenter}', 'destroyCostCenter')->name('centros-costo.destroy');
 
         Route::get('periodos', 'periodos')->name('periodos');
         Route::post('periodos/generar', 'generarPeriodos')->name('periodos.generar');
+        Route::post('periodos/anios/{yearPeriod}/abrir', 'abrirAnioPeriodo')->name('periodos.anios.abrir');
+        Route::post('periodos/anios/{yearPeriod}/cerrar', 'cerrarAnioPeriodo')->name('periodos.anios.cerrar');
         Route::post('periodos/{period}/abrir', 'abrirPeriodo')->name('periodos.abrir');
         Route::post('periodos/{period}/cerrar', 'cerrarPeriodo')->name('periodos.cerrar');
 

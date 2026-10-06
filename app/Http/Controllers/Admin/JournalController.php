@@ -6,6 +6,7 @@ use App\Exceptions\AccountingPeriodException;
 use App\Http\Controllers\Controller;
 use App\Models\AccountingAccount;
 use App\Models\AccountingPackage;
+use App\Models\CostCenter;
 use App\Models\JournalEntry;
 use App\Models\JournalEntryLine;
 use App\Services\Accounting\AccountingPeriodService;
@@ -55,9 +56,11 @@ class JournalController extends Controller
             ->get(['id', 'code', 'name', 'type', 'nature']);
 
         $cgPackage = AccountingPackage::where('code', 'CG')->first();
+        $costCenters = CostCenter::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
 
         return view('admin.accounting.diario-nuevo', [
             'accounts'  => $accounts,
+            'costCenters' => $costCenters,
             'entry'     => null,
             'today'     => now()->toDateString(),
             'cgPackage' => $cgPackage,
@@ -74,6 +77,7 @@ class JournalController extends Controller
             'action'              => 'required|in:borrador,aprobado',
             'lines'               => 'required|array|min:2',
             'lines.*.account_id'  => 'required|exists:accounting_accounts,id',
+            'lines.*.cost_center_id' => 'nullable|exists:cost_centers,id',
             'lines.*.description' => 'nullable|string|max:255',
             'lines.*.debit'       => 'required|numeric|min:0',
             'lines.*.credit'      => 'required|numeric|min:0',
@@ -112,6 +116,7 @@ class JournalController extends Controller
                 JournalEntryLine::create([
                     'journal_entry_id' => $entry->id,
                     'account_id'       => $line['account_id'],
+                    'cost_center_id'   => $line['cost_center_id'] ?? $cgPackage?->cost_center_id,
                     'description'      => $line['description'] ?? null,
                     'debit'            => round((float) $line['debit'], 2),
                     'credit'           => round((float) $line['credit'], 2),
@@ -131,7 +136,7 @@ class JournalController extends Controller
 
     public function show(JournalEntry $entry)
     {
-        $entry->load(['lines.account', 'creator', 'approver', 'accountingPackage']);
+        $entry->load(['lines.account', 'lines.costCenter', 'creator', 'approver', 'accountingPackage.costCenter']);
         return view('admin.accounting.diario-ver', compact('entry'));
     }
 
@@ -144,10 +149,12 @@ class JournalController extends Controller
 
         $accounts  = AccountingAccount::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name', 'type', 'nature']);
         $cgPackage = AccountingPackage::where('code', 'CG')->first();
+        $costCenters = CostCenter::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
         $entry->load('lines');
 
         return view('admin.accounting.diario-nuevo', [
             'accounts'  => $accounts,
+            'costCenters' => $costCenters,
             'entry'     => $entry,
             'today'     => $entry->entry_date->toDateString(),
             'cgPackage' => $cgPackage,
@@ -168,6 +175,7 @@ class JournalController extends Controller
             'action'              => 'required|in:borrador,aprobado',
             'lines'               => 'required|array|min:2',
             'lines.*.account_id'  => 'required|exists:accounting_accounts,id',
+            'lines.*.cost_center_id' => 'nullable|exists:cost_centers,id',
             'lines.*.description' => 'nullable|string|max:255',
             'lines.*.debit'       => 'required|numeric|min:0',
             'lines.*.credit'      => 'required|numeric|min:0',
@@ -199,6 +207,7 @@ class JournalController extends Controller
                 JournalEntryLine::create([
                     'journal_entry_id' => $entry->id,
                     'account_id'       => $line['account_id'],
+                    'cost_center_id'   => $line['cost_center_id'] ?? null,
                     'description'      => $line['description'] ?? null,
                     'debit'            => round((float) $line['debit'], 2),
                     'credit'           => round((float) $line['credit'], 2),
@@ -268,6 +277,7 @@ class JournalController extends Controller
                 JournalEntryLine::create([
                     'journal_entry_id' => $reversal->id,
                     'account_id'       => $line->account_id,
+                    'cost_center_id'   => $line->cost_center_id,
                     'description'      => $line->description,
                     'debit'            => $line->credit,
                     'credit'           => $line->debit,

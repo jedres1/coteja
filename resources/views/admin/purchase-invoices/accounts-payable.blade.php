@@ -68,6 +68,13 @@
         <a class="btn secondary" href="{{ route('admin.purchase-invoices.index') }}">Ver todas las facturas</a>
     </div>
 
+    @if($bankAccounts->isEmpty())
+        <div class="card" role="status" style="margin-bottom:16px;border-left:4px solid var(--warn)">
+            Para registrar pagos, primero agregue una cuenta bancaria activa en
+            <a href="{{ route('admin.bank-transactions.accounts') }}">Control bancario → Cuentas bancarias</a>.
+        </div>
+    @endif
+
     {{-- Métricas --}}
     <div class="ap-summary">
         <div class="ap-metric bad">
@@ -168,7 +175,7 @@
                                                 <label>
                                                     Estado de pago
                                                     <select name="payment_status" required>
-                                                        <option value="paid"    @selected($invoice->payment_status === 'paid')>Pagada</option>
+                                                        <option value="paid" @disabled($bankAccounts->isEmpty()) @selected($invoice->payment_status === 'paid')>Pagada</option>
                                                         <option value="partial" @selected($invoice->payment_status === 'partial')>Parcial</option>
                                                         <option value="pending" @selected($invoice->payment_status === 'pending')>Pendiente</option>
                                                     </select>
@@ -178,14 +185,19 @@
                                                     <input type="text" name="payment_method" value="{{ $invoice->payment_method }}" placeholder="Efectivo, Transferencia, Tarjeta…" maxlength="100">
                                                 </label>
                                                 <div class="bank-fields">
-                                                    <p class="bank-hint">Opcional — completa para registrar en Control bancario:</p>
+                                                    <p class="bank-hint">Obligatorio al marcar la factura como pagada.</p>
                                                     <label>
                                                         Fecha de transacción
                                                         <input type="date" name="transaction_date" value="{{ now()->toDateString() }}">
                                                     </label>
                                                     <label>
-                                                        Banco / Cuenta
-                                                        <input type="text" name="bank_account" placeholder="Banco Agrícola / Cta. 1234" maxlength="200">
+                                                        Cuenta bancaria
+                                                        <select name="bank_account_id">
+                                                            <option value="">Seleccione cuenta bancaria</option>
+                                                            @foreach($bankAccounts as $bankAccount)
+                                                                <option value="{{ $bankAccount->id }}">{{ $bankAccount->bank_name }} · {{ $bankAccount->name }}@if($bankAccount->account_number) · {{ $bankAccount->account_number }}@endif</option>
+                                                            @endforeach
+                                                        </select>
                                                     </label>
                                                     <label>
                                                         Referencia / N° cheque
@@ -215,4 +227,19 @@
             </div>
         @endif
     </div>
+    <script>
+        document.querySelectorAll('.pay-form').forEach((form) => {
+            const paymentStatus = form.querySelector('[name="payment_status"]');
+            const transactionDate = form.querySelector('[name="transaction_date"]');
+            const bankAccount = form.querySelector('[name="bank_account_id"]');
+            const syncPaymentRequirements = () => {
+                const isPaid = paymentStatus.value === 'paid';
+                transactionDate.required = isPaid;
+                bankAccount.required = isPaid;
+            };
+
+            paymentStatus.addEventListener('change', syncPaymentRequirements);
+            syncPaymentRequirements();
+        });
+    </script>
 </x-layouts.app>

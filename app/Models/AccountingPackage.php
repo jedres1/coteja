@@ -12,6 +12,7 @@ class AccountingPackage extends Model
         'code', 'name', 'description', 'type',
         'debit_account_id', 'credit_account_id',
         'secondary_debit_account_id', 'secondary_credit_account_id',
+        'cost_center_id',
         'last_correlative', 'is_active',
     ];
 
@@ -38,6 +39,11 @@ class AccountingPackage extends Model
     public function secondaryCreditAccount(): BelongsTo
     {
         return $this->belongsTo(AccountingAccount::class, 'secondary_credit_account_id');
+    }
+
+    public function costCenter(): BelongsTo
+    {
+        return $this->belongsTo(CostCenter::class);
     }
 
     public function journalEntries(): HasMany

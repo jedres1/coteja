@@ -15,8 +15,13 @@
         'nature' => $a->nature,
         'label'  => $a->code . ' — ' . $a->name,
     ])->values()->toJson();
+    $costCentersJson = $costCenters->map(fn($c) => [
+        'id' => $c->id,
+        'label' => $c->code . ' — ' . $c->name,
+    ])->values()->toJson();
     $existingLines = $entry ? $entry->lines->map(fn($l) => [
         'account_id'  => $l->account_id,
+        'cost_center_id' => $l->cost_center_id,
         'description' => $l->description ?? '',
         'debit'       => $l->debit  > 0 ? number_format($l->debit,  2, '.', '') : '',
         'credit'      => $l->credit > 0 ? number_format($l->credit, 2, '.', '') : '',
@@ -84,6 +89,7 @@
                     <tr>
                         <th style="width:36px">#</th>
                         <th>Cuenta contable</th>
+                        <th style="min-width:150px">Centro de costo</th>
                         <th style="min-width:160px">Descripción de la partida</th>
                         <th style="width:130px;text-align:right">Debe ($)</th>
                         <th style="width:130px;text-align:right">Haber ($)</th>
@@ -95,7 +101,7 @@
                 </tbody>
                 <tfoot>
                     <tr style="background:#f8fafc;font-weight:700">
-                        <td colspan="3" style="text-align:right;color:#6b7280;padding:.75rem 1rem">TOTALES</td>
+                        <td colspan="4" style="text-align:right;color:#6b7280;padding:.75rem 1rem">TOTALES</td>
                         <td style="text-align:right;padding:.75rem 1rem;font-variant-numeric:tabular-nums" id="total-debit">$0.00</td>
                         <td style="text-align:right;padding:.75rem 1rem;font-variant-numeric:tabular-nums" id="total-credit">$0.00</td>
                         <td></td>
@@ -138,8 +144,8 @@
 .line-num{color:#9ca3af;font-size:.8rem;text-align:center}
 .amount-input{text-align:right;font-variant-numeric:tabular-nums;width:100%;border:1px solid #e5e7eb;border-radius:.375rem;padding:.35rem .5rem;font-size:.875rem;background:transparent}
 .amount-input:focus{outline:none;border-color:#2563eb}
-.account-select{width:100%;border:1px solid #e5e7eb;border-radius:.375rem;padding:.35rem .5rem;font-size:.8125rem;background:transparent}
-.account-select:focus{outline:none;border-color:#2563eb}
+.account-select,.cost-center-select{width:100%;border:1px solid #e5e7eb;border-radius:.375rem;padding:.35rem .5rem;font-size:.8125rem;background:transparent}
+.account-select:focus,.cost-center-select:focus{outline:none;border-color:#2563eb}
 .line-desc-input{width:100%;border:1px solid #e5e7eb;border-radius:.375rem;padding:.35rem .5rem;font-size:.8125rem;background:transparent}
 .line-desc-input:focus{outline:none;border-color:#2563eb}
 .remove-line-btn{background:none;border:none;cursor:pointer;color:#9ca3af;font-size:1rem;padding:.25rem;border-radius:.25rem}
@@ -152,6 +158,7 @@
 
 <script>
 const ACCOUNTS = {!! $accountsJson !!};
+const COST_CENTERS = {!! $costCentersJson !!};
 const EXISTING = {!! $existingLines !!};
 const ACTION_URL = '{{ $entry ? route("admin.accounting.diario.update", $entry) : route("admin.accounting.diario.store") }}';
 const IS_EDIT = {{ $entry ? 'true' : 'false' }};
@@ -180,6 +187,15 @@ function accountOptions(selectedId = null) {
     return html;
 }
 
+function costCenterOptions(selectedId = null) {
+    let html = '<option value="">— Sin centro —</option>';
+    COST_CENTERS.forEach(c => {
+        const sel = selectedId && String(c.id) === String(selectedId) ? ' selected' : '';
+        html += `<option value="${c.id}"${sel}>${c.label}</option>`;
+    });
+    return html;
+}
+
 function addLine(data = {}) {
     lineCount++;
     const idx = lineCount;
@@ -190,6 +206,11 @@ function addLine(data = {}) {
         <td>
             <select class="account-select" data-line="${idx}" onchange="updateTotals()">
                 ${accountOptions(data.account_id)}
+            </select>
+        </td>
+        <td>
+            <select class="cost-center-select" data-line="${idx}">
+                ${costCenterOptions(data.cost_center_id)}
             </select>
         </td>
         <td>
@@ -275,6 +296,7 @@ function collectLines() {
         const idx = tr.id.replace('line-', '');
         lines.push({
             account_id:  tr.querySelector('.account-select')?.value  || '',
+            cost_center_id: tr.querySelector('.cost-center-select')?.value || '',
             description: tr.querySelector('.line-desc-input')?.value || '',
             debit:       parseFloat(tr.querySelector('.debit-input')?.value)  || 0,
             credit:      parseFloat(tr.querySelector('.credit-input')?.value) || 0,

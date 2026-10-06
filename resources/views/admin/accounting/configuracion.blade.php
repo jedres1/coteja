@@ -3,6 +3,13 @@
     $typeColors = ['automatico' => ['bg'=>'#dbeafe','color'=>'#1e40af'], 'manual' => ['bg'=>'#f3e8ff','color'=>'#6b21a8']];
     $typeLabels = ['automatico' => 'Automático', 'manual' => 'Manual'];
     $accountsJson = $accounts->toJson();
+    $allCostCentersJson = $costCenters->map(fn($c) => [
+        'id' => $c->id,
+        'code' => $c->code,
+        'name' => $c->name,
+        'description' => $c->description,
+        'is_active' => $c->is_active,
+    ])->values()->toJson();
     $packagesJson = $packages->map(fn($p) => [
         'id'                          => $p->id,
         'code'                        => $p->code,
@@ -13,6 +20,7 @@
         'credit_account_id'           => $p->credit_account_id,
         'secondary_debit_account_id'  => $p->secondary_debit_account_id,
         'secondary_credit_account_id' => $p->secondary_credit_account_id,
+        'cost_center_id'              => $p->cost_center_id,
         'is_active'                   => $p->is_active,
         'last_correlative'            => $p->last_correlative,
     ])->toJson();
@@ -56,6 +64,7 @@
                     <th>Cuenta Haber (primaria)</th>
                     <th>Debe secundario</th>
                     <th>Haber secundario</th>
+                    <th>Centro de costo</th>
                     <th style="width:70px;text-align:right">Correlat.</th>
                     <th style="width:70px;text-align:center">Estado</th>
                     <th style="width:80px">Acciones</th>
@@ -102,6 +111,13 @@
                             <span style="color:#d1d5db">—</span>
                         @endif
                     </td>
+                    <td class="text-sm text-muted">
+                        @if($pkg->costCenter)
+                            <code style="color:#0f766e">{{ $pkg->costCenter->code }}</code> {{ $pkg->costCenter->name }}
+                        @else
+                            <span style="color:#d1d5db">—</span>
+                        @endif
+                    </td>
                     <td style="text-align:right;font-variant-numeric:tabular-nums;font-size:.875rem;color:#374151">
                         {{ number_format($pkg->last_correlative) }}
                     </td>
@@ -125,6 +141,59 @@
                 @empty
                 <tr>
                     <td colspan="10" class="text-center text-muted" style="padding:2rem">No hay paquetes configurados.</td>
+                </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{{-- Centros de costo --}}
+<div class="card" style="margin-bottom:1.5rem;overflow:hidden">
+    <div style="padding:.875rem 1.25rem;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap">
+        <div>
+            <h2 style="margin:0;font-size:1rem;font-weight:700">Centros de costo</h2>
+            <p style="margin:.25rem 0 0;font-size:.8125rem;color:#6b7280">Úselos para clasificar los asientos generados por paquetes contables.</p>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openCostCenterModal()">+ Nuevo centro</button>
+    </div>
+    <div style="overflow-x:auto">
+        <table class="table" style="min-width:720px">
+            <thead>
+                <tr>
+                    <th style="width:110px">Código</th>
+                    <th>Nombre</th>
+                    <th>Descripción</th>
+                    <th style="width:90px;text-align:center">Estado</th>
+                    <th style="width:90px">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($costCenters as $center)
+                <tr>
+                    <td><code style="font-weight:700;color:#0f766e;background:#ccfbf1;padding:.2rem .5rem;border-radius:.25rem;font-size:.875rem">{{ $center->code }}</code></td>
+                    <td style="font-weight:500;font-size:.875rem">{{ $center->name }}</td>
+                    <td class="text-sm text-muted">{{ $center->description ?: '—' }}</td>
+                    <td style="text-align:center">
+                        @if($center->is_active)
+                            <span class="badge" style="background:#dcfce7;color:#166534;font-size:.7rem">Activo</span>
+                        @else
+                            <span class="badge" style="background:#f3f4f6;color:#6b7280;font-size:.7rem">Inactivo</span>
+                        @endif
+                    </td>
+                    <td>
+                        <div class="row-actions">
+                            <button class="btn-icon" title="Editar" onclick="editCostCenter({{ $center->id }})">✎</button>
+                            @if(!$center->accountingPackages()->exists() && !$center->journalEntryLines()->exists())
+                                <button class="btn-icon btn-icon-danger" title="Eliminar"
+                                        onclick="deleteCostCenter('{{ route('admin.accounting.centros-costo.destroy', $center) }}', '{{ $center->code }}')">✕</button>
+                            @endif
+                        </div>
+                    </td>
+                </tr>
+                @empty
+                <tr>
+                    <td colspan="5" class="text-center text-muted" style="padding:2rem">No hay centros de costo configurados.</td>
                 </tr>
                 @endforelse
             </tbody>
@@ -195,6 +264,11 @@
             </div>
 
             <div class="form-group">
+                <label class="form-label">Centro de costo</label>
+                <select id="p-cost-center" class="input"><option value="">— Ninguno —</option></select>
+            </div>
+
+            <div class="form-group">
                 <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
                     <input type="checkbox" id="p-active" checked style="width:1rem;height:1rem">
                     <span class="form-label" style="margin:0">Paquete activo</span>
@@ -204,6 +278,45 @@
         <div class="overlay-footer" style="padding:1rem 1.25rem;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:.75rem">
             <button type="button" class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
             <button type="button" class="btn btn-primary" id="btn-save-package" onclick="savePackage()">Guardar paquete</button>
+        </div>
+    </div>
+</details>
+
+{{-- Modal crear/editar centro de costo --}}
+<details class="overlay-modal" id="modal-cost-center">
+    <summary style="display:none"></summary>
+    <div class="overlay-backdrop" onclick="closeCostCenterModal()"></div>
+    <div class="overlay-panel" style="max-width:520px">
+        <div class="overlay-header">
+            <h2 id="cost-center-modal-title">Nuevo centro de costo</h2>
+            <button class="overlay-close" onclick="closeCostCenterModal()" type="button">✕</button>
+        </div>
+        <div style="padding:1.25rem;display:grid;gap:1rem">
+            <div class="form-grid-2">
+                <div class="form-group">
+                    <label class="form-label">Código <span class="required">*</span></label>
+                    <input id="cc-code" type="text" class="input" maxlength="20" placeholder="ej: ADM" style="text-transform:uppercase"
+                           oninput="this.value=this.value.toUpperCase()">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Nombre <span class="required">*</span></label>
+                    <input id="cc-name" type="text" class="input" maxlength="120" placeholder="Administración">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Descripción</label>
+                <input id="cc-description" type="text" class="input" maxlength="500" placeholder="Detalle opcional">
+            </div>
+            <div class="form-group">
+                <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                    <input type="checkbox" id="cc-active" checked style="width:1rem;height:1rem">
+                    <span class="form-label" style="margin:0">Centro activo</span>
+                </label>
+            </div>
+        </div>
+        <div class="overlay-footer">
+            <button type="button" class="btn btn-ghost" onclick="closeCostCenterModal()">Cancelar</button>
+            <button type="button" class="btn btn-primary" id="btn-save-cost-center" onclick="saveCostCenter()">Guardar centro</button>
         </div>
     </div>
 </details>
@@ -225,6 +338,22 @@
     </div>
 </details>
 
+<details class="overlay-modal" id="modal-delete-cost-center">
+    <summary style="display:none"></summary>
+    <div class="overlay-backdrop" onclick="document.getElementById('modal-delete-cost-center').removeAttribute('open')"></div>
+    <div class="overlay-panel" style="max-width:400px">
+        <div class="overlay-header">
+            <h2>Eliminar centro</h2>
+            <button class="overlay-close" onclick="document.getElementById('modal-delete-cost-center').removeAttribute('open')" type="button">✕</button>
+        </div>
+        <p style="padding:1rem 1.25rem">¿Eliminar el centro de costo <strong id="del-cc-code"></strong>? Esta acción no se puede deshacer.</p>
+        <div class="overlay-footer">
+            <button type="button" class="btn btn-ghost" onclick="document.getElementById('modal-delete-cost-center').removeAttribute('open')">Cancelar</button>
+            <button type="button" class="btn btn-danger" id="btn-confirm-delete-cost-center" onclick="confirmDeleteCostCenter()">Eliminar</button>
+        </div>
+    </div>
+</details>
+
 <div id="cfg-toast" style="display:none;position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;
     background:#1f2937;color:#fff;padding:.75rem 1.25rem;border-radius:.5rem;font-size:.875rem;box-shadow:0 4px 12px rgba(0,0,0,.3)"></div>
 
@@ -242,11 +371,14 @@
 
 <script>
 const ACCOUNTS = {!! $accountsJson !!};
+const ALL_COST_CENTERS = {!! $allCostCentersJson !!};
 const PACKAGES = {!! $packagesJson !!};
 const CSRF     = document.querySelector('meta[name=csrf-token]')?.content || '';
 
 let editingId     = null;
 let deleteUrl     = null;
+let editingCostCenterId = null;
+let deleteCostCenterUrl = null;
 
 function buildAccountOptions(selectedId) {
     const groups = {};
@@ -272,6 +404,18 @@ function populateSelects(pkg = null) {
         const keys = ['debit_account_id','credit_account_id','secondary_debit_account_id','secondary_credit_account_id'];
         document.getElementById(id).innerHTML = buildAccountOptions(pkg?.[keys[i]]);
     });
+    document.getElementById('p-cost-center').innerHTML = buildCostCenterOptions(pkg?.cost_center_id);
+}
+
+function buildCostCenterOptions(selectedId) {
+    let html = '<option value="">— Ninguno —</option>';
+    ALL_COST_CENTERS.forEach(c => {
+        const sel = selectedId && String(c.id) === String(selectedId) ? ' selected' : '';
+        const disabled = !c.is_active && !sel ? ' disabled' : '';
+        const suffix = c.is_active ? '' : ' (inactivo)';
+        html += `<option value="${c.id}"${sel}${disabled}>${c.code} — ${c.name}${suffix}</option>`;
+    });
+    return html;
 }
 
 function openModal(pkg = null) {
@@ -314,6 +458,7 @@ async function savePackage() {
         credit_account_id:             document.getElementById('p-credit').value    || null,
         secondary_debit_account_id:    document.getElementById('p-sec-debit').value || null,
         secondary_credit_account_id:   document.getElementById('p-sec-credit').value|| null,
+        cost_center_id:                document.getElementById('p-cost-center').value || null,
         is_active:                     document.getElementById('p-active').checked,
     };
 
@@ -353,6 +498,80 @@ async function confirmDelete() {
     btn.disabled = true;
     try {
         const res  = await fetch(deleteUrl, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json','X-CSRF-TOKEN':CSRF,'X-Requested-With':'XMLHttpRequest','Accept':'application/json'},
+            body: JSON.stringify({_method:'DELETE'}),
+        });
+        const json = await res.json();
+        showToast(json.message, res.ok);
+        if (res.ok) setTimeout(() => window.location.reload(), 700);
+    } catch { showToast('Error de red.', false); } finally { btn.disabled = false; }
+}
+
+function openCostCenterModal(center = null) {
+    editingCostCenterId = center ? center.id : null;
+    document.getElementById('cost-center-modal-title').textContent = center ? 'Editar centro — ' + center.code : 'Nuevo centro de costo';
+    document.getElementById('cc-code').value = center?.code || '';
+    document.getElementById('cc-name').value = center?.name || '';
+    document.getElementById('cc-description').value = center?.description || '';
+    document.getElementById('cc-active').checked = center ? center.is_active : true;
+    document.getElementById('modal-cost-center').setAttribute('open', '');
+}
+
+function closeCostCenterModal() {
+    document.getElementById('modal-cost-center').removeAttribute('open');
+    editingCostCenterId = null;
+}
+
+function editCostCenter(id) {
+    const center = ALL_COST_CENTERS.find(c => c.id === id);
+    if (center) openCostCenterModal(center);
+}
+
+async function saveCostCenter() {
+    const code = document.getElementById('cc-code').value.trim().toUpperCase();
+    const name = document.getElementById('cc-name').value.trim();
+    if (!code) { showToast('Ingrese el código del centro.', false); return; }
+    if (!name) { showToast('Ingrese el nombre del centro.', false); return; }
+
+    const payload = {
+        _token: CSRF,
+        code,
+        name,
+        description: document.getElementById('cc-description').value.trim(),
+        is_active: document.getElementById('cc-active').checked,
+    };
+    let url = '{{ route("admin.accounting.centros-costo.store") }}';
+    if (editingCostCenterId) {
+        url = '{{ url("admin/contabilidad/centros-costo") }}/' + editingCostCenterId;
+        payload._method = 'PUT';
+    }
+
+    const btn = document.getElementById('btn-save-cost-center');
+    btn.disabled = true;
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json','X-CSRF-TOKEN':CSRF,'X-Requested-With':'XMLHttpRequest','Accept':'application/json'},
+            body: JSON.stringify(payload),
+        });
+        const json = await res.json();
+        showToast(json.message, res.ok);
+        if (res.ok) setTimeout(() => window.location.reload(), 700);
+    } catch { showToast('Error de red.', false); } finally { btn.disabled = false; }
+}
+
+function deleteCostCenter(url, code) {
+    deleteCostCenterUrl = url;
+    document.getElementById('del-cc-code').textContent = code;
+    document.getElementById('modal-delete-cost-center').setAttribute('open', '');
+}
+
+async function confirmDeleteCostCenter() {
+    const btn = document.getElementById('btn-confirm-delete-cost-center');
+    btn.disabled = true;
+    try {
+        const res = await fetch(deleteCostCenterUrl, {
             method: 'POST',
             headers: {'Content-Type':'application/json','X-CSRF-TOKEN':CSRF,'X-Requested-With':'XMLHttpRequest','Accept':'application/json'},
             body: JSON.stringify({_method:'DELETE'}),

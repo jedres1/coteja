@@ -127,75 +127,133 @@
                                                         }
                                                     }
 
-                                                    $detailItems = [];
-                                                    $identification = $decodedDocumentBody['identificacion'] ?? [];
-                                                    $issuer = $decodedDocumentBody['emisor'] ?? [];
-                                                    $summary = $decodedDocumentBody['resumen'] ?? [];
-
-                                                    $detailItems[] = ['label' => 'Proveedor', 'value' => data_get($issuer, 'nombre') ?: $invoice->supplier?->name];
-                                                    $detailItems[] = ['label' => 'Número', 'value' => $invoice->invoice_number ?: (data_get($identification, 'numeroControl') ?: data_get($identification, 'codigoGeneracion'))];
-                                                    $detailItems[] = ['label' => 'Fecha', 'value' => $invoice->purchase_date?->format('d/m/Y') ?: data_get($identification, 'fecEmi')];
-                                                    $detailItems[] = ['label' => 'Tipo', 'value' => $documentTypes[$invoice->document_type] ?? $invoice->document_type ?: data_get($identification, 'tipoDte')];
-                                                    $detailItems[] = ['label' => 'Subtotal', 'value' => $money($invoice->subtotal ?: data_get($summary, 'subTotal'))];
-                                                    $detailItems[] = ['label' => 'IVA', 'value' => $money($invoice->iva ?: data_get($summary, 'totalIva'))];
-                                                    $detailItems[] = ['label' => 'Total', 'value' => $money($invoice->total ?: data_get($summary, 'montoTotalOperacion'))];
-                                                    $detailItems[] = ['label' => 'Estado', 'value' => $paymentStatuses[$invoice->payment_status] ?? $invoice->payment_status];
+                                                    $identification = data_get($decodedDocumentBody, 'identificacion', []);
+                                                    $issuer = data_get($decodedDocumentBody, 'emisor', []);
+                                                    $receiver = data_get($decodedDocumentBody, 'receptor', []);
+                                                    $summary = data_get($decodedDocumentBody, 'resumen', []);
+                                                    $invoiceItems = data_get($decodedDocumentBody, 'cuerpoDocumento', []);
+                                                    $invoiceItems = is_array($invoiceItems) ? array_values($invoiceItems) : [];
+                                                    $paymentCodes = [
+                                                        '01' => 'Efectivo', '02' => 'Tarjeta de débito', '03' => 'Tarjeta de crédito',
+                                                        '04' => 'Cheque', '05' => 'Transferencia', '08' => 'Dinero electrónico',
+                                                        '09' => 'Monedero electrónico', '11' => 'Bitcoin', '12' => 'Otro', '13' => 'Crédito',
+                                                    ];
+                                                    $payment = data_get($summary, 'pagos.0', []);
+                                                    $paymentCode = (string) data_get($payment, 'codigo', '');
+                                                    $paymentMethod = $invoice->payment_method ?: ($paymentCodes[$paymentCode] ?? $paymentCode);
+                                                    $paymentCondition = match ((string) data_get($summary, 'condicionOperacion', '')) {
+                                                        '1' => 'Contado',
+                                                        '2' => 'Crédito',
+                                                        '3' => 'Otro',
+                                                        default => 'No especificada',
+                                                    };
+                                                    $invoiceDate = $invoice->purchase_date?->format('d/m/Y') ?: data_get($identification, 'fecEmi', '—');
+                                                    $invoiceNumber = $invoice->invoice_number ?: data_get($identification, 'numeroControl', '—');
+                                                    $invoiceType = $documentTypes[$invoice->document_type] ?? $invoice->document_type;
+                                                    $subtotal = data_get($summary, 'subTotal', $invoice->subtotal);
+                                                    $taxTotal = data_get($summary, 'totalIva', data_get($summary, 'ivaPerci1', $invoice->iva));
+                                                    $grandTotal = data_get($summary, 'montoTotalOperacion', data_get($summary, 'totalPagar', $invoice->total));
+                                                    $taxableBase = collect($invoiceItems)->sum(fn ($item) => (float) data_get($item, 'ventaGravada', 0));
+                                                    $documentStamp = data_get($decodedDocumentBody, 'selloRecibido')
+                                                        ?: data_get($decodedDocumentBody, 'respuestaMH.selloRecibido')
+                                                        ?: data_get($decodedDocumentBody, 'sello_recepcion');
                                                 @endphp
-                                                <div class="document-detail-stack">
-                                                    @if($detailItems)
-                                                        <div class="document-summary-card">
-                                                            @foreach($detailItems as $detailItem)
-                                                                <div class="detail-item">
-                                                                    <span>{{ $detailItem['label'] }}</span>
-                                                                    <strong>{{ $detailItem['value'] ?: '—' }}</strong>
-                                                                </div>
-                                                            @endforeach
+                                                <div class="invoice-paper">
+                                                    <div class="invoice-paper-header">
+                                                        <div>
+                                                            <span class="invoice-kicker">Documento de compra</span>
+                                                            <h2>{{ $invoiceType }}</h2>
+                                                            <span class="invoice-number">{{ $invoiceNumber }}</span>
                                                         </div>
-                                                    @endif
+                                                        <dl class="invoice-meta">
+                                                            <div><dt>Fecha de emisión</dt><dd>{{ $invoiceDate }}</dd></div>
+                                                            <div><dt>Estado de pago</dt><dd>{{ $paymentStatuses[$invoice->payment_status] ?? $invoice->payment_status }}</dd></div>
+                                                        </dl>
+                                                    </div>
 
-                                                    @if($invoice->extracted_document_body)
-                                                        <div class="document-body-preview">
-                                                            <h4>Contenido extraído</h4>
-                                                            @if($decodedDocumentBody)
-                                                                @foreach($decodedDocumentBody as $sectionKey => $sectionValue)
+                                                    <div class="invoice-parties">
+                                                        <section>
+                                                            <h4>Emisor</h4>
+                                                            <strong>{{ data_get($issuer, 'nombre') ?: $invoice->supplier?->name ?: '—' }}</strong>
+                                                            <span>{{ data_get($issuer, 'nombreComercial') ?: $invoice->supplier?->trade_name ?: '' }}</span>
+                                                            <span>NIT: {{ data_get($issuer, 'nit') ?: $invoice->supplier?->document_number ?: '—' }}</span>
+                                                            <span>NRC: {{ data_get($issuer, 'nrc') ?: $invoice->supplier?->nrc ?: '—' }}</span>
+                                                            <span>{{ data_get($issuer, 'direccion.complemento') ?: $invoice->supplier?->address ?: '—' }}</span>
+                                                        </section>
+                                                        <section>
+                                                            <h4>Receptor</h4>
+                                                            <strong>{{ data_get($receiver, 'nombre') ?: $invoice->customer?->name ?: '—' }}</strong>
+                                                            <span>{{ data_get($receiver, 'nombreComercial') ?: $invoice->customer?->trade_name ?: '' }}</span>
+                                                            <span>Documento: {{ data_get($receiver, 'numDocumento') ?: $invoice->customer?->document_number ?: '—' }}</span>
+                                                            <span>NRC: {{ data_get($receiver, 'nrc') ?: $invoice->customer?->nrc ?: '—' }}</span>
+                                                            <span>{{ data_get($receiver, 'direccion.complemento') ?: $invoice->customer?->address ?: '—' }}</span>
+                                                        </section>
+                                                    </div>
+
+                                                    <div class="invoice-items-wrap">
+                                                        <table class="invoice-items">
+                                                            <thead>
+                                                                <tr><th>#</th><th>Descripción</th><th>Cantidad</th><th>Precio</th><th>Impuesto</th><th>Total</th></tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                @forelse($invoiceItems as $itemIndex => $item)
                                                                     @php
-                                                                        $sectionTitle = match ($sectionKey) {
-                                                                            'identificacion' => 'Identificación',
-                                                                            'emisor' => 'Emisor',
-                                                                            'receptor' => 'Receptor',
-                                                                            'resumen' => 'Resumen',
-                                                                            'cuerpoDocumento' => 'Cuerpo del documento',
-                                                                            'otrosDocumentos' => 'Otros documentos',
-                                                                            default => ucfirst(str_replace('_', ' ', $sectionKey)),
-                                                                        };
+                                                                        $quantity = (float) data_get($item, 'cantidad', 0);
+                                                                        $unitPrice = (float) data_get($item, 'precioUni', 0);
+                                                                        $itemTaxable = (float) data_get($item, 'ventaGravada', 0);
+                                                                        $itemExempt = (float) data_get($item, 'ventaExenta', 0);
+                                                                        $itemNonTaxable = (float) data_get($item, 'ventaNoSuj', 0);
+                                                                        $discount = (float) data_get($item, 'montoDescu', 0);
+                                                                        $lineTotal = $itemTaxable + $itemExempt + $itemNonTaxable;
+                                                                        if ($lineTotal == 0) $lineTotal = max(0, $quantity * $unitPrice - $discount);
+                                                                        $explicitTax = data_get($item, 'ivaItem', data_get($item, 'impuesto'));
+                                                                        $lineTax = $explicitTax !== null
+                                                                            ? (float) $explicitTax
+                                                                            : ($taxableBase > 0 ? (float) $taxTotal * $itemTaxable / $taxableBase : 0);
                                                                     @endphp
-                                                                    <div class="json-section">
-                                                                        <h5>{{ $sectionTitle }}</h5>
-                                                                        @if(is_array($sectionValue))
-                                                                            @if(empty($sectionValue))
-                                                                                <p class="muted">Sin datos</p>
-                                                                            @else
-                                                                                <div class="json-section-content">
-                                                                                    @foreach($sectionValue as $key => $value)
-                                                                                        <div class="json-field">
-                                                                                            <span>{{ is_string($key) ? ucfirst(str_replace('_', ' ', $key)) : $key }}</span>
-                                                                                            <div class="json-value">{{ is_scalar($value) ? (string) $value : json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) }}</div>
-                                                                                        </div>
-                                                                                    @endforeach
-                                                                                </div>
-                                                                            @endif
-                                                                        @else
-                                                                            <div class="json-value">{{ (string) $sectionValue }}</div>
-                                                                        @endif
-                                                                    </div>
-                                                                @endforeach
-                                                            @else
-                                                                <pre>{{ $invoice->extracted_document_body }}</pre>
-                                                            @endif
+                                                                    <tr>
+                                                                        <td>{{ data_get($item, 'numItem', $itemIndex + 1) }}</td>
+                                                                        <td>
+                                                                            <strong>{{ data_get($item, 'descripcion', 'Artículo sin descripción') }}</strong>
+                                                                            @if(data_get($item, 'codigo'))<small>Código: {{ data_get($item, 'codigo') }}</small>@endif
+                                                                        </td>
+                                                                        <td>{{ rtrim(rtrim(number_format($quantity, 4, '.', ','), '0'), '.') }} {{ data_get($item, 'uniMedida', '') }}</td>
+                                                                        <td>{{ $money($unitPrice) }}</td>
+                                                                        <td>{{ $money($lineTax) }}</td>
+                                                                        <td><strong>{{ $money($lineTotal + $lineTax) }}</strong></td>
+                                                                    </tr>
+                                                                @empty
+                                                                    <tr><td colspan="6" class="invoice-empty">El documento no incluye el detalle de productos.</td></tr>
+                                                                @endforelse
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+
+                                                    <div class="invoice-bottom">
+                                                        <div class="invoice-payment">
+                                                            <h4>Pago y condiciones</h4>
+                                                            <dl>
+                                                                <div><dt>Forma de pago</dt><dd>{{ $paymentMethod ?: 'No especificada' }}</dd></div>
+                                                                <div><dt>Condición</dt><dd>{{ $paymentCondition }}</dd></div>
+                                                                @if(data_get($payment, 'montoPago') !== null)
+                                                                    <div><dt>Monto pagado</dt><dd>{{ $money(data_get($payment, 'montoPago')) }}</dd></div>
+                                                                @endif
+                                                            </dl>
                                                         </div>
-                                                    @else
-                                                        <p class="muted">No hay contenido extraído disponible para esta factura; se muestran los datos registrados en el sistema.</p>
-                                                    @endif
+                                                        <div class="invoice-totals">
+                                                            <div><span>Subtotal</span><strong>{{ $money($subtotal) }}</strong></div>
+                                                            @if((float) data_get($summary, 'totalDescu', 0) > 0)
+                                                                <div><span>Descuento</span><strong>{{ $money(data_get($summary, 'totalDescu')) }}</strong></div>
+                                                            @endif
+                                                            <div><span>Impuestos</span><strong>{{ $money($taxTotal) }}</strong></div>
+                                                            <div class="invoice-grand-total"><span>Total</span><strong>{{ $money($grandTotal) }}</strong></div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="invoice-stamp">
+                                                        <strong>Sello de recepción de Hacienda</strong>
+                                                        <span>{{ $documentStamp ?: 'No disponible en el documento recibido' }}</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -229,19 +287,37 @@
         .purchases-table td { vertical-align: middle; }
         .danger { background: var(--bad); }
         .row-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-        .document-detail-stack { display: grid; gap: 12px; }
-        .document-summary-card { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
-        .detail-item { padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); display: flex; flex-direction: column; gap: 4px; }
-        .detail-item span { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-        .document-body-preview { max-height: 70vh; overflow: auto; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
-        .document-body-preview h4 { margin: 0 0 8px; font-size: 14px; }
-        .document-body-preview h5 { margin: 10px 0 6px; font-size: 13px; }
-        .json-section { border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin-bottom: 10px; background: rgba(255,255,255,0.03); }
-        .json-section-content { display: grid; gap: 8px; }
-        .json-field { display: grid; gap: 4px; padding: 8px; border-radius: 6px; background: rgba(0,0,0,0.03); }
-        .json-field span { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted); }
-        .json-value { white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, SFMono-Regular, SFMono-Regular, Menlo, monospace; font-size: 12px; }
-        .document-body-preview pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, SFMono-Regular, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+        .invoice-paper { max-height: 72vh; overflow: auto; padding: 28px; border: 1px solid #d8dde2; background: #fff; color: #202a33; box-shadow: 0 8px 24px rgba(20, 32, 44, .08); }
+        .invoice-paper-header { display: flex; justify-content: space-between; gap: 24px; padding-bottom: 20px; border-bottom: 2px solid #283b4a; }
+        .invoice-kicker { color: #647582; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+        .invoice-paper-header h2 { margin: 5px 0; color: #1c303e; font-size: 24px; }
+        .invoice-number { color: #53636e; font-size: 13px; overflow-wrap: anywhere; }
+        .invoice-meta, .invoice-payment dl { display: grid; gap: 9px; margin: 0; }
+        .invoice-meta div, .invoice-payment dl div { display: grid; gap: 3px; }
+        .invoice-meta dt, .invoice-payment dt { color: #647582; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+        .invoice-meta dd, .invoice-payment dd { margin: 0; font-size: 13px; font-weight: 600; }
+        .invoice-parties { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding: 20px 0; }
+        .invoice-parties section { display: grid; align-content: start; gap: 5px; min-width: 0; padding: 14px; border: 1px solid #dfe4e8; }
+        .invoice-parties h4, .invoice-payment h4 { margin: 0 0 5px; color: #53636e; font-size: 11px; text-transform: uppercase; }
+        .invoice-parties strong { color: #1c303e; font-size: 14px; }
+        .invoice-parties span { color: #4a5963; font-size: 12px; overflow-wrap: anywhere; }
+        .invoice-items-wrap { overflow-x: auto; }
+        .invoice-items { width: 100%; min-width: 640px; border-collapse: collapse; color: #202a33; }
+        .invoice-items th { padding: 10px 8px; border-top: 1px solid #283b4a; border-bottom: 1px solid #283b4a; color: #53636e; font-size: 10px; text-align: left; text-transform: uppercase; }
+        .invoice-items td { padding: 11px 8px; border-bottom: 1px solid #e4e8eb; font-size: 12px; vertical-align: top; }
+        .invoice-items th:first-child, .invoice-items td:first-child { width: 38px; }
+        .invoice-items td:nth-child(n+3) { white-space: nowrap; }
+        .invoice-items small { display: block; margin-top: 3px; color: #647582; }
+        .invoice-items .invoice-empty { padding: 22px 8px; color: #647582; text-align: center; }
+        .invoice-bottom { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, .65fr); gap: 28px; padding: 20px 0; }
+        .invoice-totals { display: grid; align-content: start; gap: 9px; }
+        .invoice-totals div { display: flex; justify-content: space-between; gap: 16px; color: #53636e; font-size: 12px; }
+        .invoice-totals strong { color: #202a33; }
+        .invoice-totals .invoice-grand-total { margin-top: 4px; padding-top: 12px; border-top: 2px solid #283b4a; color: #1c303e; font-size: 16px; font-weight: 700; }
+        .invoice-totals .invoice-grand-total strong { color: #1c303e; font-size: 18px; }
+        .invoice-stamp { display: grid; gap: 6px; padding-top: 14px; border-top: 1px solid #dfe4e8; }
+        .invoice-stamp strong { color: #53636e; font-size: 10px; text-transform: uppercase; }
+        .invoice-stamp span { color: #202a33; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; overflow-wrap: anywhere; }
         .pending, .registered { background: #fef3c7; color: #92400e; }
         .partial, .reviewed { background: #dbeafe; color: #1e40af; }
         .paid, .accounted { background: #dcfce7; color: #166534; }
@@ -268,6 +344,12 @@
             .purchase-search { flex: 1 1 100%; justify-content: stretch; }
             .purchase-search input,
             .purchase-search select { max-width: none; }
+        }
+        @media (max-width: 600px) {
+            .invoice-paper { padding: 16px; }
+            .invoice-paper-header { display: grid; }
+            .invoice-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .invoice-parties, .invoice-bottom { grid-template-columns: 1fr; }
         }
     </style>
     <script>

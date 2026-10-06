@@ -1,5 +1,9 @@
-<x-layouts.app title="Configuración de correo — Compras">
+<x-layouts.app title="Configuración de Compras">
     <style>
+        .accounting-config-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+        .missing-entries-panel { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-top:18px; padding:14px; border:1px solid var(--line); background:#f8fafc; }
+        .missing-entries-panel > div { display:grid; gap:4px; }
+        @media (max-width:600px) { .accounting-config-grid { grid-template-columns:1fr; } .missing-entries-panel { align-items:stretch; flex-direction:column; } }
         .config-lock-panel {
             display: flex; align-items: center; justify-content: space-between; gap: 16px;
             padding: 14px 18px; border-radius: 10px; background: #f1f5f9;
@@ -42,12 +46,107 @@
 
     <div class="top">
         <div>
-            <h1>Configuración de correo</h1>
-            <p class="muted">Parámetros IMAP para extraer facturas de compra desde el buzón.</p>
+            <h1>Configuración de Compras</h1>
+            <p class="muted">Cuentas contables y conexión de correo para el módulo de compras.</p>
         </div>
     </div>
 
+    <div class="card" style="margin-bottom:18px">
+        <div style="margin-bottom:18px">
+            <h2 style="margin:0 0 5px">Parámetros contables</h2>
+            <p class="muted" style="margin:0">Define las cuentas de los asientos que se generan al aprobar una compra y registrar su pago.</p>
+        </div>
+
+        @if(!$purchasePackage || !$payablePackage)
+            <div class="config-warning">
+                <strong>Paquetes contables no disponibles</strong>
+                Ejecute las migraciones pendientes para habilitar los paquetes CP y CXP.
+            </div>
+        @else
+            <form method="POST" action="{{ route('admin.purchase-invoices.settings.accounting') }}">
+                @csrf
+                <div class="accounting-config-grid">
+                    <label>
+                        CP · Cuenta de compra (Debe)
+                        <select name="purchase_debit_account_id" required>
+                            <option value="">Seleccione cuenta</option>
+                            @foreach($accountingAccounts as $account)
+                                <option value="{{ $account->id }}" @selected((string) old('purchase_debit_account_id', $purchasePackage->debit_account_id) === (string) $account->id)>{{ $account->code }} · {{ $account->name }} ({{ $account->typeLabel() }})</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label>
+                        CP · Cuenta por pagar (Haber)
+                        <select name="purchase_credit_account_id" required>
+                            <option value="">Seleccione cuenta</option>
+                            @foreach($accountingAccounts as $account)
+                                <option value="{{ $account->id }}" @selected((string) old('purchase_credit_account_id', $purchasePackage->credit_account_id) === (string) $account->id)>{{ $account->code }} · {{ $account->name }} ({{ $account->typeLabel() }})</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label>
+                        CP · Centro de costo
+                        <select name="purchase_cost_center_id">
+                            <option value="">Sin centro de costo</option>
+                            @foreach($costCenters as $center)
+                                <option value="{{ $center->id }}" @selected((string) old('purchase_cost_center_id', $purchasePackage->cost_center_id) === (string) $center->id)>{{ $center->code }} · {{ $center->name }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label>
+                        CXP · Disminución de proveedores (Debe)
+                        <select name="payable_debit_account_id" required>
+                            <option value="">Seleccione cuenta</option>
+                            @foreach($accountingAccounts as $account)
+                                <option value="{{ $account->id }}" @selected((string) old('payable_debit_account_id', $payablePackage->debit_account_id) === (string) $account->id)>{{ $account->code }} · {{ $account->name }} ({{ $account->typeLabel() }})</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label>
+                        CXP · Banco o caja (Haber)
+                        <select name="payable_credit_account_id" required>
+                            <option value="">Seleccione cuenta</option>
+                            @foreach($accountingAccounts as $account)
+                                <option value="{{ $account->id }}" @selected((string) old('payable_credit_account_id', $payablePackage->credit_account_id) === (string) $account->id)>{{ $account->code }} · {{ $account->name }} ({{ $account->typeLabel() }})</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label>
+                        CXP · Centro de costo
+                        <select name="payable_cost_center_id">
+                            <option value="">Sin centro de costo</option>
+                            @foreach($costCenters as $center)
+                                <option value="{{ $center->id }}" @selected((string) old('payable_cost_center_id', $payablePackage->cost_center_id) === (string) $center->id)>{{ $center->code }} · {{ $center->name }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                </div>
+                <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px">
+                    <button type="submit" class="btn">Guardar parámetros contables</button>
+                    <span class="muted" style="font-size:12px">CP se genera al aprobar; CXP al marcar la factura como pagada.</span>
+                </div>
+            </form>
+
+            @if($missingPurchaseEntries || $missingPayableEntries)
+                <div class="missing-entries-panel">
+                    <div>
+                        <strong>Hay asientos pendientes de generar</strong>
+                        <span class="muted">{{ $missingPurchaseEntries }} compra(s) aprobada(s) y {{ $missingPayableEntries }} pago(s) sin asiento.</span>
+                    </div>
+                    <form method="POST" action="{{ route('admin.purchase-invoices.settings.generate-missing-entries') }}">
+                        @csrf
+                        <button type="submit" class="btn secondary">Generar asientos faltantes</button>
+                    </form>
+                </div>
+            @endif
+        @endif
+    </div>
+
     <div class="card" style="max-width:680px">
+        <div style="margin-bottom:16px">
+            <h2 style="margin:0 0 5px">Configuración de correo</h2>
+            <p class="muted" style="margin:0">Parámetros IMAP para extraer facturas de compra desde el buzón.</p>
+        </div>
 
         {{-- Bloque lock/unlock --}}
         <div class="config-lock-panel" id="lockPanel">

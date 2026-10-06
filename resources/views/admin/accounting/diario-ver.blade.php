@@ -73,6 +73,9 @@
                         {{ $entry->accountingPackage->code }}
                     </span>
                     <span style="margin-left:.5rem;font-size:.875rem;color:#374151">{{ $entry->accountingPackage->name }}</span>
+                    @if($entry->accountingPackage->costCenter)
+                        <span style="margin-left:.5rem;font-size:.8rem;color:#0f766e">{{ $entry->accountingPackage->costCenter->code }} · {{ $entry->accountingPackage->costCenter->name }}</span>
+                    @endif
                 @else
                     <span style="color:#9ca3af">— Sin paquete —</span>
                 @endif
@@ -117,6 +120,7 @@
                     <th style="padding:.6rem 1rem;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;text-align:left;width:36px">#</th>
                     <th style="padding:.6rem 1rem;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;text-align:left">Código</th>
                     <th style="padding:.6rem 1rem;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;text-align:left">Cuenta</th>
+                    <th style="padding:.6rem 1rem;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;text-align:left">Centro de costo</th>
                     <th style="padding:.6rem 1rem;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;text-align:left">Detalle</th>
                     <th style="padding:.6rem 1rem;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;text-align:right;width:120px">Debe</th>
                     <th style="padding:.6rem 1rem;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;text-align:right;width:120px">Haber</th>
@@ -131,6 +135,13 @@
                         <code style="color:{{ $color }};font-weight:600;font-size:.875rem">{{ $line->account?->code }}</code>
                     </td>
                     <td style="padding:.65rem 1rem;font-size:.875rem">{{ $line->account?->name ?? '—' }}</td>
+                    <td style="padding:.65rem 1rem;font-size:.8125rem;color:#0f766e">
+                        @if($line->costCenter)
+                            <code style="color:#0f766e;font-weight:600">{{ $line->costCenter->code }}</code> {{ $line->costCenter->name }}
+                        @else
+                            <span style="color:#d1d5db">—</span>
+                        @endif
+                    </td>
                     <td style="padding:.65rem 1rem;font-size:.8125rem;color:#6b7280">{{ $line->description ?? '' }}</td>
                     <td style="padding:.65rem 1rem;text-align:right;font-variant-numeric:tabular-nums;font-size:.875rem">
                         @if($line->debit > 0)
@@ -151,19 +162,19 @@
             </tbody>
             <tfoot>
                 <tr style="background:#f8fafc;font-weight:700;border-top:2px solid #e5e7eb">
-                    <td colspan="4" style="padding:.85rem 1rem;text-align:right;color:#6b7280;font-size:.875rem">TOTALES</td>
+                    <td colspan="5" style="padding:.85rem 1rem;text-align:right;color:#6b7280;font-size:.875rem">TOTALES</td>
                     <td style="padding:.85rem 1rem;text-align:right;font-variant-numeric:tabular-nums;font-size:.9375rem">{{ $money($totalDebit) }}</td>
                     <td style="padding:.85rem 1rem;text-align:right;font-variant-numeric:tabular-nums;font-size:.9375rem">{{ $money($totalCredit) }}</td>
                 </tr>
                 @if(abs($totalDebit - $totalCredit) < 0.01)
                 <tr>
-                    <td colspan="6" style="padding:.5rem 1rem;text-align:center;font-size:.8125rem;color:#16a34a;background:#f0fdf4">
+                    <td colspan="7" style="padding:.5rem 1rem;text-align:center;font-size:.8125rem;color:#16a34a;background:#f0fdf4">
                         ✓ Asiento cuadrado — Debe = Haber
                     </td>
                 </tr>
                 @else
                 <tr>
-                    <td colspan="6" style="padding:.5rem 1rem;text-align:center;font-size:.8125rem;color:#dc2626;background:#fff5f5">
+                    <td colspan="7" style="padding:.5rem 1rem;text-align:center;font-size:.8125rem;color:#dc2626;background:#fff5f5">
                         ✗ Asiento descuadrado — Diferencia: {{ $money(abs($totalDebit - $totalCredit)) }}
                     </td>
                 </tr>

@@ -6,12 +6,18 @@ use App\Exceptions\AccountingPeriodException;
 use App\Http\Controllers\Controller;
 use App\Models\BillingSetting;
 use App\Models\Customer;
+use App\Models\AccountingAccount;
+use App\Models\AccountingPackage;
+use App\Models\BankAccount;
+use App\Models\CostCenter;
+use App\Models\JournalEntry;
 use App\Models\PurchaseInvoice;
 use App\Models\Supplier;
 use App\Services\Accounting\AccountingEntryService;
 use App\Services\Accounting\AccountingPeriodService;
 use App\Services\PurchaseInvoiceMailboxImporter;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use RuntimeException;
 
@@ -30,7 +36,102 @@ class PurchaseInvoiceController extends Controller
             'mailbox'    => $settings['mailbox_mailbox']     ?? $env['mailbox'],
             'onlyUnseen' => $settings['mailbox_only_unseen'] ?? $env['only_unseen'],
             'limit'      => $settings['mailbox_limit']       ?? $env['limit'],
+            'accountingAccounts' => AccountingAccount::where('is_active', true)->orderBy('code')->get(),
+            'costCenters' => CostCenter::where('is_active', true)->orderBy('code')->get(),
+            'purchasePackage' => AccountingPackage::where('code', 'CP')->first(),
+            'payablePackage' => AccountingPackage::where('code', 'CXP')->first(),
+            'missingPurchaseEntries' => PurchaseInvoice::where('status', 'approved')->whereDoesntHave('journalEntry')->count(),
+            'missingPayableEntries' => PurchaseInvoice::where('payment_status', 'paid')
+                ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('journal_entries')
+                    ->whereColumn('journal_entries.source_id', 'purchase_invoices.id')
+                    ->where('journal_entries.source_type', 'purchase_payment'))
+                ->count(),
         ]);
+    }
+
+    public function accountingSettingsUpdate(Request $request)
+    {
+        $activeAccount = Rule::exists('accounting_accounts', 'id')->where('is_active', true);
+        $activeCostCenter = Rule::exists('cost_centers', 'id')->where('is_active', true);
+        $data = $request->validate([
+            'purchase_debit_account_id' => ['required', 'integer', $activeAccount],
+            'purchase_credit_account_id' => ['required', 'integer', $activeAccount],
+            'purchase_cost_center_id' => ['nullable', 'integer', $activeCostCenter],
+            'payable_debit_account_id' => ['required', 'integer', $activeAccount],
+            'payable_credit_account_id' => ['required', 'integer', $activeAccount],
+            'payable_cost_center_id' => ['nullable', 'integer', $activeCostCenter],
+        ]);
+
+        DB::transaction(function () use ($data) {
+            AccountingPackage::where('code', 'CP')->update([
+                'debit_account_id' => $data['purchase_debit_account_id'],
+                'credit_account_id' => $data['purchase_credit_account_id'],
+                'cost_center_id' => $data['purchase_cost_center_id'] ?? null,
+                'is_active' => true,
+                'type' => 'automatico',
+            ]);
+            AccountingPackage::where('code', 'CXP')->update([
+                'debit_account_id' => $data['payable_debit_account_id'],
+                'credit_account_id' => $data['payable_credit_account_id'],
+                'cost_center_id' => $data['payable_cost_center_id'] ?? null,
+                'is_active' => true,
+                'type' => 'automatico',
+            ]);
+        });
+
+        return back()->with('status', 'Parámetros contables de compras y cuentas por pagar guardados.');
+    }
+
+    public function generateMissingEntries(AccountingEntryService $accounting, AccountingPeriodService $periods)
+    {
+        $purchaseEntries = 0;
+        $payableEntries = 0;
+        $failures = 0;
+
+        $invoices = PurchaseInvoice::with('supplier')
+            ->where('status', 'approved')
+            ->whereDoesntHave('journalEntry')
+            ->get();
+
+        foreach ($invoices as $invoice) {
+            try {
+                $periods->validateDateOrFail($invoice->purchase_date ?? now());
+                if ($accounting->createFromPurchase($invoice, request()->user()?->id)) {
+                    $purchaseEntries++;
+                }
+            } catch (\Throwable) {
+                $failures++;
+            }
+        }
+
+        $paidInvoices = PurchaseInvoice::with(['supplier', 'bankTransactions'])
+            ->where('payment_status', 'paid')
+            ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('journal_entries')
+                ->whereColumn('journal_entries.source_id', 'purchase_invoices.id')
+                ->where('journal_entries.source_type', 'purchase_payment'))
+            ->get();
+
+        foreach ($paidInvoices as $invoice) {
+            try {
+                $paymentTransaction = $invoice->bankTransactions->sortByDesc('transaction_date')->first();
+                $accounting->createFromPurchasePayment(
+                    $invoice,
+                    request()->user()?->id,
+                    $paymentTransaction?->transaction_date?->toDateString() ?? $invoice->purchase_date?->toDateString(),
+                    $paymentTransaction?->reference,
+                );
+                $payableEntries++;
+            } catch (\Throwable) {
+                $failures++;
+            }
+        }
+
+        $message = "Asientos generados: {$purchaseEntries} de compras y {$payableEntries} de pagos.";
+        if ($failures > 0) {
+            $message .= " {$failures} registro(s) no se procesaron; revise la configuración contable y los períodos.";
+        }
+
+        return back()->with('status', $message);
     }
 
     public function settingsUpdate(Request $request)
@@ -88,34 +189,62 @@ class PurchaseInvoiceController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        return view('admin.purchase-invoices.accounts-payable', compact('invoices', 'totals', 'search'));
+        $bankAccounts = BankAccount::where('is_active', true)->orderBy('bank_name')->orderBy('name')->get();
+
+        return view('admin.purchase-invoices.accounts-payable', compact('invoices', 'totals', 'search', 'bankAccounts'));
     }
 
-    public function markPaid(Request $request, PurchaseInvoice $purchaseInvoice)
+    public function markPaid(Request $request, PurchaseInvoice $purchaseInvoice, AccountingEntryService $accounting)
     {
         $data = $request->validate([
             'payment_status'   => ['required', 'in:paid,partial,pending'],
             'payment_method'   => ['nullable', 'string', 'max:100'],
-            'transaction_date' => ['nullable', 'date'],
-            'bank_account'     => ['nullable', 'string', 'max:200'],
+            'transaction_date' => ['required_if:payment_status,paid', 'nullable', 'date'],
+            'bank_account_id'  => [
+                'required_if:payment_status,paid',
+                'nullable',
+                'integer',
+                Rule::exists('bank_accounts', 'id')->where('is_active', true),
+            ],
             'reference'        => ['nullable', 'string', 'max:200'],
         ]);
 
-        $purchaseInvoice->update([
-            'payment_status' => $data['payment_status'],
-            'payment_method' => $data['payment_method'] ?? $purchaseInvoice->payment_method,
-        ]);
+        try {
+            DB::transaction(function () use ($data, $purchaseInvoice, $accounting, $request) {
+                $paymentEntryExists = JournalEntry::where('source_type', 'purchase_payment')
+                    ->where('source_id', $purchaseInvoice->id)
+                    ->exists();
 
-        if ($data['payment_status'] === 'paid' && !empty($data['transaction_date'])) {
-            $transaction = \App\Models\BankTransaction::create([
-                'transaction_date' => $data['transaction_date'],
-                'bank_account'     => $data['bank_account'] ?? null,
-                'amount'           => $purchaseInvoice->total,
-                'reference'        => $data['reference'] ?? null,
-            ]);
-            $transaction->purchaseInvoices()->attach($purchaseInvoice->id, [
-                'amount_applied' => $purchaseInvoice->total,
-            ]);
+                if ($data['payment_status'] === 'paid' && ! $paymentEntryExists) {
+                    $accounting->createFromPurchasePayment(
+                        $purchaseInvoice->load('supplier'),
+                        $request->user()?->id,
+                        $data['transaction_date'] ?? null,
+                        $data['reference'] ?? null,
+                    );
+                }
+
+                $purchaseInvoice->update([
+                    'payment_status' => $data['payment_status'],
+                    'payment_method' => $data['payment_method'] ?? $purchaseInvoice->payment_method,
+                ]);
+
+                if ($data['payment_status'] === 'paid' && ! $paymentEntryExists && ! empty($data['transaction_date'])) {
+                    $bankAccount = BankAccount::findOrFail($data['bank_account_id']);
+                    $transaction = \App\Models\BankTransaction::create([
+                        'bank_account_id' => $bankAccount->id,
+                        'transaction_date' => $data['transaction_date'],
+                        'bank_account'     => trim($bankAccount->bank_name.' / '.$bankAccount->name.' '.($bankAccount->account_number ?? '')),
+                        'amount'           => $purchaseInvoice->total,
+                        'reference'        => $data['reference'] ?? null,
+                    ]);
+                    $transaction->purchaseInvoices()->attach($purchaseInvoice->id, [
+                        'amount_applied' => $purchaseInvoice->total,
+                    ]);
+                }
+            });
+        } catch (RuntimeException $exception) {
+            return back()->withErrors($exception->getMessage());
         }
 
         return back()->with('status', 'Estado de pago actualizado.');
@@ -145,12 +274,13 @@ class PurchaseInvoiceController extends Controller
             return back()->withErrors($e->getMessage());
         }
 
-        $purchaseInvoice->update(['status' => 'approved']);
-
         try {
-            $accounting->createFromPurchase($purchaseInvoice->load('supplier'), $request->user()?->id);
-        } catch (\Throwable) {
-            // No interrumpir la aprobación si falla la contabilidad
+            DB::transaction(function () use ($accounting, $purchaseInvoice, $request) {
+                $accounting->createFromPurchase($purchaseInvoice->load('supplier'), $request->user()?->id);
+                $purchaseInvoice->update(['status' => 'approved']);
+            });
+        } catch (RuntimeException $exception) {
+            return back()->withErrors($exception->getMessage());
         }
 
         return back()->with('status', 'Factura aprobada y enviada a Cuentas por pagar.');
@@ -185,17 +315,20 @@ class PurchaseInvoiceController extends Controller
                 continue;
             }
 
-            $invoice->update(['status' => 'approved']);
-            $updated++;
-
             try {
-                $accounting->createFromPurchase($invoice, $request->user()?->id);
-            } catch (\Throwable) {}
+                DB::transaction(function () use ($accounting, $invoice, $request) {
+                    $accounting->createFromPurchase($invoice, $request->user()?->id);
+                    $invoice->update(['status' => 'approved']);
+                });
+                $updated++;
+            } catch (\Throwable) {
+                $blocked++;
+            }
         }
 
         $msg = "{$updated} factura(s) aprobada(s) y enviadas a Cuentas por pagar.";
         if ($blocked > 0) {
-            $msg .= " {$blocked} factura(s) bloqueada(s) por período contable cerrado.";
+            $msg .= " {$blocked} factura(s) no se aprobaron por período cerrado o configuración contable incompleta.";
         }
 
         return back()->with('status', $msg);

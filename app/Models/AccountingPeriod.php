@@ -29,6 +29,11 @@ class AccountingPeriod extends Model
         return $this->belongsTo(User::class, 'closed_by');
     }
 
+    public function yearPeriod(): BelongsTo
+    {
+        return $this->belongsTo(AccountingYearPeriod::class, 'year', 'year');
+    }
+
     public function isOpen(): bool
     {
         return $this->status === 'abierto';
