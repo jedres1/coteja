@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\InventoryController;
 use App\Jobs\SendInvoiceEmailJob;
 use App\Models\BillingDteCorrelative;
 use App\Models\BillingInvoice;
+use App\Models\Customer;
 use App\Models\BillingInvoicePayment;
 use App\Models\BillingProduct;
 use App\Models\BillingSetting;
