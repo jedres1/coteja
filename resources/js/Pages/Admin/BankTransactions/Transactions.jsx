@@ -1,164 +1,152 @@
 import { useState, useEffect } from 'react';
-import { Head, useForm, router, Link } from '@inertiajs/react';
+import { Head, useForm, router } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
-import Pagination from '@/Components/Pagination';
 
-// ─── Modal ────────────────────────────────────────────────────────────────────
+const SOURCE_LABEL = { compras: 'Compras', manual: 'Manual', facturacion: 'Facturación' };
+const SOURCE_COLOR = {
+    compras:      { background: '#eff6ff', color: '#1d4ed8' },
+    manual:       { background: '#f3f4f6', color: '#374151' },
+    facturacion:  { background: '#fdf4ff', color: '#7e22ce' },
+};
+const TYPE_TYPES = ['deposito', 'pago', 'transferencia', 'cheque', 'otro'];
+const TYPE_LABEL = {
+    deposito: 'Depósito', pago: 'Pago', transferencia: 'Transferencia',
+    cheque: 'Cheque', otro: 'Otro',
+    credit: 'Crédito', debit: 'Débito',
+};
 
-function Modal({ title, onClose, children }) {
-    useEffect(() => {
-        const handler = (e) => { if (e.key === 'Escape') onClose(); };
-        window.addEventListener('keydown', handler);
-        return () => window.removeEventListener('keydown', handler);
-    }, [onClose]);
-
-    return (
-        <div className="overlay-layer" role="dialog" aria-modal="true" aria-label={title}>
-            <button className="overlay-backdrop" type="button" aria-label="Cerrar" onClick={onClose} />
-            <div className="overlay-panel card">
-                <div className="overlay-header">
-                    <div><h3>{title}</h3></div>
-                    <button type="button" className="btn secondary overlay-close" onClick={onClose}>✕</button>
-                </div>
-                {children}
-            </div>
-        </div>
-    );
-}
-
-// ─── TransactionForm ──────────────────────────────────────────────────────────
-
-function TransactionForm({ accounts, onSuccess, onCancel }) {
-    const { data, setData, post, processing, errors } = useForm({
-        bank_account_id: '',
-        date:            '',
-        description:     '',
-        amount:          '',
-        type:            'credit',
-        reference:       '',
+function TransactionForm({ bankAccounts, onCancel }) {
+    const { data, setData, post, processing, errors, reset } = useForm({
+        transaction_date: '',
+        bank_account_id:  '',
+        type:             'deposito',
+        amount:           '',
+        reference:        '',
+        notes:            '',
     });
 
     function handleSubmit(e) {
         e.preventDefault();
-        post(route('admin.bank-transactions.store'), { onSuccess });
+        post(route('admin.bank-transactions.transactions.store'), {
+            onSuccess: () => { reset(); onCancel(); },
+        });
     }
 
     return (
         <form onSubmit={handleSubmit}>
-            <div className="form-grid">
-                <label>
-                    Cuenta bancaria
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <label style={{ margin: 0 }}>
+                    Fecha <span style={{ color: '#ef4444' }}>*</span>
+                    <input
+                        type="date"
+                        value={data.transaction_date}
+                        onChange={(e) => setData('transaction_date', e.target.value)}
+                        required
+                    />
+                    {errors.transaction_date && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.transaction_date}</span>}
+                </label>
+                <label style={{ margin: 0 }}>
+                    Cuenta bancaria <span style={{ color: '#ef4444' }}>*</span>
                     <select
                         value={data.bank_account_id}
                         onChange={(e) => setData('bank_account_id', e.target.value)}
                         required
                     >
                         <option value="">— Seleccionar cuenta —</option>
-                        {accounts.map((a) => (
-                            <option key={a.id} value={a.id}>{a.name}</option>
+                        {bankAccounts.map((a) => (
+                            <option key={a.id} value={a.id}>{a.name} — {a.bank_name}</option>
                         ))}
                     </select>
-                    {errors.bank_account_id && <p className="field-error">{errors.bank_account_id}</p>}
+                    {errors.bank_account_id && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.bank_account_id}</span>}
                 </label>
-
-                <label>
-                    Fecha
-                    <input
-                        type="date"
-                        value={data.date}
-                        onChange={(e) => setData('date', e.target.value)}
-                        required
-                    />
-                    {errors.date && <p className="field-error">{errors.date}</p>}
+                <label style={{ margin: 0 }}>
+                    Tipo <span style={{ color: '#ef4444' }}>*</span>
+                    <select value={data.type} onChange={(e) => setData('type', e.target.value)}>
+                        {TYPE_TYPES.map((t) => (
+                            <option key={t} value={t}>{TYPE_LABEL[t]}</option>
+                        ))}
+                    </select>
+                    {errors.type && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.type}</span>}
                 </label>
-
-                <label className="full-width">
-                    Descripción
-                    <input
-                        type="text"
-                        value={data.description}
-                        onChange={(e) => setData('description', e.target.value)}
-                        required
-                        autoFocus
-                    />
-                    {errors.description && <p className="field-error">{errors.description}</p>}
-                </label>
-
-                <label>
-                    Monto
+                <label style={{ margin: 0 }}>
+                    Monto <span style={{ color: '#ef4444' }}>*</span>
                     <input
                         type="number"
                         step="0.01"
-                        min="0"
+                        min="0.01"
                         value={data.amount}
                         onChange={(e) => setData('amount', e.target.value)}
                         required
                     />
-                    {errors.amount && <p className="field-error">{errors.amount}</p>}
+                    {errors.amount && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.amount}</span>}
                 </label>
-
-                <label>
-                    Tipo
-                    <select value={data.type} onChange={(e) => setData('type', e.target.value)}>
-                        <option value="credit">Crédito</option>
-                        <option value="debit">Débito</option>
-                    </select>
-                    {errors.type && <p className="field-error">{errors.type}</p>}
-                </label>
-
-                <label>
-                    Referencia (opcional)
+                <label style={{ margin: 0 }}>
+                    Referencia
                     <input
                         type="text"
                         value={data.reference}
                         onChange={(e) => setData('reference', e.target.value)}
+                        maxLength={200}
                     />
-                    {errors.reference && <p className="field-error">{errors.reference}</p>}
+                    {errors.reference && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.reference}</span>}
+                </label>
+                <label style={{ margin: 0 }}>
+                    Notas
+                    <input
+                        type="text"
+                        value={data.notes}
+                        onChange={(e) => setData('notes', e.target.value)}
+                        maxLength={500}
+                    />
+                    {errors.notes && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.notes}</span>}
                 </label>
             </div>
-
-            <div className="form-actions" style={{ marginTop: 20 }}>
-                <button type="button" className="btn secondary" onClick={onCancel}>Cancelar</button>
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
                 <button type="submit" className="btn" disabled={processing}>
-                    {processing ? 'Guardando…' : 'Registrar transacción'}
+                    {processing ? 'Guardando...' : 'Registrar transacción'}
                 </button>
+                <button type="button" className="btn secondary" onClick={onCancel}>Cancelar</button>
             </div>
         </form>
     );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
-
-export default function Transactions({ transactions, accounts, filters }) {
+export default function Transactions({ transactions, bankAccounts, from, to, bankAccountId }) {
     const [showCreate, setShowCreate] = useState(false);
-    const [accountId, setAccountId]   = useState(filters?.accountId ?? '');
-    const [typeVal, setTypeVal]        = useState(filters?.type ?? '');
+    const [fromVal, setFromVal]       = useState(from ?? '');
+    const [toVal, setToVal]           = useState(to ?? '');
+    const [accountVal, setAccountVal] = useState(bankAccountId ? String(bankAccountId) : '');
+    const [typeVal, setTypeVal]       = useState('');
 
-    function applyFilters(newAccountId, newType) {
+    const fmt = (n) => n != null
+        ? Number(n).toLocaleString('es-SV', { minimumFractionDigits: 2 })
+        : '—';
+
+    function applyFilters(params = {}) {
         router.get(
             route('admin.bank-transactions.transactions'),
-            { accountId: newAccountId, type: newType, search: filters?.search ?? '' },
+            {
+                from:            params.from    ?? fromVal,
+                to:              params.to      ?? toVal,
+                bank_account_id: params.account ?? accountVal,
+                type:            params.type    ?? typeVal,
+            },
             { preserveState: true }
         );
     }
 
-    function handleAccountChange(e) {
-        setAccountId(e.target.value);
-        applyFilters(e.target.value, typeVal);
+    function handleFilterSubmit(e) {
+        e.preventDefault();
+        applyFilters();
     }
 
-    function handleTypeChange(e) {
-        setTypeVal(e.target.value);
-        applyFilters(accountId, e.target.value);
-    }
-
-    const fmt = (n) =>
-        n != null
-            ? Number(n).toLocaleString('es-SV', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-            : '—';
-
-    const typeLabel = { credit: 'Crédito', debit: 'Débito' };
+    const totalCredit = (transactions ?? [])
+        .filter((t) => ['deposito', 'credit'].includes(t.type))
+        .reduce((s, t) => s + t.amount, 0);
+    const totalDebit = (transactions ?? [])
+        .filter((t) => !['deposito', 'credit'].includes(t.type))
+        .reduce((s, t) => s + t.amount, 0);
 
     return (
         <AppLayout>
@@ -170,47 +158,69 @@ export default function Transactions({ transactions, accounts, filters }) {
                     <a href={route('admin.bank-transactions.transactions.export')} className="btn secondary">
                         Exportar
                     </a>
-                    <button className="btn" type="button" onClick={() => setShowCreate(true)}>
-                        + Nueva transacción
+                    <button type="button" className="btn" onClick={() => setShowCreate((v) => !v)}>
+                        {showCreate ? 'Cancelar' : '+ Nueva transacción'}
                     </button>
                 </div>
             </div>
 
+            {showCreate && (
+                <div className="card" style={{ marginBottom: 16 }}>
+                    <h2 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 600 }}>Nueva transacción manual</h2>
+                    <TransactionForm bankAccounts={bankAccounts ?? []} onCancel={() => setShowCreate(false)} />
+                </div>
+            )}
+
             {/* Filters */}
             <div className="card" style={{ marginBottom: 16 }}>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                    <label style={{ flex: '1 1 200px', margin: 0 }}>
+                <form onSubmit={handleFilterSubmit} style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                    <label style={{ margin: 0 }}>
+                        Desde
+                        <input type="date" value={fromVal} onChange={(e) => setFromVal(e.target.value)} />
+                    </label>
+                    <label style={{ margin: 0 }}>
+                        Hasta
+                        <input type="date" value={toVal} onChange={(e) => setToVal(e.target.value)} />
+                    </label>
+                    <label style={{ flex: '1 1 160px', margin: 0 }}>
                         Cuenta
-                        <select value={accountId} onChange={handleAccountChange}>
+                        <select value={accountVal} onChange={(e) => setAccountVal(e.target.value)}>
                             <option value="">Todas las cuentas</option>
-                            {accounts.map((a) => (
+                            {(bankAccounts ?? []).map((a) => (
                                 <option key={a.id} value={a.id}>{a.name}</option>
                             ))}
                         </select>
                     </label>
                     <label style={{ flex: '0 1 160px', margin: 0 }}>
                         Tipo
-                        <select value={typeVal} onChange={handleTypeChange}>
-                            <option value="">Todos los tipos</option>
-                            <option value="credit">Crédito</option>
-                            <option value="debit">Débito</option>
+                        <select value={typeVal} onChange={(e) => setTypeVal(e.target.value)}>
+                            <option value="">Todos</option>
+                            {TYPE_TYPES.map((t) => (
+                                <option key={t} value={t}>{TYPE_LABEL[t]}</option>
+                            ))}
                         </select>
                     </label>
-                    {(accountId || typeVal) && (
-                        <button
-                            type="button"
-                            className="btn secondary"
-                            onClick={() => {
-                                setAccountId('');
-                                setTypeVal('');
-                                applyFilters('', '');
-                            }}
-                        >
-                            Limpiar
-                        </button>
-                    )}
-                </div>
+                    <button type="submit" className="btn">Filtrar</button>
+                </form>
             </div>
+
+            {/* Summary */}
+            {(transactions ?? []).length > 0 && (
+                <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+                    <div className="card" style={{ flex: 1, padding: '12px 16px' }}>
+                        <div style={{ fontSize: 12, color: '#6b7280' }}>Registros</div>
+                        <div style={{ fontWeight: 700, fontSize: 18 }}>{transactions.length}</div>
+                    </div>
+                    <div className="card" style={{ flex: 1, padding: '12px 16px' }}>
+                        <div style={{ fontSize: 12, color: '#6b7280' }}>Depósitos</div>
+                        <div style={{ fontWeight: 700, fontSize: 18, color: '#15803d', fontFamily: 'monospace' }}>{fmt(totalCredit)}</div>
+                    </div>
+                    <div className="card" style={{ flex: 1, padding: '12px 16px' }}>
+                        <div style={{ fontSize: 12, color: '#6b7280' }}>Pagos / salidas</div>
+                        <div style={{ fontWeight: 700, fontSize: 18, color: '#dc2626', fontFamily: 'monospace' }}>{fmt(totalDebit)}</div>
+                    </div>
+                </div>
+            )}
 
             {/* Table */}
             <div className="card table-scroll">
@@ -218,30 +228,50 @@ export default function Transactions({ transactions, accounts, filters }) {
                     <thead>
                         <tr>
                             <th>Fecha</th>
-                            <th>Descripción</th>
-                            <th>Monto</th>
+                            <th>Origen</th>
                             <th>Tipo</th>
                             <th>Cuenta</th>
+                            <th>Documento</th>
+                            <th>Referencia</th>
+                            <th style={{ textAlign: 'right' }}>Monto</th>
                             <th>Conciliado</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {transactions.data.length === 0 && (
+                        {(transactions ?? []).length === 0 && (
                             <tr>
-                                <td colSpan={6} className="empty">Sin registros</td>
+                                <td colSpan={8} className="empty">Sin transacciones en el período seleccionado</td>
                             </tr>
                         )}
-                        {transactions.data.map((t) => (
+                        {(transactions ?? []).map((t) => (
                             <tr key={t.id}>
-                                <td className="muted">{t.date}</td>
-                                <td>{t.description}</td>
-                                <td style={{ fontWeight: 600, color: t.type === 'debit' ? '#dc2626' : '#16a34a' }}>
-                                    {t.type === 'debit' ? '-' : '+'}{fmt(t.amount)}
-                                </td>
-                                <td>{typeLabel[t.type] ?? t.type}</td>
-                                <td>{t.bank_account?.name ?? <span className="muted">—</span>}</td>
+                                <td style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{t.date}</td>
                                 <td>
-                                    <span className={`badge ${t.is_reconciled ? 'active' : 'suspended'}`}>
+                                    <span style={{
+                                        fontSize: 11, fontWeight: 600, padding: '2px 8px',
+                                        borderRadius: 10, whiteSpace: 'nowrap',
+                                        ...(SOURCE_COLOR[t.source] ?? {}),
+                                    }}>
+                                        {SOURCE_LABEL[t.source] ?? t.source}
+                                    </span>
+                                </td>
+                                <td style={{ fontSize: 13 }}>{TYPE_LABEL[t.type] ?? t.type}</td>
+                                <td style={{ fontSize: 13 }}>{t.bank_account ?? '—'}</td>
+                                <td style={{ fontSize: 12, color: '#6b7280' }}>
+                                    {t.document
+                                        ? <><span style={{ color: '#374151' }}>{t.document}</span><br /><span>{t.document_label}</span></>
+                                        : '—'}
+                                </td>
+                                <td style={{ fontSize: 12, color: '#6b7280', fontFamily: 'monospace' }}>{t.reference ?? '—'}</td>
+                                <td style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 600 }}>
+                                    {fmt(t.amount)}
+                                </td>
+                                <td>
+                                    <span style={{
+                                        fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10,
+                                        background: t.is_reconciled ? '#f0fdf4' : '#fef3c7',
+                                        color: t.is_reconciled ? '#15803d' : '#92400e',
+                                    }}>
                                         {t.is_reconciled ? 'Conciliado' : 'Pendiente'}
                                     </span>
                                 </td>
@@ -249,18 +279,7 @@ export default function Transactions({ transactions, accounts, filters }) {
                         ))}
                     </tbody>
                 </table>
-                <Pagination links={transactions.links} />
             </div>
-
-            {showCreate && (
-                <Modal title="Nueva transacción manual" onClose={() => setShowCreate(false)}>
-                    <TransactionForm
-                        accounts={accounts}
-                        onSuccess={() => setShowCreate(false)}
-                        onCancel={() => setShowCreate(false)}
-                    />
-                </Modal>
-            )}
         </AppLayout>
     );
 }

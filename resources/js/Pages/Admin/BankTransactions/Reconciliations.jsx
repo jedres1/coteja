@@ -1,123 +1,119 @@
-import { useState, useEffect } from 'react';
-import { Head, useForm, router, Link } from '@inertiajs/react';
+import { useState } from 'react';
+import { Head, useForm, Link } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
-import Pagination from '@/Components/Pagination';
 
-// ─── Modal ────────────────────────────────────────────────────────────────────
+const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-function Modal({ title, onClose, children }) {
-    useEffect(() => {
-        const handler = (e) => { if (e.key === 'Escape') onClose(); };
-        window.addEventListener('keydown', handler);
-        return () => window.removeEventListener('keydown', handler);
-    }, [onClose]);
+const STATUS_LABEL = { open: 'Abierta', completed: 'Completada' };
+const STATUS_COLOR = {
+    open:      { background: '#fef3c7', color: '#92400e' },
+    completed: { background: '#f0fdf4', color: '#15803d' },
+};
 
-    return (
-        <div className="overlay-layer" role="dialog" aria-modal="true" aria-label={title}>
-            <button className="overlay-backdrop" type="button" aria-label="Cerrar" onClick={onClose} />
-            <div className="overlay-panel card">
-                <div className="overlay-header">
-                    <div><h3>{title}</h3></div>
-                    <button type="button" className="btn secondary overlay-close" onClick={onClose}>✕</button>
-                </div>
-                {children}
-            </div>
-        </div>
-    );
+function periodLabel(year, month) {
+    return `${MONTHS[(month ?? 1) - 1] ?? ''} ${year}`;
 }
 
-// ─── ReconciliationForm ───────────────────────────────────────────────────────
+function ReconciliationForm({ bankAccounts, onCancel }) {
+    const currentYear  = new Date().getFullYear();
+    const currentMonth = new Date().getMonth() + 1;
 
-function ReconciliationForm({ accounts, onSuccess, onCancel }) {
     const { data, setData, post, processing, errors } = useForm({
-        bank_account_id: '',
-        name:            '',
-        period_start:    '',
-        period_end:      '',
+        bank_account_id:   '',
+        period_year:       String(currentYear),
+        period_month:      String(currentMonth),
+        statement_balance: '',
+        notes:             '',
     });
 
     function handleSubmit(e) {
         e.preventDefault();
-        post(route('admin.bank-transactions.reconciliations.store'), { onSuccess });
+        post(route('admin.bank-transactions.reconciliations.store'));
     }
 
     return (
         <form onSubmit={handleSubmit}>
-            <div className="form-grid">
-                <label>
-                    Cuenta bancaria
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <label style={{ margin: 0, gridColumn: '1 / -1' }}>
+                    Cuenta bancaria <span style={{ color: '#ef4444' }}>*</span>
                     <select
                         value={data.bank_account_id}
                         onChange={(e) => setData('bank_account_id', e.target.value)}
                         required
                     >
                         <option value="">— Seleccionar cuenta —</option>
-                        {accounts.map((a) => (
-                            <option key={a.id} value={a.id}>{a.name}</option>
+                        {(bankAccounts ?? []).map((a) => (
+                            <option key={a.id} value={a.id}>{a.name} — {a.bank_name}</option>
                         ))}
                     </select>
-                    {errors.bank_account_id && <p className="field-error">{errors.bank_account_id}</p>}
+                    {errors.bank_account_id && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.bank_account_id}</span>}
                 </label>
 
-                <label>
-                    Nombre
+                <label style={{ margin: 0 }}>
+                    Año <span style={{ color: '#ef4444' }}>*</span>
+                    <input
+                        type="number"
+                        value={data.period_year}
+                        onChange={(e) => setData('period_year', e.target.value)}
+                        min="2020"
+                        max="2100"
+                        required
+                    />
+                    {errors.period_year && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.period_year}</span>}
+                </label>
+
+                <label style={{ margin: 0 }}>
+                    Mes <span style={{ color: '#ef4444' }}>*</span>
+                    <select value={data.period_month} onChange={(e) => setData('period_month', e.target.value)} required>
+                        {MONTHS.map((m, i) => (
+                            <option key={i + 1} value={i + 1}>{m}</option>
+                        ))}
+                    </select>
+                    {errors.period_month && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.period_month}</span>}
+                </label>
+
+                <label style={{ margin: 0 }}>
+                    Saldo del estado de cuenta
+                    <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={data.statement_balance}
+                        onChange={(e) => setData('statement_balance', e.target.value)}
+                        placeholder="0.00"
+                    />
+                    {errors.statement_balance && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.statement_balance}</span>}
+                </label>
+
+                <label style={{ margin: 0 }}>
+                    Notas
                     <input
                         type="text"
-                        value={data.name}
-                        onChange={(e) => setData('name', e.target.value)}
-                        required
-                        autoFocus
-                        placeholder="Ej. Conciliación enero 2026"
+                        value={data.notes}
+                        onChange={(e) => setData('notes', e.target.value)}
+                        maxLength={1000}
                     />
-                    {errors.name && <p className="field-error">{errors.name}</p>}
-                </label>
-
-                <label>
-                    Inicio del período
-                    <input
-                        type="date"
-                        value={data.period_start}
-                        onChange={(e) => setData('period_start', e.target.value)}
-                        required
-                    />
-                    {errors.period_start && <p className="field-error">{errors.period_start}</p>}
-                </label>
-
-                <label>
-                    Fin del período
-                    <input
-                        type="date"
-                        value={data.period_end}
-                        onChange={(e) => setData('period_end', e.target.value)}
-                        required
-                    />
-                    {errors.period_end && <p className="field-error">{errors.period_end}</p>}
+                    {errors.notes && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.notes}</span>}
                 </label>
             </div>
 
-            <div className="form-actions" style={{ marginTop: 20 }}>
-                <button type="button" className="btn secondary" onClick={onCancel}>Cancelar</button>
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
                 <button type="submit" className="btn" disabled={processing}>
-                    {processing ? 'Guardando…' : 'Crear conciliación'}
+                    {processing ? 'Creando...' : 'Crear conciliación'}
                 </button>
+                <button type="button" className="btn secondary" onClick={onCancel}>Cancelar</button>
             </div>
         </form>
     );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
-
-export default function Reconciliations({ reconciliations, accounts }) {
+export default function Reconciliations({ reconciliations, bankAccounts }) {
     const [showCreate, setShowCreate] = useState(false);
 
-    const statusLabel = { open: 'Abierta', completed: 'Completada' };
-    const statusBadge = { open: 'suspended', completed: 'active' };
-
-    const fmt = (n) =>
-        n != null
-            ? Number(n).toLocaleString('es-SV', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-            : '—';
+    const fmt = (n) => n != null
+        ? Number(n).toLocaleString('es-SV', { minimumFractionDigits: 2 })
+        : '—';
 
     return (
         <AppLayout>
@@ -125,49 +121,61 @@ export default function Reconciliations({ reconciliations, accounts }) {
 
             <div className="top">
                 <h1>Conciliación bancaria</h1>
-                <button className="btn" type="button" onClick={() => setShowCreate(true)}>
-                    + Nueva conciliación
+                <button type="button" className="btn" onClick={() => setShowCreate((v) => !v)}>
+                    {showCreate ? 'Cancelar' : '+ Nueva conciliación'}
                 </button>
             </div>
+
+            {showCreate && (
+                <div className="card" style={{ marginBottom: 16 }}>
+                    <h2 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 600 }}>Nueva conciliación</h2>
+                    <ReconciliationForm bankAccounts={bankAccounts} onCancel={() => setShowCreate(false)} />
+                </div>
+            )}
 
             <div className="card table-scroll">
                 <table>
                     <thead>
                         <tr>
-                            <th>Nombre</th>
-                            <th>Cuenta</th>
                             <th>Período</th>
+                            <th>Cuenta</th>
                             <th>Estado</th>
-                            <th>Diferencia</th>
+                            <th style={{ textAlign: 'right' }}>Saldo estado cuenta</th>
+                            <th>Completada</th>
                             <th></th>
                         </tr>
                     </thead>
                     <tbody>
-                        {reconciliations.data.length === 0 && (
+                        {(!reconciliations || reconciliations.length === 0) && (
                             <tr>
-                                <td colSpan={6} className="empty">Sin registros</td>
+                                <td colSpan={6} className="empty">Sin conciliaciones registradas</td>
                             </tr>
                         )}
-                        {reconciliations.data.map((r) => (
+                        {(reconciliations ?? []).map((r) => (
                             <tr key={r.id}>
-                                <td style={{ fontWeight: 600 }}>{r.name}</td>
-                                <td>{r.bank_account?.name ?? <span className="muted">—</span>}</td>
-                                <td className="muted">
-                                    {r.period_start} — {r.period_end}
+                                <td style={{ fontWeight: 600 }}>
+                                    {periodLabel(r.period_year, r.period_month)}
                                 </td>
+                                <td>{r.bank_account?.name ?? '—'}</td>
                                 <td>
-                                    <span className={`badge ${statusBadge[r.status] ?? ''}`}>
-                                        {statusLabel[r.status] ?? r.status}
+                                    <span style={{
+                                        fontSize: 11, fontWeight: 600, padding: '2px 8px',
+                                        borderRadius: 10, ...(STATUS_COLOR[r.status] ?? {}),
+                                    }}>
+                                        {STATUS_LABEL[r.status] ?? r.status}
                                     </span>
                                 </td>
-                                <td style={{ fontWeight: 600, color: Number(r.difference) === 0 ? '#16a34a' : '#dc2626' }}>
-                                    {fmt(r.difference)}
+                                <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>
+                                    {fmt(r.statement_balance)}
+                                </td>
+                                <td style={{ fontSize: 13, color: '#6b7280' }}>
+                                    {r.completed_at ? r.completed_at.substring(0, 10) : '—'}
                                 </td>
                                 <td>
                                     <Link
                                         href={route('admin.bank-transactions.reconciliations.show', r.id)}
-                                        className="btn btn-sm secondary"
-                                        style={{ fontSize: 13, padding: '6px 10px' }}
+                                        className="btn secondary"
+                                        style={{ fontSize: 12, padding: '3px 10px' }}
                                     >
                                         Ver detalle
                                     </Link>
@@ -176,18 +184,7 @@ export default function Reconciliations({ reconciliations, accounts }) {
                         ))}
                     </tbody>
                 </table>
-                <Pagination links={reconciliations.links} />
             </div>
-
-            {showCreate && (
-                <Modal title="Nueva conciliación" onClose={() => setShowCreate(false)}>
-                    <ReconciliationForm
-                        accounts={accounts}
-                        onSuccess={() => setShowCreate(false)}
-                        onCancel={() => setShowCreate(false)}
-                    />
-                </Modal>
-            )}
         </AppLayout>
     );
 }

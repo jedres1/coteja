@@ -1,20 +1,17 @@
-import { useState } from 'react';
 import { Head, useForm, router } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
+import { useState } from 'react';
 
-// ─── EmailSettingsForm ────────────────────────────────────────────────────────
-
-function EmailSettingsForm({ settings }) {
-    const [locked, setLocked] = useState(!!settings?.is_locked);
-
-    const { data, setData, post, processing, errors } = useForm({
-        email:         settings?.email ?? '',
-        imap_host:     settings?.imap_host ?? '',
-        imap_port:     settings?.imap_port ?? '',
-        imap_user:     settings?.imap_user ?? '',
-        imap_password: settings?.imap_password ?? '',
-        folder:        settings?.folder ?? 'INBOX',
+function MailboxForm({ host, port, username, password, mailbox, onlyUnseen, limit }) {
+    const { data, setData, post, processing, errors, recentlySuccessful } = useForm({
+        mailbox_host:        host ?? '',
+        mailbox_port:        port ?? '',
+        mailbox_username:    username ?? '',
+        mailbox_password:    '',
+        mailbox_mailbox:     mailbox ?? 'INBOX',
+        mailbox_only_unseen: onlyUnseen ? '1' : '0',
+        mailbox_limit:       limit ?? '25',
     });
 
     function handleSubmit(e) {
@@ -24,113 +21,107 @@ function EmailSettingsForm({ settings }) {
 
     return (
         <form onSubmit={handleSubmit}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <h3 style={{ margin: 0 }}>Correo / IMAP</h3>
-                <button
-                    type="button"
-                    className="btn secondary"
-                    onClick={() => setLocked((v) => !v)}
-                >
-                    {locked ? 'Desbloquear' : 'Bloquear'}
-                </button>
-            </div>
-
-            <div className="form-grid">
-                <label>
-                    Correo electrónico
-                    <input
-                        type="email"
-                        value={data.email}
-                        onChange={(e) => setData('email', e.target.value)}
-                        disabled={locked}
-                        required
-                    />
-                    {errors.email && <p className="field-error">{errors.email}</p>}
-                </label>
-
-                <label>
+            <h2 style={{ marginTop: 0, marginBottom: 20, fontSize: 15, fontWeight: 600 }}>
+                Configuración de correo / IMAP
+            </h2>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <label style={{ margin: 0 }}>
                     Host IMAP
                     <input
                         type="text"
-                        value={data.imap_host}
-                        onChange={(e) => setData('imap_host', e.target.value)}
-                        disabled={locked}
+                        value={data.mailbox_host}
+                        onChange={(e) => setData('mailbox_host', e.target.value)}
                         placeholder="imap.gmail.com"
+                        required
                     />
-                    {errors.imap_host && <p className="field-error">{errors.imap_host}</p>}
+                    {errors.mailbox_host && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.mailbox_host}</span>}
                 </label>
-
-                <label>
-                    Puerto IMAP
+                <label style={{ margin: 0 }}>
+                    Puerto
                     <input
                         type="number"
-                        value={data.imap_port}
-                        onChange={(e) => setData('imap_port', e.target.value)}
-                        disabled={locked}
+                        value={data.mailbox_port}
+                        onChange={(e) => setData('mailbox_port', e.target.value)}
                         placeholder="993"
+                        required
+                        min="1"
+                        max="65535"
                     />
-                    {errors.imap_port && <p className="field-error">{errors.imap_port}</p>}
+                    {errors.mailbox_port && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.mailbox_port}</span>}
                 </label>
-
-                <label>
-                    Usuario IMAP
+                <label style={{ margin: 0 }}>
+                    Usuario
                     <input
                         type="text"
-                        value={data.imap_user}
-                        onChange={(e) => setData('imap_user', e.target.value)}
-                        disabled={locked}
+                        value={data.mailbox_username}
+                        onChange={(e) => setData('mailbox_username', e.target.value)}
+                        required
                     />
-                    {errors.imap_user && <p className="field-error">{errors.imap_user}</p>}
+                    {errors.mailbox_username && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.mailbox_username}</span>}
                 </label>
-
-                <label>
-                    Contraseña IMAP
+                <label style={{ margin: 0 }}>
+                    Contraseña
                     <input
                         type="password"
-                        value={data.imap_password}
-                        onChange={(e) => setData('imap_password', e.target.value)}
-                        disabled={locked}
+                        value={data.mailbox_password}
+                        onChange={(e) => setData('mailbox_password', e.target.value)}
                         autoComplete="new-password"
-                        placeholder={locked ? '••••••••' : 'Contraseña de aplicación'}
+                        placeholder={password ? '••••••••' : 'Sin contraseña guardada'}
                     />
-                    {errors.imap_password && <p className="field-error">{errors.imap_password}</p>}
+                    {errors.mailbox_password && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.mailbox_password}</span>}
                 </label>
-
-                <label>
-                    Carpeta
+                <label style={{ margin: 0 }}>
+                    Carpeta (Mailbox)
                     <input
                         type="text"
-                        value={data.folder}
-                        onChange={(e) => setData('folder', e.target.value)}
-                        disabled={locked}
-                        placeholder="INBOX"
+                        value={data.mailbox_mailbox}
+                        onChange={(e) => setData('mailbox_mailbox', e.target.value)}
+                        required
                     />
-                    {errors.folder && <p className="field-error">{errors.folder}</p>}
+                    {errors.mailbox_mailbox && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.mailbox_mailbox}</span>}
+                </label>
+                <label style={{ margin: 0 }}>
+                    Límite de correos
+                    <input
+                        type="number"
+                        value={data.mailbox_limit}
+                        onChange={(e) => setData('mailbox_limit', e.target.value)}
+                        required
+                        min="1"
+                        max="100"
+                    />
+                    {errors.mailbox_limit && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.mailbox_limit}</span>}
+                </label>
+                <label style={{ margin: 0, gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 10, flexDirection: 'row' }}>
+                    <input
+                        type="checkbox"
+                        checked={data.mailbox_only_unseen === '1'}
+                        onChange={(e) => setData('mailbox_only_unseen', e.target.checked ? '1' : '0')}
+                        style={{ width: 'auto', margin: 0 }}
+                    />
+                    Solo correos no leídos
                 </label>
             </div>
-
-            <div className="form-actions" style={{ marginTop: 20 }}>
-                <button type="submit" className="btn" disabled={processing || locked}>
-                    {processing ? 'Guardando…' : 'Guardar configuración de correo'}
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 20 }}>
+                <button type="submit" className="btn" disabled={processing}>
+                    {processing ? 'Guardando...' : 'Guardar configuración de correo'}
                 </button>
+                {recentlySuccessful && (
+                    <span style={{ color: '#16a34a', fontSize: 13 }}>Configuración guardada.</span>
+                )}
             </div>
         </form>
     );
 }
 
-// ─── AccountingSettingsForm ───────────────────────────────────────────────────
-
-function AccountingSettingsForm({ accountingSettings, accounts }) {
-    const { data, setData, post, processing, errors } = useForm({
-        accounts_payable_account_id: accountingSettings?.accounts_payable_account_id
-            ? String(accountingSettings.accounts_payable_account_id)
-            : '',
-        purchase_account_id: accountingSettings?.purchase_account_id
-            ? String(accountingSettings.purchase_account_id)
-            : '',
-        iva_account_id: accountingSettings?.iva_account_id
-            ? String(accountingSettings.iva_account_id)
-            : '',
+function AccountingForm({ purchasePackage, payablePackage, accountingAccounts, costCenters }) {
+    const { data, setData, post, processing, errors, recentlySuccessful } = useForm({
+        purchase_debit_account_id:  purchasePackage?.debit_account_id  ? String(purchasePackage.debit_account_id)  : '',
+        purchase_credit_account_id: purchasePackage?.credit_account_id ? String(purchasePackage.credit_account_id) : '',
+        purchase_cost_center_id:    purchasePackage?.cost_center_id    ? String(purchasePackage.cost_center_id)    : '',
+        payable_debit_account_id:   payablePackage?.debit_account_id   ? String(payablePackage.debit_account_id)   : '',
+        payable_credit_account_id:  payablePackage?.credit_account_id  ? String(payablePackage.credit_account_id)  : '',
+        payable_cost_center_id:     payablePackage?.cost_center_id     ? String(payablePackage.cost_center_id)     : '',
     });
 
     function handleSubmit(e) {
@@ -138,76 +129,110 @@ function AccountingSettingsForm({ accountingSettings, accounts }) {
         post(route('admin.purchase-invoices.settings.accounting'));
     }
 
-    const accountOptions = accounts.map((a) => (
-        <option key={a.id} value={String(a.id)}>
-            {a.code} — {a.name}
-        </option>
+    const accountOpts = (accountingAccounts ?? []).map((a) => (
+        <option key={a.id} value={String(a.id)}>{a.code} — {a.name}</option>
     ));
+    const centerOpts = (costCenters ?? []).map((c) => (
+        <option key={c.id} value={String(c.id)}>{c.code} — {c.name}</option>
+    ));
+
+    const selectStyle = { margin: 0 };
+    const fieldErr = (field) => errors[field] && (
+        <span style={{ color: '#ef4444', fontSize: 12 }}>{errors[field]}</span>
+    );
 
     return (
         <form onSubmit={handleSubmit}>
-            <h3 style={{ marginTop: 0 }}>Cuentas contables</h3>
+            <h2 style={{ marginTop: 0, marginBottom: 4, fontSize: 15, fontWeight: 600 }}>
+                Cuentas contables
+            </h2>
+            <p style={{ margin: '0 0 16px', fontSize: 13, color: '#6b7280' }}>
+                Partida de compras (CP) y partida de cuentas por pagar (CXP).
+            </p>
 
-            <div className="form-grid">
-                <label>
-                    Cuentas por pagar
-                    <select
-                        value={data.accounts_payable_account_id}
-                        onChange={(e) => setData('accounts_payable_account_id', e.target.value)}
-                    >
-                        <option value="">— Seleccionar cuenta —</option>
-                        {accountOptions}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div style={{ gridColumn: '1 / -1', fontWeight: 600, fontSize: 13, borderBottom: '1px solid #e5e7eb', paddingBottom: 6 }}>
+                    Compras (CP)
+                </div>
+                <label style={selectStyle}>
+                    Cuenta débito
+                    <select value={data.purchase_debit_account_id} onChange={(e) => setData('purchase_debit_account_id', e.target.value)}>
+                        <option value="">— Seleccionar —</option>
+                        {accountOpts}
                     </select>
-                    {errors.accounts_payable_account_id && (
-                        <p className="field-error">{errors.accounts_payable_account_id}</p>
-                    )}
+                    {fieldErr('purchase_debit_account_id')}
                 </label>
+                <label style={selectStyle}>
+                    Cuenta crédito
+                    <select value={data.purchase_credit_account_id} onChange={(e) => setData('purchase_credit_account_id', e.target.value)}>
+                        <option value="">— Seleccionar —</option>
+                        {accountOpts}
+                    </select>
+                    {fieldErr('purchase_credit_account_id')}
+                </label>
+                {costCenters?.length > 0 && (
+                    <label style={selectStyle}>
+                        Centro de costo
+                        <select value={data.purchase_cost_center_id} onChange={(e) => setData('purchase_cost_center_id', e.target.value)}>
+                            <option value="">— Sin centro de costo —</option>
+                            {centerOpts}
+                        </select>
+                        {fieldErr('purchase_cost_center_id')}
+                    </label>
+                )}
 
-                <label>
-                    Cuenta de compras
-                    <select
-                        value={data.purchase_account_id}
-                        onChange={(e) => setData('purchase_account_id', e.target.value)}
-                    >
-                        <option value="">— Seleccionar cuenta —</option>
-                        {accountOptions}
+                <div style={{ gridColumn: '1 / -1', fontWeight: 600, fontSize: 13, borderBottom: '1px solid #e5e7eb', paddingBottom: 6, marginTop: 8 }}>
+                    Cuentas por pagar (CXP)
+                </div>
+                <label style={selectStyle}>
+                    Cuenta débito
+                    <select value={data.payable_debit_account_id} onChange={(e) => setData('payable_debit_account_id', e.target.value)}>
+                        <option value="">— Seleccionar —</option>
+                        {accountOpts}
                     </select>
-                    {errors.purchase_account_id && (
-                        <p className="field-error">{errors.purchase_account_id}</p>
-                    )}
+                    {fieldErr('payable_debit_account_id')}
                 </label>
-
-                <label>
-                    Cuenta IVA crédito fiscal
-                    <select
-                        value={data.iva_account_id}
-                        onChange={(e) => setData('iva_account_id', e.target.value)}
-                    >
-                        <option value="">— Seleccionar cuenta —</option>
-                        {accountOptions}
+                <label style={selectStyle}>
+                    Cuenta crédito
+                    <select value={data.payable_credit_account_id} onChange={(e) => setData('payable_credit_account_id', e.target.value)}>
+                        <option value="">— Seleccionar —</option>
+                        {accountOpts}
                     </select>
-                    {errors.iva_account_id && (
-                        <p className="field-error">{errors.iva_account_id}</p>
-                    )}
+                    {fieldErr('payable_credit_account_id')}
                 </label>
+                {costCenters?.length > 0 && (
+                    <label style={selectStyle}>
+                        Centro de costo
+                        <select value={data.payable_cost_center_id} onChange={(e) => setData('payable_cost_center_id', e.target.value)}>
+                            <option value="">— Sin centro de costo —</option>
+                            {centerOpts}
+                        </select>
+                        {fieldErr('payable_cost_center_id')}
+                    </label>
+                )}
             </div>
 
-            <div className="form-actions" style={{ marginTop: 20 }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 20 }}>
                 <button type="submit" className="btn" disabled={processing}>
-                    {processing ? 'Guardando…' : 'Guardar cuentas contables'}
+                    {processing ? 'Guardando...' : 'Guardar cuentas contables'}
                 </button>
+                {recentlySuccessful && (
+                    <span style={{ color: '#16a34a', fontSize: 13 }}>Cuentas guardadas.</span>
+                )}
             </div>
         </form>
     );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
-
-export default function Settings({ settings, accountingSettings, accounts }) {
+export default function Settings({
+    host, port, username, password, mailbox, onlyUnseen, limit,
+    accountingAccounts, costCenters, purchasePackage, payablePackage,
+    missingPurchaseEntries, missingPayableEntries,
+}) {
     const [generating, setGenerating] = useState(false);
 
     function handleGenerateMissing() {
-        if (!confirm('¿Generar partidas contables para todas las facturas sin partidas? Esto puede tardar unos segundos.')) return;
+        if (!confirm('¿Generar partidas contables faltantes? Esto puede tardar unos segundos.')) return;
         setGenerating(true);
         router.post(
             route('admin.purchase-invoices.settings.generate-missing-entries'),
@@ -215,6 +240,8 @@ export default function Settings({ settings, accountingSettings, accounts }) {
             { onFinish: () => setGenerating(false) }
         );
     }
+
+    const totalMissing = (missingPurchaseEntries ?? 0) + (missingPayableEntries ?? 0);
 
     return (
         <AppLayout>
@@ -224,29 +251,42 @@ export default function Settings({ settings, accountingSettings, accounts }) {
                 <h1>Configuración de compras</h1>
             </div>
 
-            {/* Email / IMAP card */}
             <div className="card" style={{ marginBottom: 16 }}>
-                <EmailSettingsForm settings={settings} />
+                <MailboxForm
+                    host={host}
+                    port={port}
+                    username={username}
+                    password={password}
+                    mailbox={mailbox}
+                    onlyUnseen={onlyUnseen}
+                    limit={limit}
+                />
             </div>
 
-            {/* Accounting settings card */}
             <div className="card" style={{ marginBottom: 16 }}>
-                <AccountingSettingsForm accountingSettings={accountingSettings} accounts={accounts} />
+                <AccountingForm
+                    purchasePackage={purchasePackage}
+                    payablePackage={payablePackage}
+                    accountingAccounts={accountingAccounts}
+                    costCenters={costCenters}
+                />
             </div>
 
-            {/* Generate missing entries card */}
             <div className="card">
-                <h3 style={{ marginTop: 0 }}>Partidas contables</h3>
-                <p className="muted" style={{ marginTop: 0 }}>
-                    Genera partidas contables automáticas para facturas aprobadas que aún no tienen registro contable.
+                <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15, fontWeight: 600 }}>
+                    Partidas contables faltantes
+                </h2>
+                <p style={{ margin: '0 0 12px', fontSize: 13, color: '#6b7280' }}>
+                    Facturas aprobadas sin partida de compra: <strong>{missingPurchaseEntries ?? 0}</strong>.{' '}
+                    Pagos sin partida de cuentas por pagar: <strong>{missingPayableEntries ?? 0}</strong>.
                 </p>
                 <button
                     type="button"
                     className="btn secondary"
                     onClick={handleGenerateMissing}
-                    disabled={generating}
+                    disabled={generating || totalMissing === 0}
                 >
-                    {generating ? 'Generando…' : 'Generar partidas faltantes'}
+                    {generating ? 'Generando...' : `Generar partidas faltantes (${totalMissing})`}
                 </button>
             </div>
         </AppLayout>

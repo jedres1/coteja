@@ -4,106 +4,94 @@ import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
 
-const fmt = (x) => Number(x).toLocaleString('es-SV', { minimumFractionDigits: 2 });
+const fmt = (x) => Number(x ?? 0).toLocaleString('es-SV', { minimumFractionDigits: 2 });
 
-const STATUS_LABELS = {
-    pendiente: 'Pendiente',
-    aprobado:  'Aprobado',
-    anulado:   'Anulado',
+const STATUS_LABELS = { borrador: 'Borrador', aprobado: 'Aprobado', anulado: 'Anulado' };
+const STATUS_STYLE  = {
+    borrador: { background: '#fef3c7', color: '#92400e' },
+    aprobado: { background: '#f0fdf4', color: '#15803d' },
+    anulado:  { background: '#f1f5f9', color: '#64748b' },
 };
 
-const STATUS_BADGE = {
-    pendiente: 'badge-warning',
-    aprobado:  'active',
-    anulado:   'suspended',
-};
+export default function Diario({ entries, stats, search, status, from, to }) {
+    const [searchVal, setSearchVal] = useState(search ?? '');
+    const [statusVal, setStatusVal] = useState(status ?? '');
+    const [fromVal, setFromVal]     = useState(from ?? '');
+    const [toVal, setToVal]         = useState(to ?? '');
 
-export default function Diario({ entries, filters, periods }) {
-    const [search, setSearch]   = useState(filters?.search ?? '');
-    const [status, setStatus]   = useState(filters?.status ?? '');
-    const [periodId, setPeriodId] = useState(filters?.periodId ?? '');
-
-    function applyFilters(newSearch, newStatus, newPeriod) {
-        const params = {};
-        if (newSearch)  params.search    = newSearch;
-        if (newStatus)  params.status    = newStatus;
-        if (newPeriod)  params.period_id = newPeriod;
-        router.get(route('admin.accounting.diario.index'), params, { preserveState: true });
-    }
-
-    function handleSearch(e) {
+    function applyFilters(e) {
         e.preventDefault();
-        applyFilters(search, status, periodId);
-    }
-
-    function handleStatusChange(e) {
-        const val = e.target.value;
-        setStatus(val);
-        applyFilters(search, val, periodId);
-    }
-
-    function handlePeriodChange(e) {
-        const val = e.target.value;
-        setPeriodId(val);
-        applyFilters(search, status, val);
+        router.get(route('admin.accounting.diario.index'), {
+            search: searchVal || undefined,
+            status: statusVal || undefined,
+            from:   fromVal   || undefined,
+            to:     toVal     || undefined,
+        }, { preserveState: true });
     }
 
     function handleDelete(entry) {
-        if (!confirm(`¿Eliminar la partida "${entry.reference}"? Esta acción no se puede deshacer.`)) return;
+        if (!confirm(`¿Eliminar el borrador ${entry.entry_number}? Esta acción no se puede deshacer.`)) return;
         router.delete(route('admin.accounting.diario.destroy', entry.id));
     }
-
-    const hasFilters = !!(filters?.search || filters?.status || filters?.periodId);
 
     return (
         <AppLayout>
             <Head title="Diario contable" />
-
             <div className="top">
                 <h1>Diario contable</h1>
-                <Link href={route('admin.accounting.diario.create')} className="btn">
-                    + Nueva partida
-                </Link>
+                <div style={{ display: 'flex', gap: 8 }}>
+                    <a href={route('admin.accounting.diario.export')} className="btn secondary">Exportar</a>
+                    <Link href={route('admin.accounting.diario.create')} className="btn">+ Nueva partida</Link>
+                </div>
             </div>
+
+            {/* Estadísticas */}
+            {stats && (
+                <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+                    {[
+                        { label: 'Borradores', value: stats.borrador, color: '#92400e' },
+                        { label: 'Aprobados',  value: stats.aprobado, color: '#15803d' },
+                        { label: 'Anulados',   value: stats.anulado,  color: '#64748b' },
+                        { label: 'Total',      value: stats.total,    color: '#374151' },
+                    ].map((s) => (
+                        <div key={s.label} className="card" style={{ flex: 1, padding: '10px 14px', minWidth: 100 }}>
+                            <div style={{ fontSize: 11, color: '#6b7280' }}>{s.label}</div>
+                            <div style={{ fontWeight: 700, fontSize: 18, color: s.color }}>{s.value}</div>
+                        </div>
+                    ))}
+                </div>
+            )}
 
             {/* Filtros */}
             <div className="card" style={{ marginBottom: 16 }}>
-                <form onSubmit={handleSearch} style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                    <label style={{ flex: '1 1 200px', margin: 0 }}>
+                <form onSubmit={applyFilters} style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                    <label style={{ flex: '1 1 180px', margin: 0 }}>
                         Buscar
                         <input
                             type="text"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Referencia o descripción…"
+                            value={searchVal}
+                            onChange={(e) => setSearchVal(e.target.value)}
+                            placeholder="N° asiento, descripción, referencia…"
                         />
                     </label>
-                    <label style={{ flex: '0 1 180px', margin: 0 }}>
+                    <label style={{ margin: 0 }}>
+                        Desde
+                        <input type="date" value={fromVal} onChange={(e) => setFromVal(e.target.value)} />
+                    </label>
+                    <label style={{ margin: 0 }}>
+                        Hasta
+                        <input type="date" value={toVal} onChange={(e) => setToVal(e.target.value)} />
+                    </label>
+                    <label style={{ margin: 0 }}>
                         Estado
-                        <select value={status} onChange={handleStatusChange}>
-                            <option value="">— Todos —</option>
-                            <option value="pendiente">Pendiente</option>
+                        <select value={statusVal} onChange={(e) => setStatusVal(e.target.value)}>
+                            <option value="">Todos</option>
+                            <option value="borrador">Borrador</option>
                             <option value="aprobado">Aprobado</option>
                             <option value="anulado">Anulado</option>
                         </select>
                     </label>
-                    <label style={{ flex: '0 1 220px', margin: 0 }}>
-                        Período
-                        <select value={periodId} onChange={handlePeriodChange}>
-                            <option value="">— Todos los períodos —</option>
-                            {periods.map((p) => (
-                                <option key={p.id} value={p.id}>{p.name}</option>
-                            ))}
-                        </select>
-                    </label>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-                        <button type="submit" className="btn">Buscar</button>
-                        {hasFilters && (
-                            <Link href={route('admin.accounting.diario.index')} className="btn secondary">
-                                Limpiar
-                            </Link>
-                        )}
-                    </div>
+                    <button type="submit" className="btn">Filtrar</button>
                 </form>
             </div>
 
@@ -112,55 +100,59 @@ export default function Diario({ entries, filters, periods }) {
                 <table>
                     <thead>
                         <tr>
+                            <th>N° Asiento</th>
                             <th>Fecha</th>
-                            <th>Referencia</th>
                             <th>Descripción</th>
                             <th>Estado</th>
                             <th style={{ textAlign: 'right' }}>Débito total</th>
-                            <th style={{ textAlign: 'center' }}>Líneas</th>
-                            <th>Acción</th>
+                            <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {entries.data.length === 0 && (
-                            <tr>
-                                <td colSpan={7} className="empty">Sin registros</td>
-                            </tr>
+                        {(entries?.data ?? []).length === 0 && (
+                            <tr><td colSpan={6} className="empty">Sin registros en el período seleccionado</td></tr>
                         )}
-                        {entries.data.map((entry) => (
+                        {(entries?.data ?? []).map((entry) => (
                             <tr key={entry.id}>
-                                <td style={{ whiteSpace: 'nowrap' }}>
-                                    {entry.date ? entry.date.substring(0, 10) : '—'}
+                                <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>{entry.entry_number}</td>
+                                <td style={{ whiteSpace: 'nowrap', fontSize: 13 }}>
+                                    {entry.entry_date ? String(entry.entry_date).substring(0, 10) : '—'}
                                 </td>
-                                <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>
-                                    {entry.reference}
-                                </td>
-                                <td style={{ maxWidth: 240 }}>{entry.description}</td>
+                                <td style={{ maxWidth: 260, fontSize: 13 }}>{entry.description}</td>
                                 <td>
-                                    <span className={`badge ${STATUS_BADGE[entry.status] ?? ''}`}>
+                                    <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, ...(STATUS_STYLE[entry.status] ?? {}) }}>
                                         {STATUS_LABELS[entry.status] ?? entry.status}
                                     </span>
                                 </td>
-                                <td style={{ textAlign: 'right' }}>{fmt(entry.total_debit)}</td>
-                                <td style={{ textAlign: 'center' }}>{entry.lines_count ?? '—'}</td>
+                                <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>
+                                    {fmt((entry.lines ?? []).reduce((s, l) => s + Number(l.debit ?? 0), 0))}
+                                </td>
                                 <td>
                                     <div style={{ display: 'flex', gap: 6 }}>
                                         <Link
                                             href={route('admin.accounting.diario.show', entry.id)}
-                                            className="btn btn-sm secondary"
-                                            style={{ fontSize: 13, padding: '6px 10px' }}
+                                            className="btn secondary"
+                                            style={{ fontSize: 12, padding: '3px 10px' }}
                                         >
                                             Ver
                                         </Link>
-                                        {entry.status === 'pendiente' && (
-                                            <button
-                                                type="button"
-                                                className="btn btn-sm danger"
-                                                style={{ fontSize: 13, padding: '6px 10px' }}
-                                                onClick={() => handleDelete(entry)}
-                                            >
-                                                Eliminar
-                                            </button>
+                                        {entry.status === 'borrador' && (
+                                            <>
+                                                <Link
+                                                    href={route('admin.accounting.diario.edit', entry.id)}
+                                                    className="btn secondary"
+                                                    style={{ fontSize: 12, padding: '3px 10px' }}
+                                                >
+                                                    Editar
+                                                </Link>
+                                                <button
+                                                    type="button"
+                                                    style={{ fontSize: 12, padding: '3px 10px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 6, cursor: 'pointer' }}
+                                                    onClick={() => handleDelete(entry)}
+                                                >
+                                                    Eliminar
+                                                </button>
+                                            </>
                                         )}
                                     </div>
                                 </td>
@@ -168,7 +160,7 @@ export default function Diario({ entries, filters, periods }) {
                         ))}
                     </tbody>
                 </table>
-                <Pagination links={entries.links} />
+                <Pagination links={entries?.links ?? []} />
             </div>
         </AppLayout>
     );

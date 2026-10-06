@@ -4,69 +4,90 @@ import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
 
-// ─── Modal ────────────────────────────────────────────────────────────────────
+const DOC_LABELS = {
+    ccf: 'CCF',
+    fce: 'FCE',
+    fcc: 'FCC',
+    nota_credito: 'Nota crédito',
+    nota_debito: 'Nota débito',
+};
 
-function Modal({ title, onClose, children }) {
+const PAYMENT_LABEL = { pending: 'Pendiente', partial: 'Parcial', paid: 'Pagado' };
+const PAYMENT_COLOR = {
+    pending: { background: '#fef3c7', color: '#92400e' },
+    partial: { background: '#eff6ff', color: '#1d4ed8' },
+    paid:    { background: '#f0fdf4', color: '#15803d' },
+};
+const STATUS_LABEL = { approved: 'Aprobada', pending: 'Pendiente', rejected: 'Rechazada' };
+const STATUS_COLOR = {
+    approved: { background: '#f0fdf4', color: '#15803d' },
+    pending:  { background: '#fef3c7', color: '#92400e' },
+    rejected: { background: '#fef2f2', color: '#dc2626' },
+};
+
+const badge = (map, key) => {
+    const style = map[key] ?? { background: '#f3f4f6', color: '#374151' };
+    return (
+        <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, whiteSpace: 'nowrap', ...style }}>
+            {(map === PAYMENT_LABEL ? PAYMENT_LABEL[key] : STATUS_LABEL[key]) ?? key}
+        </span>
+    );
+};
+
+function InvoiceDetailModal({ invoice, onClose }) {
     useEffect(() => {
         const handler = (e) => { if (e.key === 'Escape') onClose(); };
         window.addEventListener('keydown', handler);
         return () => window.removeEventListener('keydown', handler);
     }, [onClose]);
 
+    const fmt = (n) => n != null ? Number(n).toLocaleString('es-SV', { minimumFractionDigits: 2 }) : '—';
+
     return (
-        <div className="overlay-layer" role="dialog" aria-modal="true" aria-label={title}>
+        <div className="overlay-layer" role="dialog" aria-modal="true">
             <button className="overlay-backdrop" type="button" aria-label="Cerrar" onClick={onClose} />
-            <div className="overlay-panel card" style={{ maxWidth: 700 }}>
+            <div className="overlay-panel card" style={{ maxWidth: 560 }}>
                 <div className="overlay-header">
-                    <div><h3>{title}</h3></div>
-                    <button type="button" className="btn secondary overlay-close" onClick={onClose}>✕</button>
+                    <h3 style={{ margin: 0 }}>Factura {invoice.invoice_number}</h3>
+                    <button type="button" className="btn secondary" onClick={onClose}>✕</button>
                 </div>
-                {children}
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                    <div><span style={{ fontSize: 12, color: '#6b7280' }}>Proveedor</span><br /><strong>{invoice.supplier?.name ?? '—'}</strong></div>
+                    <div><span style={{ fontSize: 12, color: '#6b7280' }}>NIT / NRC</span><br /><span style={{ fontSize: 13 }}>{invoice.supplier?.document_number ?? '—'}</span></div>
+                    <div><span style={{ fontSize: 12, color: '#6b7280' }}>Fecha de compra</span><br /><span style={{ fontSize: 13 }}>{invoice.purchase_date ?? '—'}</span></div>
+                    <div><span style={{ fontSize: 12, color: '#6b7280' }}>Vencimiento</span><br /><span style={{ fontSize: 13 }}>{invoice.due_date ?? '—'}</span></div>
+                    <div><span style={{ fontSize: 12, color: '#6b7280' }}>Tipo</span><br /><span style={{ fontSize: 13 }}>{DOC_LABELS[invoice.document_type] ?? invoice.document_type ?? '—'}</span></div>
+                    <div><span style={{ fontSize: 12, color: '#6b7280' }}>Método de pago</span><br /><span style={{ fontSize: 13 }}>{invoice.payment_method ?? '—'}</span></div>
+                    <div><span style={{ fontSize: 12, color: '#6b7280' }}>Subtotal</span><br /><span style={{ fontFamily: 'monospace' }}>{fmt(invoice.subtotal)}</span></div>
+                    <div><span style={{ fontSize: 12, color: '#6b7280' }}>IVA</span><br /><span style={{ fontFamily: 'monospace' }}>{fmt(invoice.iva)}</span></div>
+                    <div><span style={{ fontSize: 12, color: '#6b7280' }}>Total</span><br /><strong style={{ fontFamily: 'monospace', fontSize: 15 }}>{fmt(invoice.total)}</strong></div>
+                    <div><span style={{ fontSize: 12, color: '#6b7280' }}>Estado de pago</span><br />
+                        <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, ...(PAYMENT_COLOR[invoice.payment_status] ?? {}) }}>
+                            {PAYMENT_LABEL[invoice.payment_status] ?? invoice.payment_status}
+                        </span>
+                    </div>
+                </div>
+
+                {invoice.notes && (
+                    <div style={{ marginBottom: 12 }}>
+                        <span style={{ fontSize: 12, color: '#6b7280' }}>Notas</span>
+                        <p style={{ margin: '4px 0 0', fontSize: 13 }}>{invoice.notes}</p>
+                    </div>
+                )}
             </div>
         </div>
     );
 }
 
-// ─── DocumentDataView ─────────────────────────────────────────────────────────
-
-function DocumentDataView({ data }) {
-    if (!data) return <p className="muted">Sin datos de documento.</p>;
-
-    const parsed = typeof data === 'string' ? (() => { try { return JSON.parse(data); } catch { return null; } })() : data;
-
-    if (!parsed) {
-        return <pre style={{ whiteSpace: 'pre-wrap', fontSize: 13, wordBreak: 'break-all' }}>{String(data)}</pre>;
-    }
-
-    return (
-        <div style={{ maxHeight: 420, overflowY: 'auto' }}>
-            <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
-                <tbody>
-                    {Object.entries(parsed).map(([key, val]) => (
-                        <tr key={key} style={{ borderBottom: '1px solid var(--border, #e5e7eb)' }}>
-                            <td style={{ padding: '6px 10px 6px 0', fontWeight: 600, whiteSpace: 'nowrap', verticalAlign: 'top', color: '#6b7280', width: '35%' }}>
-                                {key}
-                            </td>
-                            <td style={{ padding: '6px 0', verticalAlign: 'top', wordBreak: 'break-all' }}>
-                                {typeof val === 'object' && val !== null
-                                    ? <pre style={{ margin: 0, fontSize: 12 }}>{JSON.stringify(val, null, 2)}</pre>
-                                    : String(val ?? '—')
-                                }
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
-    );
-}
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
-
-export default function PurchaseInvoicesIndex({ invoices, search, supplierId, suppliers, documentTypes }) {
+export default function PurchaseInvoicesIndex({ invoices, search, supplierId, suppliers }) {
     const [searchVal, setSearchVal]     = useState(search ?? '');
     const [supplierVal, setSupplierVal] = useState(supplierId ? String(supplierId) : '');
     const [viewItem, setViewItem]       = useState(null);
+
+    const fmt = (n) => n != null
+        ? Number(n).toLocaleString('es-SV', { minimumFractionDigits: 2 })
+        : '—';
 
     function handleSearch(e) {
         e.preventDefault();
@@ -78,37 +99,11 @@ export default function PurchaseInvoicesIndex({ invoices, search, supplierId, su
     }
 
     function handleDelete(invoice) {
-        if (!confirm(`¿Eliminar la factura #${invoice.invoice_number}? Esta acción no se puede deshacer.`)) return;
+        if (!confirm(`¿Eliminar la factura ${invoice.invoice_number}? Esta acción no se puede deshacer.`)) return;
         router.delete(route('admin.purchase-invoices.destroy', invoice.id));
     }
 
     const hasFilter = !!(search || supplierId);
-
-    const paymentBadge = {
-        pending:     'suspended',
-        partial:     '',
-        paid:        'active',
-    };
-    const paymentLabel = {
-        pending:     'Pendiente',
-        partial:     'Parcial',
-        paid:        'Pagado',
-    };
-    const statusBadge = {
-        approved: 'active',
-        pending:  'suspended',
-        rejected: 'danger',
-    };
-    const statusLabel = {
-        approved: 'Aprobada',
-        pending:  'Pendiente',
-        rejected: 'Rechazada',
-    };
-
-    const fmt = (n) =>
-        n != null
-            ? Number(n).toLocaleString('es-SV', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-            : '—';
 
     return (
         <AppLayout>
@@ -116,9 +111,11 @@ export default function PurchaseInvoicesIndex({ invoices, search, supplierId, su
 
             <div className="top">
                 <h1>Facturas de compra</h1>
+                <a href={route('admin.purchase-invoices.export')} className="btn secondary">
+                    Exportar
+                </a>
             </div>
 
-            {/* Search bar */}
             <div className="card" style={{ marginBottom: 16 }}>
                 <form onSubmit={handleSearch} style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
                     <label style={{ flex: '1 1 200px', margin: 0 }}>
@@ -127,19 +124,19 @@ export default function PurchaseInvoicesIndex({ invoices, search, supplierId, su
                             type="text"
                             value={searchVal}
                             onChange={(e) => setSearchVal(e.target.value)}
-                            placeholder="Número de factura…"
+                            placeholder="Número de factura, proveedor…"
                         />
                     </label>
-                    <label style={{ flex: '1 1 200px', margin: 0 }}>
+                    <label style={{ flex: '1 1 180px', margin: 0 }}>
                         Proveedor
                         <select value={supplierVal} onChange={(e) => setSupplierVal(e.target.value)}>
                             <option value="">Todos los proveedores</option>
-                            {suppliers.map((s) => (
+                            {(suppliers ?? []).map((s) => (
                                 <option key={s.id} value={s.id}>{s.name}</option>
                             ))}
                         </select>
                     </label>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                    <div style={{ display: 'flex', gap: 8 }}>
                         <button type="submit" className="btn">Buscar</button>
                         {hasFilter && (
                             <Link href={route('admin.purchase-invoices.index')} className="btn secondary">
@@ -150,17 +147,16 @@ export default function PurchaseInvoicesIndex({ invoices, search, supplierId, su
                 </form>
             </div>
 
-            {/* Table */}
             <div className="card table-scroll">
                 <table>
                     <thead>
                         <tr>
-                            <th>Fecha / Vence</th>
+                            <th>Fecha</th>
                             <th>Proveedor</th>
-                            <th>Tipo / Número</th>
-                            <th>Subtotal</th>
-                            <th>IVA</th>
-                            <th>Total</th>
+                            <th>Tipo / N°</th>
+                            <th style={{ textAlign: 'right' }}>Subtotal</th>
+                            <th style={{ textAlign: 'right' }}>IVA</th>
+                            <th style={{ textAlign: 'right' }}>Total</th>
                             <th>Pago</th>
                             <th>Estado</th>
                             <th></th>
@@ -169,56 +165,54 @@ export default function PurchaseInvoicesIndex({ invoices, search, supplierId, su
                     <tbody>
                         {invoices.data.length === 0 && (
                             <tr>
-                                <td colSpan={9} className="empty">Sin registros</td>
+                                <td colSpan={9} className="empty">Sin facturas registradas</td>
                             </tr>
                         )}
-                        {invoices.data.map((invoice) => (
-                            <tr key={invoice.id}>
+                        {invoices.data.map((inv) => (
+                            <tr key={inv.id}>
                                 <td>
-                                    <span>{invoice.date}</span>
-                                    {invoice.due_date && (
-                                        <><br /><span className="muted" style={{ fontSize: 12 }}>Vence: {invoice.due_date}</span></>
+                                    <div style={{ fontSize: 13 }}>{inv.purchase_date ?? '—'}</div>
+                                    {inv.due_date && (
+                                        <div style={{ fontSize: 11, color: '#6b7280' }}>Vence: {inv.due_date}</div>
                                     )}
                                 </td>
                                 <td>
-                                    <span style={{ fontWeight: 600 }}>{invoice.supplier?.name}</span>
-                                    {invoice.supplier?.document_number && (
-                                        <><br /><span className="muted" style={{ fontSize: 12 }}>{invoice.supplier.document_number}</span></>
+                                    <div style={{ fontWeight: 500 }}>{inv.supplier?.name ?? '—'}</div>
+                                    {inv.supplier?.document_number && (
+                                        <div style={{ fontSize: 11, color: '#6b7280' }}>{inv.supplier.document_number}</div>
                                     )}
                                 </td>
                                 <td>
-                                    <span>{documentTypes[invoice.document_type] ?? invoice.document_type}</span>
-                                    <br />
-                                    <span className="muted" style={{ fontSize: 12 }}>{invoice.invoice_number}</span>
+                                    <div style={{ fontSize: 12, color: '#6b7280' }}>{DOC_LABELS[inv.document_type] ?? inv.document_type}</div>
+                                    <div style={{ fontFamily: 'monospace', fontSize: 12 }}>{inv.invoice_number}</div>
                                 </td>
-                                <td>{fmt(invoice.subtotal)}</td>
-                                <td>{fmt(invoice.iva)}</td>
-                                <td style={{ fontWeight: 600 }}>{fmt(invoice.total)}</td>
+                                <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 13 }}>{fmt(inv.subtotal)}</td>
+                                <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 13 }}>{fmt(inv.iva)}</td>
+                                <td style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 600 }}>{fmt(inv.total)}</td>
                                 <td>
-                                    <span className={`badge ${paymentBadge[invoice.payment_status] ?? ''}`}>
-                                        {paymentLabel[invoice.payment_status] ?? invoice.payment_status}
+                                    <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, ...(PAYMENT_COLOR[inv.payment_status] ?? {}) }}>
+                                        {PAYMENT_LABEL[inv.payment_status] ?? inv.payment_status}
                                     </span>
                                 </td>
                                 <td>
-                                    <span className={`badge ${statusBadge[invoice.status] ?? ''}`}>
-                                        {statusLabel[invoice.status] ?? invoice.status}
+                                    <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, ...(STATUS_COLOR[inv.status] ?? {}) }}>
+                                        {STATUS_LABEL[inv.status] ?? inv.status}
                                     </span>
                                 </td>
                                 <td>
                                     <div style={{ display: 'flex', gap: 6 }}>
                                         <button
                                             type="button"
-                                            className="btn btn-sm secondary"
-                                            style={{ fontSize: 13, padding: '6px 10px' }}
-                                            onClick={() => setViewItem(invoice)}
+                                            className="btn secondary"
+                                            style={{ fontSize: 12, padding: '3px 10px' }}
+                                            onClick={() => setViewItem(inv)}
                                         >
                                             Ver
                                         </button>
                                         <button
                                             type="button"
-                                            className="btn btn-sm danger"
-                                            style={{ fontSize: 13, padding: '6px 10px' }}
-                                            onClick={() => handleDelete(invoice)}
+                                            style={{ fontSize: 12, padding: '3px 10px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 6, cursor: 'pointer' }}
+                                            onClick={() => handleDelete(inv)}
                                         >
                                             Eliminar
                                         </button>
@@ -231,14 +225,8 @@ export default function PurchaseInvoicesIndex({ invoices, search, supplierId, su
                 <Pagination links={invoices.links} />
             </div>
 
-            {/* View modal */}
             {viewItem && (
-                <Modal
-                    title={`Factura ${viewItem.invoice_number}`}
-                    onClose={() => setViewItem(null)}
-                >
-                    <DocumentDataView data={viewItem.document_data} />
-                </Modal>
+                <InvoiceDetailModal invoice={viewItem} onClose={() => setViewItem(null)} />
             )}
         </AppLayout>
     );
