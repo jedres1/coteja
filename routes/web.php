@@ -179,6 +179,7 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:billing'])-
         Route::get('billing/facturas', 'facturasPage')->name('billing.facturas');
         Route::get('billing/configuracion', 'configuracionPage')->name('billing.configuracion');
         Route::get('billing/nueva-factura', 'nuevaFacturaPage')->name('billing.nueva-factura');
+        Route::get('billing/facturas/{invoice}/corregir', 'editarFactura')->name('billing.editar-factura');
         Route::get('billing/dashboard', 'billingDashboardPage')->name('billing.dashboard');
         Route::get('productos', 'productos')->name('productos');
         Route::post('productos', 'guardarProducto')->name('productos.guardar');

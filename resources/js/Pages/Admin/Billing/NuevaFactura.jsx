@@ -164,6 +164,44 @@ function Combobox({ options, value, search, onSearch, onSelect, onClear, placeho
     );
 }
 
+// ─── Edit helpers ─────────────────────────────────────────────────────────────
+
+function extractNotas(apendice) {
+    if (!Array.isArray(apendice)) return '';
+    const found = apendice.find(a => (a.campo || '').toLowerCase() === 'notas' || (a.etiqueta || '').toLowerCase().includes('nota'));
+    return found?.valor || '';
+}
+
+function mapDteToItems(cuerpoDocumento) {
+    if (!Array.isArray(cuerpoDocumento)) return [];
+    return cuerpoDocumento
+        .filter(item => item.tipoItem !== 4)
+        .map(item => ({
+            codigo: item.codigo || '',
+            descripcion: item.descripcion || '',
+            tipo_item: Number(item.tipoItem) || 1,
+            cantidad: Number(item.cantidad) || 1,
+            precio_unitario: Number(item.precioUni) || 0,
+            unidad_medida: String(item.uniMedida ?? '99'),
+            exento: Number(item.ventaExenta) > 0 || Number(item.ventaNoSuj) > 0,
+            descuento: Number(item.montoDescu) || 0,
+            tipoDescuento: 'monto',
+            valorDescuento: Number(item.montoDescu) || 0,
+            numeroDocumentoRelacionado: item.numeroDocumento || null,
+        }));
+}
+
+function mapDocRelacionado(dte) {
+    const raw = dte?.documentoRelacionado;
+    const def = { tipoDocumento: '03', tipoGeneracion: 2, numeroDocumento: '', fechaEmision: '' };
+    if (!raw) return { docRelacionado: def, docRelacionados: [] };
+    if (Array.isArray(raw)) {
+        const docs = raw.map(d => ({ tipoDocumento: d.tipoDocumento || '03', tipoGeneracion: Number(d.tipoGeneracion) || 2, numeroDocumento: d.numeroDocumento || '', fechaEmision: d.fechaEmision || '' }));
+        return { docRelacionado: docs[0] || def, docRelacionados: docs };
+    }
+    return { docRelacionado: { tipoDocumento: raw.tipoDocumento || '03', tipoGeneracion: Number(raw.tipoGeneracion) || 2, numeroDocumento: raw.numeroDocumento || '', fechaEmision: raw.fechaEmision || '' }, docRelacionados: [] };
+}
+
 // ─── Progress Overlay ─────────────────────────────────────────────────────────
 
 const STEP_ICON = { done: '✓', error: '✗', warning: '⚠' };
@@ -329,33 +367,75 @@ const STEP_LABELS = [
     'Enviando correo',
 ];
 
-export default function NuevaFactura({ customers, products, settings, correlativos, clientesVariosId, hasInventory }) {
+export default function NuevaFactura({ customers, products, settings, correlativos, clientesVariosId, hasInventory, editInvoice = null }) {
     const enabledDteTypes = (() => {
         const docs = settings.documentos || [];
         const filtered = docs.length ? DTE_TYPES.filter((t) => docs.includes(t.codigo)) : DTE_TYPES;
         return filtered.length ? filtered : DTE_TYPES;
     })();
 
+    // Pre-compute initial state from editInvoice (evaluated once on mount)
+    const eDte = editInvoice?.dte || null;
+    const eResumen = eDte?.resumen || {};
+    const eReceptor = eDte ? (eDte.sujetoExcluido || eDte.receptor || null) : null;
+    const eDirec = eReceptor?.direccion || {};
+    const eRelated = eDte ? mapDocRelacionado(eDte) : null;
+    const eCuerpo0 = eDte?.cuerpoDocumento?.[0] || {};
+
     // ── Customer state ──
-    const [customerSearch, setCustomerSearch] = useState('');
-    const [selectedCustomer, setSelectedCustomer] = useState(null);
-    const [clienteData, setClienteData] = useState({ ...EMPTY_CLIENTE });
+    const [customerSearch, setCustomerSearch] = useState(() => editInvoice?.customerId ? (customers.find(c => c.id === editInvoice.customerId)?.name || '') : '');
+    const [selectedCustomer, setSelectedCustomer] = useState(() => editInvoice?.customerId ? (customers.find(c => c.id === editInvoice.customerId) || null) : null);
+    const [clienteData, setClienteData] = useState(() => eReceptor ? {
+        tipo_documento: eReceptor.tipoDocumento || '',
+        numero_documento: eReceptor.numDocumento || '',
+        nrc: eReceptor.nrc || '',
+        nombre: eReceptor.nombre || '',
+        nombre_comercial: eReceptor.nombreComercial || '',
+        giro: eReceptor.codActividad || '',
+        desc_actividad: eReceptor.descActividad || '',
+        email: eReceptor.correo || '',
+        telefono: eReceptor.telefono || '',
+        direccion: eDirec.complemento || '',
+        departamento: eDirec.departamento || '',
+        municipio: eDirec.municipio || '',
+        pais: eReceptor.codPais || '',
+        nombre_pais: eReceptor.nombrePais || '',
+    } : { ...EMPTY_CLIENTE });
 
     // ── Invoice state ──
-    const [tipo, setTipo] = useState(enabledDteTypes[0]?.codigo || '01');
-    const [factura, setFactura] = useState({ condicionOperacion: 1, descuentoTipo: 'monto', descuentoGeneral: 0, ivaRete1: 0, ivaPerci1: 0, reteRenta: 0, notas: '' });
-    const [items, setItems] = useState([]);
+    const [tipo, setTipo] = useState(() => eDte?.identificacion?.tipoDte || enabledDteTypes[0]?.codigo || '01');
+    const [factura, setFactura] = useState(() => eDte ? {
+        condicionOperacion: Number(eResumen.condicionOperacion) || 1,
+        descuentoTipo: 'monto',
+        descuentoGeneral: Number(eResumen.totalDescu) || 0,
+        ivaRete1: Number(eResumen.ivaRete1) || 0,
+        ivaPerci1: Number(eResumen.ivaPerci1) || 0,
+        reteRenta: Number(eResumen.reteRenta) || 0,
+        notas: extractNotas(eDte.apendice),
+    } : { condicionOperacion: 1, descuentoTipo: 'monto', descuentoGeneral: 0, ivaRete1: 0, ivaPerci1: 0, reteRenta: 0, notas: '' });
+    const [items, setItems] = useState(() => eDte ? mapDteToItems(eDte.cuerpoDocumento) : []);
     const [showItemModal, setShowItemModal] = useState(false);
 
     // ── Documento relacionado ──
-    const [docRelacionado, setDocRelacionado] = useState({ tipoDocumento: '03', tipoGeneracion: 2, numeroDocumento: '', fechaEmision: '' });
-    const [docRelacionados, setDocRelacionados] = useState([]);
+    const [docRelacionado, setDocRelacionado] = useState(() => eRelated?.docRelacionado || { tipoDocumento: '03', tipoGeneracion: 2, numeroDocumento: '', fechaEmision: '' });
+    const [docRelacionados, setDocRelacionados] = useState(() => eRelated?.docRelacionados || []);
 
     // ── Retención (tipo 07) ──
-    const [retencion, setRetencion] = useState({ codigo: '22', montoSujeto: 0, porcentaje: 1 });
+    const [retencion, setRetencion] = useState(() => eDte?.identificacion?.tipoDte === '07' ? {
+        codigo: eCuerpo0.codigoRetencionMH || '22',
+        montoSujeto: Number(eCuerpo0.montoSujetoGrav) || 0,
+        porcentaje: Number(eCuerpo0.montoSujetoGrav) > 0 ? Math.round((Number(eCuerpo0.ivaRetenido) / Number(eCuerpo0.montoSujetoGrav)) * 100) : 1,
+    } : { codigo: '22', montoSujeto: 0, porcentaje: 1 });
 
     // ── Exportación (tipo 11) ──
-    const [opciones, setOpciones] = useState({ tipoItemExpor: 2, recintoFiscal: '', regimen: '', codIncoterms: '01', flete: 0, seguro: 0 });
+    const [opciones, setOpciones] = useState(() => eDte?.identificacion?.tipoDte === '11' ? {
+        tipoItemExpor: Number(eDte.emisor?.tipoItemExpor) || 2,
+        recintoFiscal: eDte.emisor?.recintoFiscal || '',
+        regimen: eDte.emisor?.regimen || '',
+        codIncoterms: eResumen.codIncoterms || '01',
+        flete: Number(eResumen.flete) || 0,
+        seguro: Number(eResumen.seguro) || 0,
+    } : { tipoItemExpor: 2, recintoFiscal: '', regimen: '', codIncoterms: '01', flete: 0, seguro: 0 });
 
     // ── UI state ──
     const [formError, setFormError] = useState('');
@@ -616,6 +696,16 @@ export default function NuevaFactura({ customers, products, settings, correlativ
                     <p className="muted">Emisión de documentos tributarios electrónicos</p>
                 </div>
             </div>
+
+            {editInvoice && !result && (
+                <div className="notice" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    <span>⚠ <strong>Corrigiendo factura rechazada</strong> {editInvoice.numberControl} — al enviar se creará una nueva factura con número de control siguiente.</span>
+                    {editInvoice.observations && (
+                        <span style={{ color: '#92400e', fontSize: 12 }}>Motivo de rechazo: {editInvoice.observations}</span>
+                    )}
+                    <a href={route('admin.factura-sv.billing.facturas')} className="btn secondary" style={{ marginLeft: 'auto', textDecoration: 'none', fontSize: 12 }}>← Volver</a>
+                </div>
+            )}
 
             {result && (
                 <div className={result.success ? 'notice' : 'errors'} style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>

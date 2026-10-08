@@ -110,6 +110,9 @@ function canReturnInvoice(invoice) {
 function canMarkContingencia(invoice) {
     return invoice?.status === 'FIRMADO' && !invoice?.accepted;
 }
+function canCorrectInvoice(invoice) {
+    return invoice?.status === 'RECHAZADO';
+}
 // ─────────────────────────────────────────────────────────────────────────────
 
 function StatCard({ label, value, mono = false }) {
@@ -849,6 +852,14 @@ export default function Facturas({ stats, invoices, filters, contingenciaInvoice
                                             >
                                                 {markingContingencia === inv.id ? '…' : 'Contingencia'}
                                             </button>
+                                        )}
+                                        {canCorrectInvoice(inv) && (
+                                            <a
+                                                href={route('admin.factura-sv.billing.editar-factura', inv.id)}
+                                                style={{ fontSize: 11, padding: '2px 8px', background: '#fefce8', color: '#854d0e', border: '1px solid #fde68a', borderRadius: 6, cursor: 'pointer', fontWeight: 600, textDecoration: 'none', display: 'inline-block' }}
+                                            >
+                                                Corregir
+                                            </a>
                                         )}
                                         {canVoidInvoice(inv) && (
                                             <button

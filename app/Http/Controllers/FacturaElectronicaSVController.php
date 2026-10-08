@@ -785,6 +785,76 @@ class FacturaElectronicaSVController extends Controller
         ]);
     }
 
+    public function editarFactura(Request $request, BillingInvoice $invoice)
+    {
+        if ($invoice->status !== 'RECHAZADO') {
+            return redirect()->route('admin.factura-sv.billing.facturas')
+                ->withErrors(['_error' => 'Solo se pueden corregir facturas en estado RECHAZADO.']);
+        }
+
+        $settings  = BillingSetting::allAsArray();
+        $emisor    = $settings['emisor']   ?? [];
+        $hacienda  = $settings['hacienda'] ?? [];
+        $firma     = $settings['firma']    ?? [];
+        $correo    = $settings['correo']   ?? [];
+
+        $correlativos = BillingDteCorrelative::query()
+            ->where('year', now()->year)
+            ->get()
+            ->mapWithKeys(fn (BillingDteCorrelative $r) => [$r->document_type => $r->next_number])
+            ->all();
+
+        $hasInventory = $request->user()?->hasModuleAccess('inventory') ?? false;
+
+        $customers = Customer::where('status', 'active')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (Customer $customer) => [
+                'id'               => $customer->id,
+                'name'             => $customer->name,
+                'preferredDteType' => $customer->preferred_dte_type,
+                'receptor'         => $customer->toDteReceptor(),
+                'isClientesVarios' => $customer->email === 'clientes.varios@coteja.internal',
+            ]);
+
+        $products = BillingProduct::with('productType')
+            ->orderBy('description')
+            ->get()
+            ->map(fn ($p) => [
+                'id'          => $p->id,
+                'code'        => $p->code,
+                'description' => $p->description,
+                'type'        => $p->type,
+                'price'       => $p->price,
+                'unit'        => $p->unit,
+                'isExempt'    => (bool) $p->is_exempt,
+                'notes'       => $p->notes,
+            ]);
+
+        return Inertia::render('Admin/Billing/NuevaFactura', [
+            'customers'        => $customers,
+            'products'         => $products,
+            'settings'         => [
+                'emisor'    => $emisor,
+                'hacienda'  => $hacienda,
+                'firma'     => $firma,
+                'correo'    => $correo,
+                'documentos' => $settings['documentos'] ?? [],
+            ],
+            'correlativos'    => $correlativos,
+            'clientesVariosId' => Customer::where('email', 'clientes.varios@coteja.internal')->value('id'),
+            'hasInventory'    => $hasInventory,
+            'currentYear'     => now()->year,
+            'editInvoice'     => [
+                'id'            => $invoice->id,
+                'customerId'    => $invoice->customer_id,
+                'numberControl' => $invoice->number_control,
+                'observations'  => $invoice->observations,
+                'dte'           => $invoice->json_dte,
+            ],
+        ]);
+    }
+
     public function guardarConfiguracion(Request $request)
     {
         $data = $request->validate([
