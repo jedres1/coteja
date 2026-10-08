@@ -166,6 +166,7 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:billing'])-
         Route::get('facturas', 'facturas')->name('facturas');
         Route::get('facturas/{invoice}', 'verFactura')->name('facturas.ver');
         Route::post('facturas/contingencia', 'eventoContingencia')->name('facturas.contingencia');
+        Route::post('facturas/{invoice}/marcar-contingencia', 'marcarContingencia')->name('facturas.marcar-contingencia');
         Route::post('facturas/{invoice}/enviar', 'enviarFacturaGuardada')->name('facturas.enviar');
         Route::post('facturas/{invoice}/correo', 'enviarCorreoFacturaGuardada')->name('facturas.correo');
         Route::post('facturas/{invoice}/anular', 'anularFacturaGuardada')->name('facturas.anular');

@@ -306,6 +306,7 @@ class FacturaElectronicaSVController extends Controller
                 'accepted'       => $invoice->accepted,
                 'emailSent'      => $invoice->email_sent,
                 'receptionStamp' => $invoice->reception_stamp,
+                'returnStamp'    => $invoice->return_stamp,
                 'voidStamp'      => $invoice->void_stamp,
                 'voidedAt'       => optional($invoice->voided_at)->format('Y-m-d H:i:s'),
                 'voidReason'     => $invoice->void_reason,
@@ -318,6 +319,19 @@ class FacturaElectronicaSVController extends Controller
                 'status' => $request->query('status', ''),
                 'type'   => $request->query('type', ''),
             ],
+            'contingenciaInvoices' => BillingInvoice::where('status', 'CONTINGENCIA')
+                ->whereNotNull('signed_dte')
+                ->orderBy('issued_at')
+                ->get()
+                ->map(fn (BillingInvoice $inv) => [
+                    'id'            => $inv->id,
+                    'numberControl' => $inv->number_control,
+                    'generationCode'=> $inv->generation_code,
+                    'documentType'  => $inv->document_type,
+                    'customerName'  => $inv->customer_name,
+                    'date'          => optional($inv->issued_at)->format('Y-m-d'),
+                ])
+                ->values(),
         ]);
     }
 
@@ -702,6 +716,7 @@ class FacturaElectronicaSVController extends Controller
                 'accepted'      => $invoice->accepted,
                 'emailSent'     => $invoice->email_sent,
                 'receptionStamp'=> $invoice->reception_stamp,
+                'returnStamp'   => $invoice->return_stamp,
                 'voidStamp'     => $invoice->void_stamp,
                 'voidReason'    => $invoice->void_reason,
             ]);
@@ -995,9 +1010,31 @@ class FacturaElectronicaSVController extends Controller
         ]);
     }
 
+    public function marcarContingencia(Request $request, BillingInvoice $invoice)
+    {
+        if (! in_array($invoice->status, ['FIRMADO', 'RECHAZADO'])) {
+            return back()->withErrors(['_error' => 'Solo facturas en estado FIRMADO o RECHAZADO pueden marcarse como contingencia.']);
+        }
+
+        if (! $invoice->signed_dte) {
+            return back()->withErrors(['_error' => 'La factura no tiene documento firmado. Fírmela antes de marcar como contingencia.']);
+        }
+
+        $invoice->update(['status' => 'CONTINGENCIA', 'has_error' => false]);
+
+        return back()->with('status', 'Factura marcada como contingencia. Podrá enviarla en lote cuando Hacienda esté disponible.');
+    }
+
     public function enviarFacturaGuardada(Request $request, BillingInvoice $invoice)
     {
         $isInertia = (bool) $request->header('X-Inertia');
+
+        if ($invoice->status === 'CONTINGENCIA') {
+            $msg = 'Las facturas en contingencia deben enviarse mediante el lote de contingencia, no de forma individual.';
+            if ($isInertia) return back()->withErrors(['_error' => $msg]);
+            return response()->json(['success' => false, 'message' => $msg], 422);
+        }
+
         $settings = BillingSetting::allAsArray();
         $hacienda = $this->normalizarHacienda($settings['hacienda'] ?? []);
         $correo = $this->normalizarCorreo($settings['correo'] ?? []);
