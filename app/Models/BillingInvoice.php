@@ -30,6 +30,9 @@ class BillingInvoice extends Model
         'voided_at',
         'void_reason',
         'void_json',
+        'return_stamp',
+        'returned_at',
+        'return_json',
         'observations',
         'json_dte',
         'signed_dte',
@@ -50,6 +53,7 @@ class BillingInvoice extends Model
         'voided_at' => 'datetime',
         'paid_at' => 'datetime',
         'void_json' => 'array',
+        'return_json' => 'array',
         'json_dte' => 'array',
         'signed_dte' => 'array',
     ];

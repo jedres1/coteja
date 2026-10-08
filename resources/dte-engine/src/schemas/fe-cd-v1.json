@@ -1,0 +1,119 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Comprobante de Donación V1",
+  "type": "object",
+  "properties": {
+    "identificacion": {
+      "type": "object",
+      "properties": {
+        "version":           { "type": "integer", "const": 1 },
+        "ambiente":          { "type": "string", "enum": ["00", "01"] },
+        "tipoDte":           { "type": "string", "const": "15" },
+        "numeroControl":     { "type": "string", "minLength": 31, "maxLength": 31, "pattern": "^DTE-15-[A-Z0-9]{8}-[0-9]{15}$" },
+        "codigoGeneracion":  { "type": "string", "minLength": 36, "maxLength": 36, "pattern": "^[A-F0-9]{8}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{12}$" },
+        "tipoModelo":        { "type": "number", "enum": [1, 2] },
+        "tipoOperacion":     { "type": "integer", "enum": [1, 2] },
+        "tipoContingencia":  { "type": ["integer", "null"], "enum": [null, 1, 2, 3, 4, 5] },
+        "motivoContin":      { "type": ["string", "null"], "maxLength": 150 },
+        "fecEmi":            { "type": "string", "format": "date" },
+        "horEmi":            { "type": "string", "pattern": "^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$" },
+        "tipoMoneda":        { "type": "string", "const": "USD" }
+      },
+      "required": ["version", "ambiente", "tipoDte", "numeroControl", "codigoGeneracion", "tipoModelo", "tipoOperacion", "fecEmi", "horEmi", "tipoMoneda"],
+      "additionalProperties": false
+    },
+    "emisor": {
+      "type": "object",
+      "properties": {
+        "nit":               { "type": "string" },
+        "nrc":               { "type": "string" },
+        "nombre":            { "type": "string", "minLength": 3, "maxLength": 250 },
+        "codActividad":      { "type": ["string", "null"] },
+        "descActividad":     { "type": ["string", "null"] },
+        "nombreComercial":   { "type": ["string", "null"] },
+        "tipoEstablecimiento": { "type": "string", "enum": ["01", "02", "04", "07", "20"] },
+        "direccion": {
+          "type": "object",
+          "properties": {
+            "departamento": { "type": "string" },
+            "municipio":    { "type": "string" },
+            "complemento":  { "type": "string" }
+          },
+          "required": ["departamento", "municipio", "complemento"],
+          "additionalProperties": false
+        },
+        "telefono":          { "type": ["string", "null"] },
+        "correo":            { "type": "string" },
+        "codEstableMH":      { "type": ["string", "null"] },
+        "codEstable":        { "type": ["string", "null"] },
+        "codPuntoVentaMH":   { "type": ["string", "null"] },
+        "codPuntoVenta":     { "type": ["string", "null"] }
+      },
+      "required": ["nit", "nrc", "nombre", "tipoEstablecimiento", "direccion", "correo"],
+      "additionalProperties": false
+    },
+    "receptor": {
+      "type": "object",
+      "properties": {
+        "tipoDocumento":  { "type": ["string", "null"] },
+        "numDocumento":   { "type": ["string", "null"] },
+        "nrc":            { "type": ["string", "null"] },
+        "nombre":         { "type": "string", "minLength": 3, "maxLength": 250 },
+        "codActividad":   { "type": ["string", "null"] },
+        "descActividad":  { "type": ["string", "null"] },
+        "direccion":      { "type": ["object", "null"] },
+        "telefono":       { "type": ["string", "null"] },
+        "correo":         { "type": ["string", "null"] },
+        "domicilioFiscal":{ "type": ["string", "null"] }
+      },
+      "required": ["nombre"],
+      "additionalProperties": false
+    },
+    "otrosDocumentos": { "type": ["array", "null"] },
+    "cuerpoDocumento": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "numItem":      { "type": "integer", "minimum": 1 },
+          "tipoItem":     { "type": "integer", "enum": [1, 2, 3, 4] },
+          "cantidad":     { "type": "number", "exclusiveMinimum": 0 },
+          "uniMedida":    { "type": "integer" },
+          "descripcion":  { "type": "string", "minLength": 1, "maxLength": 1000 },
+          "valorUni":     { "type": "number", "minimum": 0, "multipleOf": 0.01 },
+          "depreciacion": { "type": "number", "minimum": 0, "multipleOf": 0.01 },
+          "valorDonado":  { "type": "number", "minimum": 0, "multipleOf": 0.01 }
+        },
+        "required": ["numItem", "tipoItem", "cantidad", "uniMedida", "descripcion", "valorUni", "depreciacion", "valorDonado"],
+        "additionalProperties": false
+      }
+    },
+    "resumen": {
+      "type": "object",
+      "properties": {
+        "totalDonado":        { "type": "number", "minimum": 0, "multipleOf": 0.01 },
+        "totalLetras":        { "type": "string", "maxLength": 200 },
+        "condicionOperacion": { "type": "integer", "enum": [1, 2, 3] },
+        "formaDonacion": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "codigo":        { "type": "string" },
+              "montoDonacion": { "type": "number", "minimum": 0 },
+              "referencia":    { "type": ["string", "null"] }
+            },
+            "required": ["codigo", "montoDonacion"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["totalDonado", "condicionOperacion"],
+      "additionalProperties": false
+    },
+    "apendice": { "type": ["array", "null"] }
+  },
+  "required": ["identificacion", "emisor", "receptor", "cuerpoDocumento", "resumen"],
+  "additionalProperties": false
+}

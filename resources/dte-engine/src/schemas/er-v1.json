@@ -1,0 +1,152 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Evento de Retorno V1",
+  "type": "object",
+  "properties": {
+    "identificacion": {
+      "type": "object",
+      "properties": {
+        "version": { "type": "integer", "const": 1 },
+        "ambiente": { "type": "string", "enum": ["00", "01"] },
+        "codigoGeneracion": {
+          "type": "string",
+          "minLength": 36,
+          "maxLength": 36,
+          "pattern": "^[A-F0-9]{8}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{12}$"
+        },
+        "fecEmi": { "type": "string", "format": "date" },
+        "horEmi": {
+          "type": "string",
+          "pattern": "^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$"
+        }
+      },
+      "required": ["version", "ambiente", "codigoGeneracion", "fecEmi", "horEmi"],
+      "additionalProperties": false
+    },
+    "emisor": {
+      "type": "object",
+      "properties": {
+        "nit": { "type": "string", "pattern": "^([0-9]{14}|[0-9]{9})$" },
+        "nrc": { "type": ["string", "null"] },
+        "nombre": { "type": "string", "maxLength": 250, "minLength": 3 },
+        "codActividad": { "type": ["string", "null"] },
+        "descActividad": { "type": ["string", "null"] },
+        "nombreComercial": { "type": ["string", "null"] },
+        "tipoEstablecimiento": { "type": "string", "enum": ["01", "02", "04", "07", "20"] },
+        "direccion": {
+          "type": "object",
+          "properties": {
+            "departamento": { "type": "string" },
+            "municipio": { "type": "string" },
+            "complemento": { "type": "string" }
+          },
+          "required": ["departamento", "municipio", "complemento"],
+          "additionalProperties": false
+        },
+        "telefono": { "type": ["string", "null"] },
+        "correo": { "type": "string", "format": "email" },
+        "codEstableMH": { "type": ["string", "null"] },
+        "codEstable": { "type": ["string", "null"] },
+        "codPuntoVentaMH": { "type": ["string", "null"] },
+        "codPuntoVenta": { "type": ["string", "null"] },
+        "tipoItemExpor": { "type": "integer", "enum": [1, 2, 3] },
+        "recintoFiscal": { "type": ["string", "null"] },
+        "regimen": { "type": ["string", "null"] }
+      },
+      "required": ["nit", "nombre", "tipoEstablecimiento", "direccion", "correo"],
+      "additionalProperties": false
+    },
+    "receptor": {
+      "type": "object",
+      "properties": {
+        "nombre": { "type": "string", "maxLength": 250, "minLength": 3 },
+        "codPais": { "type": "string", "minLength": 4, "maxLength": 4 },
+        "nombrePais": { "type": "string", "maxLength": 100 },
+        "tipoPersona": { "type": "integer", "enum": [1, 2] },
+        "complemento": { "type": ["string", "null"], "maxLength": 250 },
+        "telefono": { "type": ["string", "null"] },
+        "correo": { "type": ["string", "null"] }
+      },
+      "required": ["nombre", "codPais", "nombrePais", "tipoPersona"],
+      "additionalProperties": false
+    },
+    "documentoRelacionado": {
+      "type": "object",
+      "properties": {
+        "tipoDte": { "type": "string", "const": "11" },
+        "codigoGeneracion": {
+          "type": "string",
+          "minLength": 36,
+          "maxLength": 36,
+          "pattern": "^[A-F0-9]{8}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{12}$"
+        },
+        "selloRecibido": { "type": "string", "minLength": 40, "maxLength": 40 },
+        "numeroControl": { "type": "string", "minLength": 31, "maxLength": 31 },
+        "fecEmi": { "type": "string", "format": "date" }
+      },
+      "required": ["tipoDte", "codigoGeneracion", "selloRecibido", "numeroControl", "fecEmi"],
+      "additionalProperties": false
+    },
+    "ventaTercero": {
+      "type": ["object", "null"],
+      "properties": {
+        "nit": { "type": "string" },
+        "nombre": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "cuerpoDocumento": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "numItem": { "type": "integer", "minimum": 1 },
+          "tipoItem": { "type": "integer", "enum": [1, 2, 3, 4] },
+          "descripcion": { "type": "string", "maxLength": 1000, "minLength": 1 },
+          "cantidad": { "type": "number", "exclusiveMinimum": 0 },
+          "uniMedida": { "type": "integer" },
+          "precioUni": { "type": "number", "minimum": 0 },
+          "montoDescu": { "type": "number", "minimum": 0 },
+          "compra": { "type": "number", "minimum": 0 },
+          "seguro": { "type": "number", "minimum": 0 },
+          "flete": { "type": "number", "minimum": 0 },
+          "retencionRenta": { "type": "number", "minimum": 0 },
+          "totalItem": { "type": "number" }
+        },
+        "required": ["numItem", "tipoItem", "descripcion", "cantidad", "uniMedida", "precioUni", "montoDescu", "compra", "totalItem"],
+        "additionalProperties": false
+      }
+    },
+    "resumen": {
+      "type": "object",
+      "properties": {
+        "condicionOperacion": { "type": "integer", "enum": [1, 2, 3] },
+        "totalCompra": { "type": "number", "minimum": 0, "multipleOf": 0.01 },
+        "totalFlete": { "type": "number", "minimum": 0, "multipleOf": 0.01 },
+        "totalSeguro": { "type": "number", "minimum": 0, "multipleOf": 0.01 },
+        "totalRetencionRenta": { "type": "number", "minimum": 0, "multipleOf": 0.01 },
+        "montoTotalOperacion": { "type": "number", "minimum": 0, "multipleOf": 0.01 },
+        "totalLetras": { "type": "string", "maxLength": 200 },
+        "observaciones": { "type": ["string", "null"], "maxLength": 3000 }
+      },
+      "required": ["condicionOperacion", "montoTotalOperacion"],
+      "additionalProperties": false
+    },
+    "apendice": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "object",
+        "properties": {
+          "campo": { "type": "string" },
+          "etiqueta": { "type": "string" },
+          "valor": { "type": "string" }
+        },
+        "required": ["campo", "etiqueta", "valor"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["identificacion", "emisor", "receptor", "documentoRelacionado", "cuerpoDocumento", "resumen"],
+  "additionalProperties": false
+}

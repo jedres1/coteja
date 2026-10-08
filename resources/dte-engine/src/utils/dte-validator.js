@@ -4,16 +4,21 @@ const Ajv = require('ajv');
 const schemas = {
   '01': require(path.join(__dirname, '../schemas/fe-fc-v1.json')),
   '03': require(path.join(__dirname, '../schemas/fe-ccf-v3.json')),
+  '04': require(path.join(__dirname, '../schemas/fe-nr-v1.json')),
   '05': require(path.join(__dirname, '../schemas/fe-nc-v3.json')),
   '06': require(path.join(__dirname, '../schemas/fe-nd-v3.json')),
   '07': require(path.join(__dirname, '../schemas/fe-cr-v1.json')),
+  '08': require(path.join(__dirname, '../schemas/fe-cl-v1.json')),
   '11': require(path.join(__dirname, '../schemas/fe-fex-v1.json')),
-  '14': require(path.join(__dirname, '../schemas/fe-fse-v1.json'))
+  '14': require(path.join(__dirname, '../schemas/fe-fse-v1.json')),
+  '15': require(path.join(__dirname, '../schemas/fe-cd-v1.json'))
 };
 
 const eventSchemas = {
-  anulacion: require(path.join(__dirname, '../schemas/anulacion-schema-v2.json')),
-  contingencia: require(path.join(__dirname, '../schemas/contingencia-schema-v3.json'))
+  anulacion:   require(path.join(__dirname, '../schemas/anulacion-schema-v2.json')),
+  contingencia: require(path.join(__dirname, '../schemas/contingencia-schema-v3.json')),
+  retorno:     require(path.join(__dirname, '../schemas/er-v1.json')),
+  eoe:         require(path.join(__dirname, '../schemas/eoe-v1.json'))
 };
 
 const receptorRetencionAllOf = schemas['07']?.properties?.receptor?.allOf;

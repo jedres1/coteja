@@ -159,7 +159,7 @@
 					"description": "Numero control",
 					"maxLength": 31,
 					"minLength": 31,
-					"pattern": "^DTE-0[0-9]|1[0-2]-[A-Z0-9]{8}-[0-9]{15}$"
+					"pattern": "^DTE-(0[1-9]|1[0-5])-[A-Z0-9]{8}-[0-9]{15}$"
 				},
 				"fecEmi": {
 					"type": "string",

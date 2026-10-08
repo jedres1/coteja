@@ -1263,6 +1263,319 @@ class DTEGenerator {
       totalIVAretenidoLetras: this.numeroALetras(totalIVAretenido)
     };
   }
+
+  /**
+   * Generar Nota de Remisión (Tipo 04) — V2.0
+   * Documento de traslado de bienes sin efecto fiscal inmediato.
+   */
+  generarNotaRemision(config, cliente, items, resumen, opciones = {}) {
+    const now = new Date();
+    const codigoGeneracion = this.generarCodigoGeneracion();
+    const correlativo = opciones.correlativo || 1;
+    const numeroControl = this.generarNumeroControl('04', config.codigo_establecimiento, config.punto_venta, correlativo);
+    const cuerpoDocumento = this.construirCuerpoDocumento(items);
+
+    return {
+      identificacion: this.construirIdentificacion(config, '04', 1, numeroControl, codigoGeneracion, now, opciones),
+      documentoRelacionado: opciones.documentoRelacionado || null,
+      emisor: this.construirEmisor(config),
+      receptor: this.construirReceptorCCF(cliente),
+      otrosDocumentos: opciones.otrosDocumentos || null,
+      ventaTercero: opciones.ventaTercero || null,
+      cuerpoDocumento,
+      resumen: this.construirResumenCCF(this.ajustarResumenDesdeCuerpo(resumen, cuerpoDocumento, '04')),
+      extension: opciones.extension || null,
+      apendice: opciones.apendice || null
+    };
+  }
+
+  /**
+   * Generar Comprobante de Liquidación (Tipo 08) — V2.0
+   * Documento para liquidación de operaciones entre agentes y comisionistas.
+   */
+  generarComprobanteLiquidacion(config, cliente, items, resumen, opciones = {}) {
+    const now = new Date();
+    const codigoGeneracion = this.generarCodigoGeneracion();
+    const correlativo = opciones.correlativo || 1;
+    const numeroControl = this.generarNumeroControl('08', config.codigo_establecimiento, config.punto_venta, correlativo);
+    const cuerpoDocumento = this.construirCuerpoDocumentoCL(items);
+
+    return {
+      identificacion: this.construirIdentificacion(config, '08', 1, numeroControl, codigoGeneracion, now, opciones),
+      emisor: this.construirEmisor(config),
+      receptor: this.construirReceptorCCF(cliente),
+      cuerpoDocumento,
+      resumen: this.construirResumenCL(this.ajustarResumenDesdeCuerpo(resumen, cuerpoDocumento, '08')),
+      extension: opciones.extension || null,
+      apendice: opciones.apendice || null
+    };
+  }
+
+  construirCuerpoDocumentoCL(items) {
+    return items.map((item, index) => {
+      const cantidad = this.redondear(Number(item.cantidad ?? 1), 2);
+      const precioUni = this.redondear(Number(item.precioUni ?? item.precio ?? 0), 2);
+      const gravadas = this.redondear(Number(item.ventaGravada ?? item.gravadas ?? (precioUni * cantidad)), 2);
+      const exentas = this.redondear(Number(item.ventaExenta ?? item.exentas ?? 0), 2);
+      const noSujetas = this.redondear(Number(item.ventaNoSujeta ?? item.noSujetas ?? 0), 2);
+      const iva = this.redondear(gravadas * 0.13, 2);
+
+      return {
+        numItem: index + 1,
+        tipoDte: item.tipoDte || '01',
+        numDocumento: item.numDocumento || item.numero_control || null,
+        fechaEmision: item.fechaEmision || null,
+        gravadas,
+        exentas,
+        noSujetas,
+        ivaItem: iva
+      };
+    });
+  }
+
+  construirResumenCL(resumen) {
+    const gravadas = this.redondear(Number(resumen.ventaGravada ?? resumen.totalGravado ?? 0), 2);
+    const exentas = this.redondear(Number(resumen.ventaExenta ?? resumen.totalExento ?? 0), 2);
+    const noSujetas = this.redondear(Number(resumen.ventaNoSujeta ?? 0), 2);
+    const totalIva = this.redondear(gravadas * 0.13, 2);
+    const totalPagar = this.redondear(gravadas + exentas + noSujetas + totalIva, 2);
+
+    return {
+      totalGravado: gravadas,
+      totalExento: exentas,
+      totalNoSujeto: noSujetas,
+      totalIva,
+      montoTotalOperacion: totalPagar,
+      totalLetras: this.numeroALetras(totalPagar),
+      condicionOperacion: Number(resumen.condicionOperacion ?? resumen.condicion ?? 1),
+      pagos: resumen.pagos || [{ codigo: '01', montoPago: totalPagar, referencia: null, plazo: null, periodo: null }]
+    };
+  }
+
+  /**
+   * Generar Comprobante de Donación (Tipo 15) — V2.1
+   * Documento para registrar donaciones de bienes o efectivo.
+   */
+  generarComprobanteDonacion(config, cliente, items, resumen, opciones = {}) {
+    const now = new Date();
+    const codigoGeneracion = this.generarCodigoGeneracion();
+    const correlativo = opciones.correlativo || 1;
+    const numeroControl = this.generarNumeroControl('15', config.codigo_establecimiento, config.punto_venta, correlativo);
+    const cuerpoDocumento = this.construirCuerpoDocumentoCD(items);
+
+    return {
+      identificacion: this.construirIdentificacion(config, '15', 1, numeroControl, codigoGeneracion, now, opciones),
+      emisor: this.construirEmisor(config),
+      receptor: this.construirReceptorCD(cliente),
+      otrosDocumentos: opciones.otrosDocumentos || null,
+      cuerpoDocumento,
+      resumen: this.construirResumenCD(resumen, cuerpoDocumento),
+      apendice: opciones.apendice || null
+    };
+  }
+
+  construirReceptorCD(cliente) {
+    return {
+      tipoDocumento: cliente.tipoDocumento || null,
+      numDocumento: cliente.numDocumento || null,
+      nrc: cliente.nrc || null,
+      nombre: cliente.nombre,
+      codActividad: cliente.codActividad || null,
+      descActividad: cliente.descActividad || null,
+      direccion: cliente.direccion || null,
+      telefono: cliente.telefono || null,
+      correo: cliente.correo || null,
+      domicilioFiscal: cliente.domicilioFiscal || null
+    };
+  }
+
+  construirCuerpoDocumentoCD(items) {
+    return items.map((item, index) => {
+      const tipo = item.tipo ?? item.tipoItem ?? 1;
+      const cantidad = this.redondear(Number(item.cantidad ?? 1), 2);
+      const valorUni = this.redondear(Number(item.precioUni ?? item.precio ?? 0), 2);
+      const depreciacion = this.redondear(Number(item.depreciacion ?? 0), 2);
+      const valorDonado = this.redondear((valorUni * cantidad) - depreciacion, 2);
+
+      return {
+        numItem: index + 1,
+        tipoItem: Number(tipo),
+        cantidad,
+        uniMedida: this.obtenerCodigoUnidadMedida(item.unidad_medida || item.unidadMedida || item.unidad || 'UND'),
+        descripcion: String(item.descripcion || item.nombre || ''),
+        valorUni,
+        depreciacion,
+        valorDonado
+      };
+    });
+  }
+
+  construirResumenCD(resumen, cuerpoDocumento) {
+    const totalDonado = this.redondear(
+      cuerpoDocumento.reduce((s, i) => s + (i.valorDonado || 0), 0),
+      2
+    );
+
+    return {
+      totalDonado,
+      totalLetras: this.numeroALetras(totalDonado),
+      condicionOperacion: Number(resumen.condicionOperacion ?? resumen.condicion ?? 1),
+      formaDonacion: resumen.formaDonacion || [{ codigo: '01', montoDonacion: totalDonado, referencia: null }]
+    };
+  }
+
+  /**
+   * Generar Evento de Operaciones Especiales (EOE) — V2.0
+   * Evento para reportar operaciones especiales que no generan DTE estándar.
+   */
+  generarEventoOperacionesEspeciales(config, detalle, resumen, receptor = null, opciones = {}) {
+    const now = new Date();
+    const codigoGeneracion = this.generarCodigoGeneracion();
+    const detalleOperaciones = this.construirDetalleEOE(detalle);
+
+    const evento = {
+      identificacion: {
+        version: 1,
+        ambiente: this.obtenerCodigoAmbiente(config.hacienda_ambiente),
+        codigoGeneracion,
+        fecEmi: this.formatearFecha(now),
+        horEmi: this.formatearHora(now)
+      },
+      emisor: this.construirEmisor(config),
+      receptor: receptor ? this.construirReceptorEOE(receptor) : null,
+      detalleOperaciones,
+      resumen: this.construirResumenEOE(resumen, detalleOperaciones),
+      apendice: opciones.apendice || null
+    };
+
+    if (evento.receptor === null) delete evento.receptor;
+    return evento;
+  }
+
+  construirReceptorEOE(receptor) {
+    const pais = this.obtenerPaisExportacion(receptor);
+    return {
+      nombre: receptor.nombre,
+      tipoPersona: this.normalizarTipoPersonaExportacion(receptor),
+      codPais: pais.codigo,
+      nombrePais: pais.nombre,
+      complemento: receptor.complemento || receptor.direccion || null,
+      telefono: receptor.telefono || null,
+      correo: receptor.email || receptor.correo || null
+    };
+  }
+
+  construirDetalleEOE(detalle) {
+    return (Array.isArray(detalle) ? detalle : [detalle]).map((op, index) => ({
+      numItem: index + 1,
+      tipoOperacion: String(op.tipoOperacion || '01').padStart(2, '0'),
+      descripcion: String(op.descripcion || ''),
+      monto: this.redondear(Number(op.monto ?? 0), 2),
+      observaciones: op.observaciones || null
+    }));
+  }
+
+  construirResumenEOE(resumen, detalleOperaciones) {
+    const montoTotal = this.redondear(
+      detalleOperaciones.reduce((s, op) => s + (op.monto || 0), 0),
+      2
+    );
+    return {
+      condicionOperacion: Number(resumen.condicionOperacion ?? resumen.condicion ?? 1),
+      montoTotal,
+      totalLetras: this.numeroALetras(montoTotal),
+      observaciones: resumen.observaciones || null
+    };
+  }
+
+  /**
+   * Generar Evento de Retorno (ER) — V2.0
+   * Evento para mercancías devueltas de una exportación (FEXE tipo 11).
+   */
+  generarEventoRetorno(config, receptor, items, resumen, documentoRelacionado, opciones = {}) {
+    const now = new Date();
+    const codigoGeneracion = this.generarCodigoGeneracion();
+    const pais = this.obtenerPaisExportacion(receptor);
+    const cuerpoDocumento = this.construirCuerpoDocumentoER(items);
+
+    return {
+      identificacion: {
+        version: 1,
+        ambiente: this.obtenerCodigoAmbiente(config.hacienda_ambiente),
+        codigoGeneracion,
+        fecEmi: this.formatearFecha(now),
+        horEmi: this.formatearHora(now)
+      },
+      emisor: this.construirEmisorExportacion(config, opciones),
+      receptor: {
+        nombre: receptor.nombre,
+        codPais: pais.codigo,
+        nombrePais: pais.nombre,
+        tipoPersona: this.normalizarTipoPersonaExportacion(receptor),
+        complemento: receptor.complemento || receptor.direccion || null,
+        telefono: receptor.telefono || null,
+        correo: receptor.email || receptor.correo || null
+      },
+      documentoRelacionado: {
+        tipoDte: '11',
+        codigoGeneracion: String(documentoRelacionado.codigoGeneracion || '').toUpperCase(),
+        selloRecibido: String(documentoRelacionado.selloRecibido || ''),
+        numeroControl: String(documentoRelacionado.numeroControl || ''),
+        fecEmi: documentoRelacionado.fecEmi || documentoRelacionado.fechaEmision
+      },
+      ventaTercero: opciones.ventaTercero || null,
+      cuerpoDocumento,
+      resumen: this.construirResumenER(resumen, cuerpoDocumento),
+      apendice: opciones.apendice || null
+    };
+  }
+
+  construirCuerpoDocumentoER(items) {
+    return items.map((item, index) => {
+      const cantidad = this.redondear(Number(item.cantidad ?? 1), 8);
+      const precioUni = this.redondear(Number(item.precioUni ?? item.precio_unitario ?? 0), 8);
+      const montoDescu = this.redondear(Number(item.montoDescu ?? item.descuento ?? 0), 8);
+      const compra = this.redondear((cantidad * precioUni) - montoDescu, 8);
+      const seguro = this.redondear(Number(item.seguro ?? 0), 8);
+      const flete = this.redondear(Number(item.flete ?? 0), 8);
+      const retencionRenta = this.redondear(Number(item.retencionRenta ?? item.retencion_renta ?? 0), 2);
+      const totalItem = this.redondear(compra + seguro + flete, 8);
+
+      return {
+        numItem: index + 1,
+        tipoItem: Number(item.tipoItem ?? item.tipo_item ?? 1),
+        descripcion: String(item.descripcion || item.nombre || ''),
+        cantidad,
+        uniMedida: this.obtenerCodigoUnidadMedida(item.unidad_medida || item.unidadMedida || 'UND'),
+        precioUni,
+        montoDescu,
+        compra,
+        seguro,
+        flete,
+        retencionRenta,
+        totalItem
+      };
+    });
+  }
+
+  construirResumenER(resumen, cuerpoDocumento) {
+    const totalCompra = this.redondear(cuerpoDocumento.reduce((s, i) => s + (i.compra || 0), 0), 2);
+    const totalFlete = this.redondear(cuerpoDocumento.reduce((s, i) => s + (i.flete || 0), 0), 2);
+    const totalSeguro = this.redondear(cuerpoDocumento.reduce((s, i) => s + (i.seguro || 0), 0), 2);
+    const totalRetencionRenta = this.redondear(cuerpoDocumento.reduce((s, i) => s + (i.retencionRenta || 0), 0), 2);
+    const montoTotal = this.redondear(totalCompra + totalFlete + totalSeguro, 2);
+
+    return {
+      condicionOperacion: Number(resumen.condicionOperacion ?? resumen.condicion ?? 1),
+      totalCompra,
+      totalFlete,
+      totalSeguro,
+      totalRetencionRenta,
+      montoTotalOperacion: montoTotal,
+      totalLetras: this.numeroALetras(montoTotal),
+      observaciones: resumen.observaciones || null
+    };
+  }
 }
 
 module.exports = DTEGenerator;

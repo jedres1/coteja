@@ -22,16 +22,22 @@ function buildDte(tipo, generator, payload) {
       return generator.generarFactura(config, cliente, items, resumen, opciones);
     case '03':
       return generator.generarCreditoFiscal(config, cliente, items, resumen, opciones);
+    case '04':
+      return generator.generarNotaRemision(config, cliente, items, resumen, opciones);
     case '05':
       return generator.generarNotaCredito(config, cliente, items, resumen, opciones.documentoRelacionado, opciones);
     case '06':
       return generator.generarNotaDebito(config, cliente, items, resumen, opciones.documentoRelacionado, opciones);
     case '07':
       return generator.generarComprobanteRetencion(config, cliente, items, resumen, opciones.documentoRelacionado, opciones);
+    case '08':
+      return generator.generarComprobanteLiquidacion(config, cliente, items, resumen, opciones);
     case '11':
       return generator.generarFacturaExportacion(config, cliente, items, resumen, opciones);
     case '14':
       return generator.generarFacturaSujetoExcluido(config, cliente, items, resumen, opciones);
+    case '15':
+      return generator.generarComprobanteDonacion(config, cliente, items, resumen, opciones);
     default:
       throw new Error(`Tipo de DTE no soportado: ${tipo}`);
   }
@@ -122,6 +128,47 @@ async function run() {
     const api = new HaciendaAPI(payload.config || {});
     if (!api.token) await api.autenticar();
     return await api.consultarLoteDTE(payload.codigoLote);
+  }
+
+  if (action === 'generate-eoe') {
+    const generator = new DTEGenerator();
+    const validator = new DTEValidator();
+    const eoe = generator.generarEventoOperacionesEspeciales(
+      payload.config || {},
+      payload.detalle || [],
+      payload.resumen || {},
+      payload.receptor || null,
+      payload.opciones || {}
+    );
+    const validation = validator.validarEvento('eoe', eoe);
+    return { success: validation.valido, eoe, validation };
+  }
+
+  if (action === 'send-eoe') {
+    const api = new HaciendaAPI(payload.config || {});
+    if (!api.token) await api.autenticar();
+    return await api.enviarEOE(payload.eventoFirmado, payload.nit);
+  }
+
+  if (action === 'generate-er') {
+    const generator = new DTEGenerator();
+    const validator = new DTEValidator();
+    const er = generator.generarEventoRetorno(
+      payload.config || {},
+      payload.receptor || {},
+      payload.items || [],
+      payload.resumen || {},
+      payload.documentoRelacionado || {},
+      payload.opciones || {}
+    );
+    const validation = validator.validarEvento('retorno', er);
+    return { success: validation.valido, er, validation };
+  }
+
+  if (action === 'send-er') {
+    const api = new HaciendaAPI(payload.config || {});
+    if (!api.token) await api.autenticar();
+    return await api.enviarRetorno(payload.eventoFirmado, payload.nit);
   }
 
   if (action === 'pdf') {

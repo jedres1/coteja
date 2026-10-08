@@ -58,6 +58,36 @@ class DteEngine
         return $this->run('void', compact('eventoFirmado', 'config'));
     }
 
+    public function generateEOE(array $config, array $detalle, array $resumen, ?array $receptor = null, array $opciones = []): array
+    {
+        return $this->run('generate-eoe', compact('config', 'detalle', 'resumen', 'receptor', 'opciones'));
+    }
+
+    public function sendEOE(array|string $eventoFirmado, array $config, ?string $nit = null): array
+    {
+        return $this->run('send-eoe', compact('eventoFirmado', 'config', 'nit'));
+    }
+
+    public function generateEventoRetorno(array $config, array $receptor, array $items, array $resumen, array $documentoRelacionado, array $opciones = []): array
+    {
+        return $this->run('generate-er', compact('config', 'receptor', 'items', 'resumen', 'documentoRelacionado', 'opciones'));
+    }
+
+    public function sendRetorno(array|string $eventoFirmado, array $config, ?string $nit = null): array
+    {
+        return $this->run('send-er', compact('eventoFirmado', 'config', 'nit'));
+    }
+
+    public function sendBatch(array $dtes, string $nit, array $config): array
+    {
+        return $this->run('send-batch', compact('dtes', 'nit', 'config'));
+    }
+
+    public function sendContingency(array|string $eventoFirmado, string $nit, array $config): array
+    {
+        return $this->run('contingency', compact('eventoFirmado', 'nit', 'config'));
+    }
+
     public function pdf(array $factura, array|string $dte, array $config, string $filename = 'dte.pdf'): array
     {
         return $this->run('pdf', compact('factura', 'dte', 'config', 'filename'));

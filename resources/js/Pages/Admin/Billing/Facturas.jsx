@@ -8,11 +8,14 @@ import Modal from '@/Components/Modal';
 const DTE_TYPES = [
     { code: '01', label: 'Factura' },
     { code: '03', label: 'CCF' },
+    { code: '04', label: 'Nota de Remisión' },
     { code: '05', label: 'Nota de Crédito' },
     { code: '06', label: 'Nota de Débito' },
     { code: '07', label: 'Comp. Retención' },
+    { code: '08', label: 'Comp. Liquidación' },
     { code: '11', label: 'Factura Exportación' },
     { code: '14', label: 'Sujeto Excluido' },
+    { code: '15', label: 'Comp. Donación' },
 ];
 
 const STATUS_STYLE = {
@@ -237,6 +240,118 @@ function VoidForm({ invoice, onClose }) {
     );
 }
 
+function canReturnInvoice(invoice) {
+    return (
+        String(invoice?.documentType ?? '').padStart(2, '0') === '11' &&
+        Boolean(invoice?.accepted && invoice?.receptionStamp) &&
+        ['ENVIADO', 'ACEPTADO'].includes(invoice?.status) &&
+        !invoice?.returnStamp
+    );
+}
+
+const BLANK_ITEM = { descripcion: '', cantidad: 1, precioUni: 0, seguro: 0, flete: 0 };
+
+function ReturnForm({ invoice, onClose }) {
+    const [items, setItems] = useState([{ ...BLANK_ITEM }]);
+    const form = useForm({ items, resumen: { condicionOperacion: 1, observaciones: '' } });
+
+    function updateItem(i, field, value) {
+        const next = items.map((it, idx) => idx === i ? { ...it, [field]: value } : it);
+        setItems(next);
+        form.setData('items', next);
+    }
+    function addItem() {
+        const next = [...items, { ...BLANK_ITEM }];
+        setItems(next);
+        form.setData('items', next);
+    }
+    function removeItem(i) {
+        const next = items.filter((_, idx) => idx !== i);
+        setItems(next);
+        form.setData('items', next);
+    }
+
+    function handleSubmit(e) {
+        e.preventDefault();
+        form.post(route('admin.factura-sv.facturas.retorno', invoice.id), { onSuccess: onClose });
+    }
+
+    const inputStyle = { width: '100%', padding: '4px 6px', fontSize: 12, border: '1px solid #d1d5db', borderRadius: 4 };
+    const labelStyle = { fontSize: 11, color: '#6b7280', display: 'block', marginBottom: 2 };
+
+    return (
+        <form onSubmit={handleSubmit}>
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, padding: '8px 12px', marginBottom: 14, fontSize: 12, color: '#15803d' }}>
+                Registra la devolución de mercancías exportadas. Se enviará un Evento de Retorno (ER) a Hacienda vinculado a esta FEXE.
+            </div>
+
+            <p style={{ fontWeight: 600, fontSize: 13, margin: '0 0 8px' }}>Ítems a retornar</p>
+            {items.map((it, i) => (
+                <div key={i} style={{ border: '1px solid #e5e7eb', borderRadius: 6, padding: 10, marginBottom: 8 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr auto', gap: 6, alignItems: 'flex-end' }}>
+                        <div>
+                            <label style={labelStyle}>Descripción *</label>
+                            <input style={inputStyle} value={it.descripcion} onChange={e => updateItem(i, 'descripcion', e.target.value)} required />
+                        </div>
+                        <div>
+                            <label style={labelStyle}>Cantidad *</label>
+                            <input style={inputStyle} type="number" min="0.000001" step="any" value={it.cantidad} onChange={e => updateItem(i, 'cantidad', e.target.value)} required />
+                        </div>
+                        <div>
+                            <label style={labelStyle}>Precio Unit. *</label>
+                            <input style={inputStyle} type="number" min="0" step="any" value={it.precioUni} onChange={e => updateItem(i, 'precioUni', e.target.value)} required />
+                        </div>
+                        <div>
+                            <label style={labelStyle}>Seguro</label>
+                            <input style={inputStyle} type="number" min="0" step="any" value={it.seguro} onChange={e => updateItem(i, 'seguro', e.target.value)} />
+                        </div>
+                        <div>
+                            <label style={labelStyle}>Flete</label>
+                            <input style={inputStyle} type="number" min="0" step="any" value={it.flete} onChange={e => updateItem(i, 'flete', e.target.value)} />
+                        </div>
+                        <button type="button" onClick={() => removeItem(i)} disabled={items.length === 1}
+                            style={{ padding: '4px 8px', fontSize: 14, background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 4, cursor: 'pointer', marginTop: 14 }}>
+                            ✕
+                        </button>
+                    </div>
+                </div>
+            ))}
+            <button type="button" onClick={addItem}
+                style={{ fontSize: 12, padding: '4px 10px', background: '#f0fdf4', color: '#15803d', border: '1px solid #86efac', borderRadius: 4, cursor: 'pointer', marginBottom: 14 }}>
+                + Agregar ítem
+            </button>
+
+            {form.errors.items && <p style={{ color: '#dc2626', fontSize: 12 }}>{form.errors.items}</p>}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+                <div className="field">
+                    <label>Condición de operación</label>
+                    <select value={form.data.resumen?.condicionOperacion} onChange={e => form.setData('resumen', { ...form.data.resumen, condicionOperacion: Number(e.target.value) })}>
+                        <option value={1}>1 - Contado</option>
+                        <option value={2}>2 - Crédito</option>
+                        <option value={3}>3 - Otro</option>
+                    </select>
+                </div>
+            </div>
+
+            <div className="field">
+                <label>Observaciones</label>
+                <textarea rows={3} maxLength={3000} value={form.data.resumen?.observaciones}
+                    onChange={e => form.setData('resumen', { ...form.data.resumen, observaciones: e.target.value })}
+                    placeholder="Motivo del retorno (opcional)" />
+            </div>
+
+            <div className="form-actions">
+                <button type="button" className="btn secondary" onClick={onClose}>Cancelar</button>
+                <button type="submit" disabled={form.processing}
+                    style={{ padding: '8px 16px', background: '#15803d', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}>
+                    {form.processing ? 'Enviando…' : 'Enviar retorno a Hacienda'}
+                </button>
+            </div>
+        </form>
+    );
+}
+
 export default function Facturas({ stats, invoices, filters }) {
     const [search, setSearch]     = useState(filters?.search ?? '');
     const [from, setFrom]         = useState(filters?.from ?? '');
@@ -245,6 +360,7 @@ export default function Facturas({ stats, invoices, filters }) {
     const [type, setType]         = useState(filters?.type ?? '');
     const [detailInv, setDetailInv] = useState(null);
     const [voidInv, setVoidInv]     = useState(null);
+    const [returnInv, setReturnInv] = useState(null);
     const [sending, setSending]     = useState(null);
 
     function handleFilter(e) {
@@ -427,6 +543,15 @@ export default function Facturas({ stats, invoices, filters }) {
                                                 Anular
                                             </button>
                                         )}
+                                        {canReturnInvoice(inv) && (
+                                            <button
+                                                type="button"
+                                                style={{ fontSize: 11, padding: '2px 8px', background: '#f0fdf4', color: '#15803d', border: '1px solid #86efac', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+                                                onClick={() => setReturnInv(inv)}
+                                            >
+                                                Retorno
+                                            </button>
+                                        )}
                                     </div>
                                 </td>
                             </tr>
@@ -453,6 +578,16 @@ export default function Facturas({ stats, invoices, filters }) {
                     maxWidth={520}
                 >
                     <VoidForm invoice={voidInv} onClose={() => setVoidInv(null)} />
+                </Modal>
+            )}
+
+            {returnInv && (
+                <Modal
+                    title={`Evento de Retorno — ${returnInv.numberControl}`}
+                    onClose={() => setReturnInv(null)}
+                    maxWidth={720}
+                >
+                    <ReturnForm invoice={returnInv} onClose={() => setReturnInv(null)} />
                 </Modal>
             )}
         </AppLayout>

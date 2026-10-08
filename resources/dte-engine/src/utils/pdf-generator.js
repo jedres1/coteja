@@ -74,12 +74,19 @@ class PDFGenerator {
       await this.drawSeccionesFiscalesAdicionales(page, fontBold, fontRegular, dteData);
 
       // 5. Tabla de productos/servicios
+      const tipoDte = dteData.identificacion?.tipoDte;
       this.currentY -= 14;
-      await this.drawItemsTable(page, fontBold, fontRegular, dteData.cuerpoDocumento);
+      if (tipoDte === '08') {
+        await this.drawItemsTableCL(page, fontBold, fontRegular, dteData.cuerpoDocumento);
+      } else if (tipoDte === '15') {
+        await this.drawItemsTableCD(page, fontBold, fontRegular, dteData.cuerpoDocumento);
+      } else {
+        await this.drawItemsTable(page, fontBold, fontRegular, dteData.cuerpoDocumento);
+      }
 
       // 6. Resumen de totales
       this.currentY -= 20;
-      await this.drawResumen(page, fontBold, fontRegular, dteData.resumen);
+      await this.drawResumen(page, fontBold, fontRegular, dteData.resumen, tipoDte);
 
       // 7. Código QR (obligatorio)
       const qrDataUrl = await this.generarQR(dteData);
@@ -798,15 +805,111 @@ class PDFGenerator {
     return this.toMoneyNumber(item.precioUni ?? item.precio_unitario);
   }
 
+  async drawItemsTableCL(page, fontBold, fontRegular, items) {
+    items = Array.isArray(items) ? items : [];
+    const tableWidth = this.pageWidth - 2 * this.margin;
+    const colWidths = [24, 50, 130, 90, 80, 80, 58];
+    let x = this.margin;
+    let y = this.currentY;
+
+    page.drawRectangle({ x: this.margin, y: y - 15, width: tableWidth, height: 15, color: rgb(0.2, 0.2, 0.2) });
+    y -= 11;
+    const headers = ['N°', 'Tipo DTE', 'No. Documento', 'Fecha Emisión', 'Gravadas', 'Exentas', 'IVA'];
+    headers.forEach((h, i) => {
+      page.drawText(this.truncateToWidth(h, colWidths[i] - 4, fontBold, 7), { x: x + 3, y, size: 7, font: fontBold, color: rgb(1, 1, 1) });
+      x += colWidths[i];
+    });
+    y -= 15;
+
+    items.forEach((item, index) => {
+      if (y < this.margin + 150) return;
+      if (index % 2 === 0) page.drawRectangle({ x: this.margin, y: y - 12, width: tableWidth, height: 12, color: rgb(0.98, 0.98, 0.98) });
+      x = this.margin;
+      const values = [
+        item.numItem || index + 1,
+        item.tipoDte || '',
+        item.numDocumento || '—',
+        item.fechaEmision || '—',
+        this.formatMoney(item.gravadas || 0),
+        this.formatMoney(item.exentas || 0),
+        this.formatMoney(item.ivaItem || 0)
+      ];
+      values.forEach((v, i) => {
+        const text = this.truncateText(String(v), i === 2 ? 20 : 10);
+        page.drawText(text, { x: x + 3, y: y - 8, size: 7, font: fontRegular });
+        x += colWidths[i];
+      });
+      y -= 12;
+    });
+
+    page.drawLine({ start: { x: this.margin, y }, end: { x: this.pageWidth - this.margin, y }, thickness: 1, color: rgb(0, 0, 0) });
+    this.currentY = y - 5;
+  }
+
+  async drawItemsTableCD(page, fontBold, fontRegular, items) {
+    items = Array.isArray(items) ? items : [];
+    const tableWidth = this.pageWidth - 2 * this.margin;
+    const colWidths = [24, 40, 50, 180, 68, 72, 78];
+    let x = this.margin;
+    let y = this.currentY;
+
+    page.drawRectangle({ x: this.margin, y: y - 15, width: tableWidth, height: 15, color: rgb(0.2, 0.2, 0.2) });
+    y -= 11;
+    const headers = ['N°', 'Tipo', 'Cantidad', 'Descripción', 'Valor Unit.', 'Depreciación', 'Valor Donado'];
+    headers.forEach((h, i) => {
+      page.drawText(this.truncateToWidth(h, colWidths[i] - 4, fontBold, 7), { x: x + 3, y, size: 7, font: fontBold, color: rgb(1, 1, 1) });
+      x += colWidths[i];
+    });
+    y -= 15;
+
+    items.forEach((item, index) => {
+      if (y < this.margin + 150) return;
+      if (index % 2 === 0) page.drawRectangle({ x: this.margin, y: y - 12, width: tableWidth, height: 12, color: rgb(0.98, 0.98, 0.98) });
+      x = this.margin;
+      const values = [
+        item.numItem || index + 1,
+        item.tipoItem || '',
+        this.formatQuantity(item.cantidad || 0),
+        this.truncateText(String(item.descripcion || ''), 28),
+        this.formatMoney(item.valorUni || 0),
+        this.formatMoney(item.depreciacion || 0),
+        this.formatMoney(item.valorDonado || 0)
+      ];
+      values.forEach((v, i) => {
+        const text = String(v);
+        page.drawText(text, { x: x + 3, y: y - 8, size: 7, font: fontRegular });
+        x += colWidths[i];
+      });
+      y -= 12;
+    });
+
+    page.drawLine({ start: { x: this.margin, y }, end: { x: this.pageWidth - this.margin, y }, thickness: 1, color: rgb(0, 0, 0) });
+    this.currentY = y - 5;
+  }
+
   /**
    * Dibujar resumen de totales
    */
-  async drawResumen(page, fontBold, fontRegular, resumen) {
+  async drawResumen(page, fontBold, fontRegular, resumen, tipoDte) {
     resumen = resumen || {};
     const rightX = this.pageWidth - this.margin - 150;
     let y = this.currentY;
-    
-    const totales = [
+
+    let totales;
+    if (tipoDte === '08') {
+      totales = [
+        { label: 'Total Gravado:', valor: resumen.totalGravado || 0 },
+        { label: 'Total Exento:', valor: resumen.totalExento || 0 },
+        { label: 'Total No Sujeto:', valor: resumen.totalNoSujeto || 0 },
+        { label: 'Total IVA:', valor: resumen.totalIva || 0, bold: true },
+        { label: 'TOTAL OPERACIÓN:', valor: resumen.montoTotalOperacion || 0, bold: true, large: true }
+      ];
+    } else if (tipoDte === '15') {
+      totales = [
+        { label: 'TOTAL DONADO:', valor: resumen.totalDonado || 0, bold: true, large: true }
+      ];
+    } else {
+      totales = [
       { label: 'Suma Ventas No Sujetas:', valor: resumen.totalNoSuj || 0 },
       { label: 'Suma Ventas Exentas:', valor: resumen.totalExenta || 0 },
       { label: 'Suma Ventas Gravadas:', valor: resumen.totalGravada || 0 },
@@ -823,6 +926,7 @@ class PDFGenerator {
       { label: 'Otros Montos No Afectos:', valor: resumen.totalNoGravado || 0 },
       { label: 'TOTAL A PAGAR:', valor: resumen.totalPagar ?? resumen.totalIVAretenido ?? resumen.montoTotalOperacion ?? 0, bold: true, large: true }
     ];
+    }
     
     totales.forEach(item => {
       const valor = this.toMoneyNumber(item.valor);
@@ -1217,11 +1321,14 @@ class PDFGenerator {
     const tipos = {
       '01': 'FACTURA',
       '03': 'COMPROBANTE DE CRÉDITO FISCAL',
+      '04': 'NOTA DE REMISIÓN',
       '05': 'NOTA DE CRÉDITO',
       '06': 'NOTA DE DÉBITO',
       '07': 'COMPROBANTE DE RETENCIÓN',
+      '08': 'COMPROBANTE DE LIQUIDACIÓN',
       '11': 'FACTURA DE EXPORTACIÓN',
-      '14': 'FACTURA SUJETO EXCLUIDO'
+      '14': 'FACTURA SUJETO EXCLUIDO',
+      '15': 'COMPROBANTE DE DONACIÓN'
     };
     return tipos[tipo] || 'DOCUMENTO TRIBUTARIO ELECTRÓNICO';
   }

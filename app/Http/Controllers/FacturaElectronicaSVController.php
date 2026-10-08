@@ -16,6 +16,9 @@ use App\Models\ProductType;
 use App\Services\Accounting\AccountingEntryService;
 use App\Services\Accounting\AccountingPeriodService;
 use App\Services\Billing\CorrelativeService;
+use App\Services\Billing\InvoiceContingenciaService;
+use App\Services\Billing\InvoiceEOEService;
+use App\Services\Billing\InvoiceReturnService;
 use App\Services\Billing\InvoiceVoidService;
 use App\Services\DteEngine;
 use Illuminate\Http\Request;
@@ -30,6 +33,9 @@ class FacturaElectronicaSVController extends Controller
         private readonly DteEngine $engine,
         private readonly CorrelativeService $correlatives,
         private readonly InvoiceVoidService $voids,
+        private readonly InvoiceReturnService $returns,
+        private readonly InvoiceEOEService $eoes,
+        private readonly InvoiceContingenciaService $contingencias,
     ) {}
 
     public function accountsReceivablePage(Request $request)
@@ -39,7 +45,7 @@ class FacturaElectronicaSVController extends Controller
 
         $query = BillingInvoice::query()
             ->whereIn('status', ['ENVIADO', 'ACEPTADO'])
-            ->where('document_type', '!=', '05')
+            ->whereNotIn('document_type', ['04', '05', '07', '15'])
             ->when($paymentStatus !== '', fn ($q) => $q->where('payment_status', $paymentStatus))
             ->when($search !== '', fn ($q) => $q->where(function ($q) use ($search) {
                 $q->where('number_control', 'like', "%{$search}%")
@@ -52,7 +58,7 @@ class FacturaElectronicaSVController extends Controller
 
         $all = BillingInvoice::query()
             ->whereIn('status', ['ENVIADO', 'ACEPTADO'])
-            ->where('document_type', '!=', '05');
+            ->whereNotIn('document_type', ['04', '05', '07', '15']);
 
         $stats = [
             'totalPorCobrar' => (float) (clone $all)->where('payment_status', '!=', 'pagado')->sum(DB::raw('total - amount_paid')),
@@ -92,7 +98,7 @@ class FacturaElectronicaSVController extends Controller
 
         $query = BillingInvoice::query()
             ->whereIn('status', ['ENVIADO', 'ACEPTADO'])
-            ->where('document_type', '!=', '05')
+            ->whereNotIn('document_type', ['04', '05', '07', '15'])
             ->when($paymentStatus !== '', fn ($q) => $q->where('payment_status', $paymentStatus))
             ->when($search !== '', fn ($q) => $q->where(function ($q) use ($search) {
                 $q->where('number_control', 'like', "%{$search}%")
@@ -105,7 +111,7 @@ class FacturaElectronicaSVController extends Controller
 
         $all = BillingInvoice::query()
             ->whereIn('status', ['ENVIADO', 'ACEPTADO'])
-            ->where('document_type', '!=', '05');
+            ->whereNotIn('document_type', ['04', '05', '07', '15']);
 
         $stats = [
             'totalPorCobrar' => (float) (clone $all)->where('payment_status', '!=', 'pagado')->sum(\DB::raw('total - amount_paid')),
@@ -451,6 +457,121 @@ class FacturaElectronicaSVController extends Controller
         return response()->json($result);
     }
 
+    public function eventoRetorno(Request $request, BillingInvoice $invoice)
+    {
+        $isInertia = (bool) $request->header('X-Inertia');
+
+        $data = $request->validate([
+            'items'                        => 'required|array|min:1',
+            'items.*.descripcion'          => 'required|string|max:1000',
+            'items.*.cantidad'             => 'required|numeric|min:0.000001',
+            'items.*.precioUni'            => 'required|numeric|min:0',
+            'items.*.montoDescu'           => 'nullable|numeric|min:0',
+            'items.*.tipoItem'             => 'nullable|integer|in:1,2,3,4',
+            'items.*.unidad_medida'        => 'nullable|string',
+            'items.*.seguro'               => 'nullable|numeric|min:0',
+            'items.*.flete'                => 'nullable|numeric|min:0',
+            'items.*.retencionRenta'       => 'nullable|numeric|min:0',
+            'resumen.condicionOperacion'   => 'nullable|integer|in:1,2,3',
+            'resumen.observaciones'        => 'nullable|string|max:3000',
+        ]);
+
+        try {
+            $result = $this->returns->process($invoice, BillingSetting::allAsArray(), $data);
+        } catch (\Throwable $e) {
+            $invoice->update(['has_error' => true, 'observations' => $e->getMessage()]);
+            if ($isInertia) return back()->withErrors(['items' => $e->getMessage()]);
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+
+        if (! ($result['success'] ?? false)) {
+            $invoice->update([
+                'has_error'    => true,
+                'observations' => json_encode($result['response'] ?? $result, JSON_UNESCAPED_UNICODE),
+            ]);
+            if ($isInertia) {
+                $msg = $result['message'] ?? json_encode($result['response'] ?? $result, JSON_UNESCAPED_UNICODE);
+                return back()->withErrors(['items' => $msg]);
+            }
+            return response()->json($result, 422);
+        }
+
+        if ($isInertia) {
+            return back()->with('status', 'Evento de Retorno enviado exitosamente a Hacienda.');
+        }
+
+        return response()->json($result);
+    }
+
+    public function eventoOperacionesEspeciales(Request $request)
+    {
+        $data = $request->validate([
+            'detalle'                          => 'required|array|min:1',
+            'detalle.*.tipoOperacion'          => 'required|string|in:01,02,03',
+            'detalle.*.descripcion'            => 'required|string|max:1000',
+            'detalle.*.monto'                  => 'required|numeric|min:0',
+            'detalle.*.observaciones'          => 'nullable|string|max:3000',
+            'resumen.condicionOperacion'       => 'nullable|integer|in:1,2,3',
+            'resumen.observaciones'            => 'nullable|string|max:3000',
+            'receptor.nombre'                  => 'nullable|string|max:250',
+            'receptor.codPais'                 => 'nullable|string',
+            'receptor.tipoPersona'             => 'nullable|integer|in:1,2',
+        ]);
+
+        try {
+            $result = $this->eoes->process(BillingSetting::allAsArray(), $data);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+
+        if (! ($result['success'] ?? false)) {
+            return response()->json($result, 422);
+        }
+
+        return response()->json($result);
+    }
+
+    public function eventoContingencia(Request $request)
+    {
+        $data = $request->validate([
+            'invoiceIds'                        => 'required|array|min:1',
+            'invoiceIds.*'                      => 'integer|exists:billing_invoices,id',
+            'emisor.nombreResponsable'          => 'required|string|min:5|max:100',
+            'emisor.tipoDocResponsable'         => 'required|string|in:36,13,02,03,37',
+            'emisor.numeroDocResponsable'       => 'required|string|min:3|max:20',
+            'motivo.tipoContingencia'           => 'required|integer|in:1,2,3,4,5',
+            'motivo.motivoContingencia'         => 'nullable|string|max:500',
+            'motivo.fInicio'                    => 'required|date_format:Y-m-d',
+            'motivo.fFin'                       => 'required|date_format:Y-m-d',
+            'motivo.hInicio'                    => 'required|date_format:H:i:s',
+            'motivo.hFin'                       => 'required|date_format:H:i:s',
+        ]);
+
+        $invoices = BillingInvoice::whereIn('id', $data['invoiceIds'])
+            ->where('status', 'CONTINGENCIA')
+            ->whereNotNull('signed_dte')
+            ->get();
+
+        if ($invoices->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se encontraron facturas en contingencia con DTE firmado para los IDs proporcionados.',
+            ], 422);
+        }
+
+        try {
+            $result = $this->contingencias->process($invoices, BillingSetting::allAsArray(), $data);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+
+        if (! ($result['success'] ?? false)) {
+            return response()->json($result, 422);
+        }
+
+        return response()->json($result);
+    }
+
     public function guardarProducto(Request $request)
     {
         $hasInventory = $request->user()?->hasModuleAccess('inventory') ?? false;
@@ -687,7 +808,7 @@ class FacturaElectronicaSVController extends Controller
     public function procesarFactura(Request $request)
     {
         $data = $request->validate([
-            'tipo' => 'nullable|string|in:01,03,05,06,07,11,14',
+            'tipo' => 'nullable|string|in:01,03,04,05,06,07,08,11,14,15',
             'config' => 'required|array',
             'cliente' => 'required|array',
             'items' => 'required|array',

@@ -229,6 +229,103 @@ class HaciendaAPI {
   }
 
   /**
+   * Enviar Evento de Operaciones Especiales (EOE) — V2.0
+   */
+  async enviarEOE(eventoFirmado, nit = null) {
+    if (!this.token) {
+      throw new Error('No hay token de autenticación. Autentique primero.');
+    }
+
+    try {
+      const identificacion = this.obtenerIdentificacion(eventoFirmado);
+      const documento = this.obtenerDocumentoFirmado(eventoFirmado);
+
+      if (!identificacion) throw new Error('No se encontró la sección identificacion del EOE.');
+      if (!documento) throw new Error('El EOE no contiene firmaMh/documento firmado.');
+
+      const payload = {
+        ambiente: this.obtenerCodigoAmbiente(identificacion.ambiente || this.ambiente),
+        idEnvio: Date.now(),
+        version: identificacion.version || 1,
+        documento
+      };
+
+      if (nit) payload.nit = String(nit).replace(/[^0-9]/g, '');
+
+      const response = await this.axiosInstance.post('/fesv/operacionesEspeciales', payload, {
+        headers: { 'Authorization': this.token, 'Content-Type': 'application/json' }
+      });
+
+      return {
+        success: true,
+        estado: response.data.estado,
+        codigoGeneracion: response.data.codigoGeneracion,
+        selloRecibido: response.data.selloRecibido,
+        observaciones: response.data.observaciones,
+        raw: response.data
+      };
+    } catch (error) {
+      const errorResponse = this.procesarErrorHacienda(error);
+      return { success: false, error: errorResponse.error, errorDetalle: errorResponse };
+    }
+  }
+
+  /**
+   * Enviar Evento de Retorno (ER) — V2.0
+   * Aplica cuando mercancías exportadas (FEXE tipo 11) son devueltas.
+   */
+  async enviarRetorno(eventoFirmado, nit = null) {
+    if (!this.token) {
+      throw new Error('No hay token de autenticación. Autentique primero.');
+    }
+
+    try {
+      const identificacion = this.obtenerIdentificacion(eventoFirmado);
+      const documento = this.obtenerDocumentoFirmado(eventoFirmado);
+
+      if (!identificacion) {
+        throw new Error('No se encontró la sección identificacion del evento de retorno.');
+      }
+
+      if (!documento) {
+        throw new Error('El evento de retorno no contiene firmaMh/documento firmado.');
+      }
+
+      const payload = {
+        ambiente: this.obtenerCodigoAmbiente(identificacion.ambiente || this.ambiente),
+        idEnvio: Date.now(),
+        version: identificacion.version || 1,
+        documento
+      };
+
+      if (nit) payload.nit = String(nit).replace(/[^0-9]/g, '');
+
+      const response = await this.axiosInstance.post('/fesv/retornodte', payload, {
+        headers: {
+          'Authorization': this.token,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      return {
+        success: true,
+        estado: response.data.estado,
+        codigoGeneracion: response.data.codigoGeneracion,
+        selloRecibido: response.data.selloRecibido,
+        observaciones: response.data.observaciones,
+        raw: response.data
+      };
+    } catch (error) {
+      const errorResponse = this.procesarErrorHacienda(error);
+      return {
+        success: false,
+        error: errorResponse.error,
+        errorDetalle: errorResponse
+      };
+    }
+  }
+
+  /**
    * Enviar DTEs por lote (modelo asíncrono), requerido para DTEs emitidos en contingencia.
    * @param {Array<Object|string>} dtes - Documentos firmados.
    * @param {string} nit - NIT del emisor.
