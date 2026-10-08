@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class BillingDteCorrelative extends Model
 {
     protected $fillable = [
+        'customer_id',
         'document_type',
         'year',
         'establishment',

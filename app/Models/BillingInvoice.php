@@ -10,6 +10,7 @@ class BillingInvoice extends Model
     use SoftDeletes;
 
     protected $fillable = [
+        'tenant_customer_id',
         'created_by',
         'updated_by',
         'number_control',

@@ -1,6 +1,7 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
+import TenantSelector from '@/Components/Billing/TenantSelector';
 
 const DTE_LABEL = {
     '01': 'Factura', '03': 'CCF', '05': 'N. Crédito', '06': 'N. Débito',
@@ -44,9 +45,18 @@ function StatusBadge({ status }) {
     );
 }
 
-export default function Dashboard({ stats, recent }) {
+export default function Dashboard({ stats, recent, availableCustomers = [] }) {
+    const { auth, billingTenant } = usePage().props;
     return (
         <AppLayout title="Facturación — Dashboard">
+            {auth?.user?.is_admin && (
+                <TenantSelector
+                    billingTenant={billingTenant}
+                    availableCustomers={availableCustomers}
+                    setRoute="billing.empresa.set"
+                    clearRoute="billing.empresa.clear"
+                />
+            )}
             <div className="section-top">
                 <div>
                     <h1>Facturación</h1>

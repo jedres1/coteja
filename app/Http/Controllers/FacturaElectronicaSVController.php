@@ -40,10 +40,14 @@ class FacturaElectronicaSVController extends Controller
 
     public function accountsReceivablePage(Request $request)
     {
+        $tenantId      = $this->activeTenantId($request);
         $paymentStatus = $request->query('payment_status', '');
-        $search = trim((string) $request->query('search', ''));
+        $search        = trim((string) $request->query('search', ''));
+
+        $tenantScope = fn ($q) => $q->when($tenantId !== null, fn ($q) => $q->where('tenant_customer_id', $tenantId));
 
         $query = BillingInvoice::query()
+            ->tap($tenantScope)
             ->whereIn('status', ['ENVIADO', 'ACEPTADO'])
             ->whereNotIn('document_type', ['04', '05', '07', '15'])
             ->when($paymentStatus !== '', fn ($q) => $q->where('payment_status', $paymentStatus))
@@ -57,6 +61,7 @@ class FacturaElectronicaSVController extends Controller
             ->latest('id');
 
         $all = BillingInvoice::query()
+            ->tap($tenantScope)
             ->whereIn('status', ['ENVIADO', 'ACEPTADO'])
             ->whereNotIn('document_type', ['04', '05', '07', '15']);
 
@@ -67,6 +72,11 @@ class FacturaElectronicaSVController extends Controller
             'countParcial'   => (clone $all)->where('payment_status', 'parcial')->count(),
             'countPagado'    => (clone $all)->where('payment_status', 'pagado')->count(),
         ];
+
+        $availableCustomers = $request->user()?->isAdmin()
+            ? Customer::where('status', 'active')->orderBy('name')->get(['id', 'name'])
+                ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])->values()
+            : collect();
 
         return Inertia::render('Admin/Billing/CuentasPorCobrar', [
             'stats'   => $stats,
@@ -88,15 +98,20 @@ class FacturaElectronicaSVController extends Controller
                 'to'             => $request->query('to', ''),
                 'payment_status' => $paymentStatus,
             ],
+            'availableCustomers' => $availableCustomers,
         ]);
     }
 
     public function accountsReceivable(Request $request)
     {
+        $tenantId      = $this->activeTenantId($request);
         $paymentStatus = $request->query('payment_status', '');
-        $search = trim((string) $request->query('search', ''));
+        $search        = trim((string) $request->query('search', ''));
+
+        $tenantScope = fn ($q) => $q->when($tenantId !== null, fn ($q) => $q->where('tenant_customer_id', $tenantId));
 
         $query = BillingInvoice::query()
+            ->tap($tenantScope)
             ->whereIn('status', ['ENVIADO', 'ACEPTADO'])
             ->whereNotIn('document_type', ['04', '05', '07', '15'])
             ->when($paymentStatus !== '', fn ($q) => $q->where('payment_status', $paymentStatus))
@@ -110,6 +125,7 @@ class FacturaElectronicaSVController extends Controller
             ->latest('id');
 
         $all = BillingInvoice::query()
+            ->tap($tenantScope)
             ->whereIn('status', ['ENVIADO', 'ACEPTADO'])
             ->whereNotIn('document_type', ['04', '05', '07', '15']);
 
@@ -265,10 +281,16 @@ class FacturaElectronicaSVController extends Controller
 
     public function facturasPage(Request $request)
     {
-        $today  = now()->toDateString();
-        $search = trim((string) $request->query('search', ''));
+        $tenantId = $this->activeTenantId($request);
+        $today    = now()->toDateString();
+        $search   = trim((string) $request->query('search', ''));
+
+        $tenantScope = fn ($q) => $q
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_customer_id', $tenantId))
+            ->when($tenantId === null && $request->user()?->isAdmin(), fn ($q) => $q);
 
         $invoices = BillingInvoice::query()
+            ->tap($tenantScope)
             ->when($search !== '', fn ($q) => $q->where(function ($q) use ($search) {
                 $q->where('number_control', 'like', "%{$search}%")
                     ->orWhere('generation_code', 'like', "%{$search}%")
@@ -284,14 +306,19 @@ class FacturaElectronicaSVController extends Controller
             ->latest('id')
             ->paginate(15);
 
+        $availableCustomers = $request->user()?->isAdmin()
+            ? Customer::where('status', 'active')->orderBy('name')->get(['id', 'name'])
+                ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])->values()
+            : collect();
+
         return Inertia::render('Admin/Billing/Facturas', [
             'stats' => [
-                'todayCount'     => BillingInvoice::whereDate('issued_at', $today)->count(),
+                'todayCount'     => BillingInvoice::whereDate('issued_at', $today)->tap($tenantScope)->count(),
                 'todaySentTotal' => (float) BillingInvoice::whereDate('issued_at', $today)
-                    ->whereIn('status', ['ENVIADO', 'ACEPTADO'])->sum('total'),
-                'sentCount'      => BillingInvoice::whereIn('status', ['ENVIADO', 'ACEPTADO'])->count(),
-                'pendingCount'   => BillingInvoice::whereIn('status', ['PENDIENTE', 'FIRMADO', 'CONTINGENCIA'])->count(),
-                'voidedCount'    => BillingInvoice::where('status', 'ANULADO')->count(),
+                    ->whereIn('status', ['ENVIADO', 'ACEPTADO'])->tap($tenantScope)->sum('total'),
+                'sentCount'      => BillingInvoice::whereIn('status', ['ENVIADO', 'ACEPTADO'])->tap($tenantScope)->count(),
+                'pendingCount'   => BillingInvoice::whereIn('status', ['PENDIENTE', 'FIRMADO', 'CONTINGENCIA'])->tap($tenantScope)->count(),
+                'voidedCount'    => BillingInvoice::where('status', 'ANULADO')->tap($tenantScope)->count(),
             ],
             'invoices' => $invoices->through(fn (BillingInvoice $invoice) => [
                 'id'             => $invoice->id,
@@ -320,6 +347,7 @@ class FacturaElectronicaSVController extends Controller
                 'type'   => $request->query('type', ''),
             ],
             'contingenciaInvoices' => BillingInvoice::where('status', 'CONTINGENCIA')
+                ->tap($tenantScope)
                 ->whereNotNull('signed_dte')
                 ->orderBy('issued_at')
                 ->get()
@@ -332,6 +360,7 @@ class FacturaElectronicaSVController extends Controller
                     'date'          => optional($inv->issued_at)->format('Y-m-d'),
                 ])
                 ->values(),
+            'availableCustomers' => $availableCustomers,
         ]);
     }
 
@@ -444,8 +473,10 @@ class FacturaElectronicaSVController extends Controller
             'codigoGeneracionR' => 'nullable|string|max:36',
         ]);
 
+        $tenantId = $invoice->tenant_customer_id ?? $this->activeTenantId($request);
+
         try {
-            $result = $this->voids->process($invoice, BillingSetting::allAsArray(), $data);
+            $result = $this->voids->process($invoice, BillingSetting::allAsArray($tenantId), $data);
         } catch (\Throwable $e) {
             $invoice->update(['has_error' => true, 'observations' => $e->getMessage()]);
             if ($isInertia) return back()->withErrors(['motivo' => $e->getMessage()]);
@@ -490,8 +521,10 @@ class FacturaElectronicaSVController extends Controller
             'resumen.observaciones'        => 'nullable|string|max:3000',
         ]);
 
+        $tenantId = $invoice->tenant_customer_id ?? $this->activeTenantId($request);
+
         try {
-            $result = $this->returns->process($invoice, BillingSetting::allAsArray(), $data);
+            $result = $this->returns->process($invoice, BillingSetting::allAsArray($tenantId), $data);
         } catch (\Throwable $e) {
             $invoice->update(['has_error' => true, 'observations' => $e->getMessage()]);
             if ($isInertia) return back()->withErrors(['items' => $e->getMessage()]);
@@ -532,8 +565,10 @@ class FacturaElectronicaSVController extends Controller
             'receptor.tipoPersona'             => 'nullable|integer|in:1,2',
         ]);
 
+        $tenantId = $this->activeTenantId($request);
+
         try {
-            $result = $this->eoes->process(BillingSetting::allAsArray(), $data);
+            $result = $this->eoes->process(BillingSetting::allAsArray($tenantId), $data);
         } catch (\Throwable $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
@@ -561,9 +596,12 @@ class FacturaElectronicaSVController extends Controller
             'motivo.hFin'                       => 'required|date_format:H:i:s',
         ]);
 
+        $tenantId = $this->activeTenantId($request);
+
         $invoices = BillingInvoice::whereIn('id', $data['invoiceIds'])
             ->where('status', 'CONTINGENCIA')
             ->whereNotNull('signed_dte')
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_customer_id', $tenantId))
             ->get();
 
         if ($invoices->isEmpty()) {
@@ -574,7 +612,7 @@ class FacturaElectronicaSVController extends Controller
         }
 
         try {
-            $result = $this->contingencias->process($invoices, BillingSetting::allAsArray(), $data);
+            $result = $this->contingencias->process($invoices, BillingSetting::allAsArray($tenantId), $data);
         } catch (\Throwable $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
@@ -656,9 +694,10 @@ class FacturaElectronicaSVController extends Controller
         ]);
     }
 
-    public function configuracionPage()
+    public function configuracionPage(Request $request)
     {
-        $settings = BillingSetting::allAsArray();
+        $tenantId = $this->activeTenantId($request);
+        $settings = BillingSetting::allAsArray($tenantId);
         $emisor   = $settings['emisor']   ?? [];
         $hacienda = $settings['hacienda'] ?? [];
         $firma    = $settings['firma']    ?? [];
@@ -667,9 +706,16 @@ class FacturaElectronicaSVController extends Controller
 
         $correlativos = BillingDteCorrelative::query()
             ->where('year', now()->year)
+            ->when($tenantId !== null, fn ($q) => $q->where('customer_id', $tenantId))
+            ->when($tenantId === null, fn ($q) => $q->whereNull('customer_id'))
             ->get()
             ->mapWithKeys(fn (BillingDteCorrelative $r) => [$r->document_type => $r->next_number])
             ->all();
+
+        $availableCustomers = $request->user()?->isAdmin()
+            ? Customer::where('status', 'active')->orderBy('name')->get(['id', 'name'])
+                ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])->values()
+            : collect();
 
         return Inertia::render('Admin/Billing/Configuracion', [
             'settings' => [
@@ -680,25 +726,30 @@ class FacturaElectronicaSVController extends Controller
                 'backup'   => $backup,
                 'documentos' => $settings['documentos'] ?? [],
             ],
-            'correlativos'  => $correlativos,
-            'currentYear'   => now()->year,
+            'correlativos'      => $correlativos,
+            'currentYear'       => now()->year,
+            'availableCustomers' => $availableCustomers,
         ]);
     }
 
-    public function billingDashboardPage()
+    public function billingDashboardPage(Request $request)
     {
+        $tenantId = $this->activeTenantId($request);
         $today = now()->toDateString();
 
+        $scope = fn ($q) => $q->when($tenantId !== null, fn ($q) => $q->where('tenant_customer_id', $tenantId));
+
         $stats = [
-            'todayCount'     => BillingInvoice::whereDate('issued_at', $today)->count(),
+            'todayCount'     => BillingInvoice::whereDate('issued_at', $today)->tap($scope)->count(),
             'todaySentTotal' => (float) BillingInvoice::whereDate('issued_at', $today)
-                ->whereIn('status', ['ENVIADO', 'ACEPTADO'])->sum('total'),
-            'sentCount'      => BillingInvoice::whereIn('status', ['ENVIADO', 'ACEPTADO'])->count(),
-            'pendingCount'   => BillingInvoice::whereIn('status', ['PENDIENTE', 'FIRMADO', 'CONTINGENCIA'])->count(),
-            'voidedCount'    => BillingInvoice::where('status', 'ANULADO')->count(),
+                ->whereIn('status', ['ENVIADO', 'ACEPTADO'])->tap($scope)->sum('total'),
+            'sentCount'      => BillingInvoice::whereIn('status', ['ENVIADO', 'ACEPTADO'])->tap($scope)->count(),
+            'pendingCount'   => BillingInvoice::whereIn('status', ['PENDIENTE', 'FIRMADO', 'CONTINGENCIA'])->tap($scope)->count(),
+            'voidedCount'    => BillingInvoice::where('status', 'ANULADO')->tap($scope)->count(),
         ];
 
         $recent = BillingInvoice::query()
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_customer_id', $tenantId))
             ->latest('issued_at')
             ->latest('id')
             ->take(15)
@@ -721,15 +772,22 @@ class FacturaElectronicaSVController extends Controller
                 'voidReason'    => $invoice->void_reason,
             ]);
 
+        $availableCustomers = $request->user()?->isAdmin()
+            ? Customer::where('status', 'active')->orderBy('name')->get(['id', 'name'])
+                ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])->values()
+            : collect();
+
         return Inertia::render('Admin/Billing/Dashboard', [
-            'stats'  => $stats,
-            'recent' => $recent,
+            'stats'              => $stats,
+            'recent'             => $recent,
+            'availableCustomers' => $availableCustomers,
         ]);
     }
 
     public function nuevaFacturaPage(Request $request)
     {
-        $settings  = BillingSetting::allAsArray();
+        $tenantId  = $this->activeTenantId($request);
+        $settings  = BillingSetting::allAsArray($tenantId);
         $emisor    = $settings['emisor']   ?? [];
         $hacienda  = $settings['hacienda'] ?? [];
         $firma     = $settings['firma']    ?? [];
@@ -737,6 +795,8 @@ class FacturaElectronicaSVController extends Controller
 
         $correlativos = BillingDteCorrelative::query()
             ->where('year', now()->year)
+            ->when($tenantId !== null, fn ($q) => $q->where('customer_id', $tenantId))
+            ->when($tenantId === null, fn ($q) => $q->whereNull('customer_id'))
             ->get()
             ->mapWithKeys(fn (BillingDteCorrelative $r) => [$r->document_type => $r->next_number])
             ->all();
@@ -768,20 +828,26 @@ class FacturaElectronicaSVController extends Controller
                 'notes'       => $p->notes,
             ]);
 
+        $availableCustomers = $request->user()?->isAdmin()
+            ? Customer::where('status', 'active')->orderBy('name')->get(['id', 'name'])
+                ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])->values()
+            : collect();
+
         return Inertia::render('Admin/Billing/NuevaFactura', [
-            'customers'       => $customers,
-            'products'        => $products,
-            'settings'        => [
+            'customers'          => $customers,
+            'products'           => $products,
+            'settings'           => [
                 'emisor'    => $emisor,
                 'hacienda'  => $hacienda,
                 'firma'     => $firma,
                 'correo'    => $correo,
                 'documentos' => $settings['documentos'] ?? [],
             ],
-            'correlativos'    => $correlativos,
-            'clientesVariosId' => Customer::where('email', 'clientes.varios@coteja.internal')->value('id'),
-            'hasInventory'    => $hasInventory,
-            'currentYear'     => now()->year,
+            'correlativos'       => $correlativos,
+            'clientesVariosId'   => Customer::where('email', 'clientes.varios@coteja.internal')->value('id'),
+            'hasInventory'       => $hasInventory,
+            'currentYear'        => now()->year,
+            'availableCustomers' => $availableCustomers,
         ]);
     }
 
@@ -792,7 +858,8 @@ class FacturaElectronicaSVController extends Controller
                 ->withErrors(['_error' => 'Solo se pueden corregir facturas en estado RECHAZADO.']);
         }
 
-        $settings  = BillingSetting::allAsArray();
+        $tenantId  = $invoice->tenant_customer_id ?? $this->activeTenantId($request);
+        $settings  = BillingSetting::allAsArray($tenantId);
         $emisor    = $settings['emisor']   ?? [];
         $hacienda  = $settings['hacienda'] ?? [];
         $firma     = $settings['firma']    ?? [];
@@ -800,6 +867,8 @@ class FacturaElectronicaSVController extends Controller
 
         $correlativos = BillingDteCorrelative::query()
             ->where('year', now()->year)
+            ->when($tenantId !== null, fn ($q) => $q->where('customer_id', $tenantId))
+            ->when($tenantId === null, fn ($q) => $q->whereNull('customer_id'))
             ->get()
             ->mapWithKeys(fn (BillingDteCorrelative $r) => [$r->document_type => $r->next_number])
             ->all();
@@ -857,6 +926,8 @@ class FacturaElectronicaSVController extends Controller
 
     public function guardarConfiguracion(Request $request)
     {
+        $tenantId = $this->activeTenantId($request);
+
         $data = $request->validate([
             'emisor'       => 'required|array',
             'hacienda'     => 'required|array',
@@ -868,12 +939,13 @@ class FacturaElectronicaSVController extends Controller
         ]);
 
         foreach (['emisor', 'hacienda', 'firma', 'correo', 'backup', 'documentos'] as $key) {
-            BillingSetting::put($key, $data[$key] ?? []);
+            BillingSetting::put($key, $data[$key] ?? [], $tenantId);
         }
 
         foreach (($data['correlativos'] ?? []) as $documentType => $nextNumber) {
             BillingDteCorrelative::updateOrCreate(
                 [
+                    'customer_id'   => $tenantId,
                     'document_type' => $documentType,
                     'year'          => now()->year,
                     'establishment' => $data['emisor']['codigo_establecimiento'] ?? 'M001',
@@ -907,6 +979,7 @@ class FacturaElectronicaSVController extends Controller
 
         $steps = [];
         $tipo = $data['tipo'] ?? '01';
+        $tenantId = $this->activeTenantId($request);
 
         // Validar período contable antes de iniciar el proceso DTE
         try {
@@ -915,8 +988,8 @@ class FacturaElectronicaSVController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
 
-        [$invoice, $dte, $generated] = DB::transaction(function () use ($data, $tipo) {
-            $correlative = $this->correlatives->reserve($tipo, $data['config']);
+        [$invoice, $dte, $generated] = DB::transaction(function () use ($data, $tipo, $tenantId) {
+            $correlative = $this->correlatives->reserve($tipo, $data['config'], $tenantId);
             $options = $data['opciones'] ?? [];
             $options['correlativo'] = (int) $correlative->next_number;
 
@@ -940,6 +1013,7 @@ class FacturaElectronicaSVController extends Controller
             $invoice = BillingInvoice::updateOrCreate(
                 ['generation_code' => $generationCode],
                 [
+                    'tenant_customer_id' => $tenantId,
                     'number_control' => $numberControl,
                     'document_type' => $tipo,
                     'issued_at' => data_get($dte, 'identificacion.fecEmi', now()->toDateString()),
@@ -981,7 +1055,8 @@ class FacturaElectronicaSVController extends Controller
             // No interrumpir el flujo de facturación si falla la contabilidad
         }
 
-        $firma = $this->normalizarFirma($data['firma'] ?? []);
+        $tenantSettings = BillingSetting::allAsArray($tenantId);
+        $firma = $this->normalizarFirma($data['firma'] ?? [], $tenantSettings);
         $signedDte = null;
         if (! empty($firma['certificado_path']) && ! empty($firma['password'])) {
             try {
@@ -1014,7 +1089,7 @@ class FacturaElectronicaSVController extends Controller
             $steps[] = ['key' => 'sign', 'status' => 'warning', 'message' => 'Factura pendiente de firma. Configure certificado y contraseña para firmar automáticamente.'];
         }
 
-        $hacienda = $this->normalizarHacienda($data['hacienda'] ?? []);
+        $hacienda = $this->normalizarHacienda($data['hacienda'] ?? [], $tenantSettings);
         if ($signedDte && ! empty($hacienda['usuario']) && ! empty($hacienda['password'])) {
             try {
                 $sent = $this->engine->send(
@@ -1045,7 +1120,7 @@ class FacturaElectronicaSVController extends Controller
                         $invoice->fresh(),
                         $signedDte,
                         $data['config'],
-                        $this->normalizarCorreo($data['correo'] ?? []),
+                        $this->normalizarCorreo($data['correo'] ?? [], $tenantSettings),
                         $data['cliente'],
                         $sent,
                     );
@@ -1105,10 +1180,11 @@ class FacturaElectronicaSVController extends Controller
             return response()->json(['success' => false, 'message' => $msg], 422);
         }
 
-        $settings = BillingSetting::allAsArray();
-        $hacienda = $this->normalizarHacienda($settings['hacienda'] ?? []);
-        $correo = $this->normalizarCorreo($settings['correo'] ?? []);
-        $firma = $this->normalizarFirma($settings['firma'] ?? []);
+        $tenantId = $invoice->tenant_customer_id ?? $this->activeTenantId($request);
+        $settings = BillingSetting::allAsArray($tenantId);
+        $hacienda = $this->normalizarHacienda($settings['hacienda'] ?? [], $settings);
+        $correo = $this->normalizarCorreo($settings['correo'] ?? [], $settings);
+        $firma = $this->normalizarFirma($settings['firma'] ?? [], $settings);
         $emisor = $settings['emisor'] ?? [];
         $dte = $invoice->signed_dte ?: $invoice->json_dte;
         $steps = [];
@@ -1273,9 +1349,35 @@ class FacturaElectronicaSVController extends Controller
         return null;
     }
 
-    private function normalizarHacienda(array $input): array
+    private function activeTenantId(Request $request): ?int
     {
-        $settings = BillingSetting::allAsArray();
+        $user = $request->user();
+        if (! $user) {
+            return null;
+        }
+        if ($user->isAdmin()) {
+            $id = $request->session()->get('billing_tenant_id');
+            return $id ? (int) $id : null;
+        }
+        return $user->customer_id ? (int) $user->customer_id : null;
+    }
+
+    public function setActiveTenant(Request $request)
+    {
+        $request->validate(['customer_id' => 'required|integer|exists:customers,id']);
+        $request->session()->put('billing_tenant_id', $request->input('customer_id'));
+        return back()->with('status', 'Empresa activa actualizada.');
+    }
+
+    public function clearActiveTenant(Request $request)
+    {
+        $request->session()->forget('billing_tenant_id');
+        return back()->with('status', 'Empresa activa eliminada.');
+    }
+
+    private function normalizarHacienda(array $input, ?array $resolvedSettings = null): array
+    {
+        $settings = $resolvedSettings ?? BillingSetting::allAsArray();
         $saved = $settings['hacienda'] ?? [];
         $raw = $settings['electron_raw_config'] ?? [];
         $ambiente = $input['ambiente'] ?? $saved['ambiente'] ?? $raw['hacienda_ambiente'] ?? '00';
@@ -1330,9 +1432,9 @@ class FacturaElectronicaSVController extends Controller
         }
     }
 
-    private function normalizarFirma(array $input): array
+    private function normalizarFirma(array $input, ?array $resolvedSettings = null): array
     {
-        $settings = BillingSetting::allAsArray();
+        $settings = $resolvedSettings ?? BillingSetting::allAsArray();
         $saved = $settings['firma'] ?? [];
         $raw = $settings['electron_raw_config'] ?? [];
 
@@ -1348,9 +1450,9 @@ class FacturaElectronicaSVController extends Controller
         return preg_replace('/\D+/', '', (string) ($firma['nit'] ?? $emisor['nit'] ?? ''));
     }
 
-    private function normalizarCorreo(array $input): array
+    private function normalizarCorreo(array $input, ?array $resolvedSettings = null): array
     {
-        $settings = BillingSetting::allAsArray();
+        $settings = $resolvedSettings ?? BillingSetting::allAsArray();
         $saved = $settings['correo'] ?? [];
         $raw = $settings['electron_raw_config'] ?? [];
 

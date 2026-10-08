@@ -6,28 +6,23 @@ use App\Models\BillingDteCorrelative;
 
 class CorrelativeService
 {
-    public function reserve(string $documentType, array $config): BillingDteCorrelative
+    public function reserve(string $documentType, array $config, ?int $customerId = null): BillingDteCorrelative
     {
-        $year = (int) now()->year;
+        $year          = (int) now()->year;
         $establishment = $this->normalizeCode($config['codigo_establecimiento'] ?? 'M001');
-        $pointOfSale = $this->normalizeCode($config['punto_venta'] ?? 'P001');
+        $pointOfSale   = $this->normalizeCode($config['punto_venta'] ?? 'P001');
 
-        BillingDteCorrelative::firstOrCreate(
-            [
-                'document_type' => $documentType,
-                'year' => $year,
-                'establishment' => $establishment,
-                'point_of_sale' => $pointOfSale,
-            ],
-            ['next_number' => 1],
-        );
-
-        return BillingDteCorrelative::where([
+        $criteria = [
+            'customer_id'   => $customerId,
             'document_type' => $documentType,
-            'year' => $year,
+            'year'          => $year,
             'establishment' => $establishment,
             'point_of_sale' => $pointOfSale,
-        ])->lockForUpdate()->firstOrFail();
+        ];
+
+        BillingDteCorrelative::firstOrCreate($criteria, ['next_number' => 1]);
+
+        return BillingDteCorrelative::where($criteria)->lockForUpdate()->firstOrFail();
     }
 
     public function advance(BillingDteCorrelative $correlative, int $usedNumber): void

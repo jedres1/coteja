@@ -1,7 +1,8 @@
 import { useState, useRef, useCallback } from 'react';
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
+import TenantSelector from '@/Components/Billing/TenantSelector';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -367,7 +368,8 @@ const STEP_LABELS = [
     'Enviando correo',
 ];
 
-export default function NuevaFactura({ customers, products, settings, correlativos, clientesVariosId, hasInventory, editInvoice = null }) {
+export default function NuevaFactura({ customers, products, settings, correlativos, clientesVariosId, hasInventory, editInvoice = null, availableCustomers = [] }) {
+    const { auth, billingTenant } = usePage().props;
     const enabledDteTypes = (() => {
         const docs = settings.documentos || [];
         const filtered = docs.length ? DTE_TYPES.filter((t) => docs.includes(t.codigo)) : DTE_TYPES;
@@ -690,6 +692,14 @@ export default function NuevaFactura({ customers, products, settings, correlativ
     // ── Render ──
     return (
         <AppLayout title="Nueva Factura">
+            {auth?.user?.is_admin && !editInvoice && (
+                <TenantSelector
+                    billingTenant={billingTenant}
+                    availableCustomers={availableCustomers}
+                    setRoute="billing.empresa.set"
+                    clearRoute="billing.empresa.clear"
+                />
+            )}
             <div className="section-top">
                 <div>
                     <h1>Nueva Factura</h1>

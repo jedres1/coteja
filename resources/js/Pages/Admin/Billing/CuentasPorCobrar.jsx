@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
 import Modal from '@/Components/Modal';
+import TenantSelector from '@/Components/Billing/TenantSelector';
 
 const PAYMENT_STATUS_LABEL = { pendiente: 'Pendiente', parcial: 'Parcial', pagado: 'Pagado' };
 const PAYMENT_STATUS_STYLE = {
@@ -102,7 +103,8 @@ function PaymentForm({ invoice, onClose }) {
     );
 }
 
-export default function CuentasPorCobrar({ stats, invoices, filters }) {
+export default function CuentasPorCobrar({ stats, invoices, filters, availableCustomers = [] }) {
+    const { auth, billingTenant } = usePage().props;
     const [search, setSearch]         = useState(filters?.search ?? '');
     const [from, setFrom]             = useState(filters?.from ?? '');
     const [to, setTo]                 = useState(filters?.to ?? '');
@@ -128,6 +130,15 @@ export default function CuentasPorCobrar({ stats, invoices, filters }) {
     return (
         <AppLayout>
             <Head title="Cuentas por cobrar" />
+
+            {auth?.user?.is_admin && (
+                <TenantSelector
+                    billingTenant={billingTenant}
+                    availableCustomers={availableCustomers}
+                    setRoute="billing.empresa.set"
+                    clearRoute="billing.empresa.clear"
+                />
+            )}
 
             <div className="top">
                 <h1>Cuentas por cobrar</h1>

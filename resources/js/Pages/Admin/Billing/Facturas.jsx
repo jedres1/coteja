@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
 import Modal from '@/Components/Modal';
+import TenantSelector from '@/Components/Billing/TenantSelector';
 
 const DTE_TYPES = [
     { code: '01', label: 'Factura' },
@@ -632,7 +633,8 @@ function ContingenciaForm({ contingenciaInvoices, onClose }) {
     );
 }
 
-export default function Facturas({ stats, invoices, filters, contingenciaInvoices = [] }) {
+export default function Facturas({ stats, invoices, filters, contingenciaInvoices = [], availableCustomers = [] }) {
+    const { auth, billingTenant } = usePage().props;
     const [search, setSearch]         = useState(filters?.search ?? '');
     const [from, setFrom]             = useState(filters?.from ?? '');
     const [to, setTo]                 = useState(filters?.to ?? '');
@@ -685,6 +687,15 @@ export default function Facturas({ stats, invoices, filters, contingenciaInvoice
     return (
         <AppLayout>
             <Head title="Facturas electrónicas" />
+
+            {auth?.user?.is_admin && (
+                <TenantSelector
+                    billingTenant={billingTenant}
+                    availableCustomers={availableCustomers}
+                    setRoute="billing.empresa.set"
+                    clearRoute="billing.empresa.clear"
+                />
+            )}
 
             <div className="top">
                 <h1>Facturas electrónicas</h1>
