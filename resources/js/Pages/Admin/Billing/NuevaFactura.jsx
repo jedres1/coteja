@@ -8,17 +8,22 @@ import AppLayout from '@/Layouts/AppLayout';
 const DTE_TYPES = [
     { codigo: '01', nombre: 'Factura' },
     { codigo: '03', nombre: 'Comprobante de Crédito Fiscal' },
+    { codigo: '04', nombre: 'Nota de Remisión' },
     { codigo: '05', nombre: 'Nota de Crédito' },
     { codigo: '06', nombre: 'Nota de Débito' },
     { codigo: '07', nombre: 'Comprobante de Retención' },
+    { codigo: '08', nombre: 'Comprobante de Liquidación' },
     { codigo: '11', nombre: 'Factura de Exportación' },
     { codigo: '14', nombre: 'Factura de Sujeto Excluido' },
+    { codigo: '15', nombre: 'Comprobante de Donación' },
 ];
 
 const RELATED_DOC_TYPES = [
     { codigo: '03', nombre: 'Comprobante de Crédito Fiscal' },
     { codigo: '01', nombre: 'Factura' },
+    { codigo: '04', nombre: 'Nota de Remisión' },
     { codigo: '07', nombre: 'Comprobante de Retención' },
+    { codigo: '11', nombre: 'Factura de Exportación' },
     { codigo: '14', nombre: 'Sujeto Excluido' },
 ];
 
@@ -57,7 +62,7 @@ function money(v) { return `$${roundMoney(v).toFixed(2)}`; }
 function lineGross(item) { return Number(item.cantidad || 0) * Number(item.precio_unitario || 0); }
 function lineBase(item) { return Math.max(0, roundMoney(lineGross(item) - Number(item.descuento || 0))); }
 function lineIva(item, tipo) {
-    return item.exento || ['07', '11', '14'].includes(tipo) ? 0 : roundMoney(lineBase(item) * 0.13);
+    return item.exento || ['07', '11', '14', '15'].includes(tipo) ? 0 : roundMoney(lineBase(item) * 0.13);
 }
 function lineTotal(item, tipo) { return roundMoney(lineBase(item) + lineIva(item, tipo)); }
 
@@ -78,7 +83,7 @@ function computeTotals(items, factura, tipo, retencion, opciones) {
     const subtotalGravado = Math.max(0, items.reduce((s, i) => s + (i.exento ? 0 : lineBase(i)), 0) - dscGravado);
     const subtotalExento = Math.max(0, items.reduce((s, i) => s + (i.exento ? lineBase(i) : 0), 0) - dscExento);
     const subtotalTotal = roundMoney(subtotalGravado + subtotalExento);
-    const ivaEstimado = ['07', '11', '14'].includes(tipo) ? 0 : roundMoney(subtotalGravado * 0.13);
+    const ivaEstimado = ['07', '11', '14', '15'].includes(tipo) ? 0 : roundMoney(subtotalGravado * 0.13);
     const retencionCalculada = roundMoney(Number(retencion.montoSujeto || 0) * (Number(retencion.porcentaje || 0) / 100));
     const exportExtras = tipo === '11' && Number(opciones.tipoItemExpor) !== 2
         ? Number(opciones.flete || 0) + Number(opciones.seguro || 0) : 0;
@@ -438,14 +443,14 @@ export default function NuevaFactura({ customers, products, settings, correlativ
     function validateInvoice() {
         if (!selectedCustomer) return 'Seleccione un cliente. Para ventas sin datos del receptor use "CLIENTES VARIOS".';
         if (tipo !== '07' && items.length === 0) return 'Agregue al menos un producto o servicio.';
-        if (['03', '05', '06'].includes(tipo)) {
+        if (['03', '04', '05', '06'].includes(tipo)) {
             const nit = cleanDigits(clienteData.numero_documento);
-            if (!nit || nit.length !== 14) return 'Para CCF/Notas el receptor debe tener NIT de 14 dígitos.';
-            if (!clienteData.nrc) return 'Para CCF/Notas el receptor debe tener NRC.';
-            if (!clienteData.giro) return 'Para CCF/Notas el receptor debe tener código de actividad económica.';
-            if (!clienteData.desc_actividad) return 'Para CCF/Notas el receptor debe tener descripción de actividad.';
-            if (!clienteData.departamento || !clienteData.municipio) return 'Para CCF/Notas el receptor debe tener departamento y municipio.';
-            if (!clienteData.direccion) return 'Para CCF/Notas el receptor debe tener dirección.';
+            if (!nit || nit.length !== 14) return 'Para CCF/NR/Notas el receptor debe tener NIT de 14 dígitos.';
+            if (!clienteData.nrc) return 'Para CCF/NR/Notas el receptor debe tener NRC.';
+            if (!clienteData.giro) return 'Para CCF/NR/Notas el receptor debe tener código de actividad económica.';
+            if (!clienteData.desc_actividad) return 'Para CCF/NR/Notas el receptor debe tener descripción de actividad.';
+            if (!clienteData.departamento || !clienteData.municipio) return 'Para CCF/NR/Notas el receptor debe tener departamento y municipio.';
+            if (!clienteData.direccion) return 'Para CCF/NR/Notas el receptor debe tener dirección.';
         }
         if (usesMultipleRelated && docRelacionados.length === 0) return `Agregue al menos un CCF relacionado.`;
         if (usesMultipleRelated && items.some((i) => !i.numeroDocumentoRelacionado)) return `Cada ítem debe seleccionar el CCF al que aplica.`;
@@ -672,22 +677,22 @@ export default function NuevaFactura({ customers, products, settings, correlativ
                                     {clienteData.numero_documento
                                         ? <>{clienteData.tipo_documento} {clienteData.numero_documento}{clienteData.nrc && ` · NRC ${clienteData.nrc}`}</>
                                         : <span className="receptor-faltante">Sin documento</span>}
-                                    {!clienteData.nrc && ['03','05','06'].includes(tipo) && <span className="receptor-faltante"> · NRC faltante</span>}
+                                    {!clienteData.nrc && ['03','04','05','06'].includes(tipo) && <span className="receptor-faltante"> · NRC faltante</span>}
                                 </span>
                                 <span className="receptor-label">Actividad</span>
                                 <span className="receptor-valor">
                                     {clienteData.giro
                                         ? `${clienteData.giro} — ${clienteData.desc_actividad || '—'}`
-                                        : <span className={['03','05','06'].includes(tipo) ? 'receptor-faltante' : 'receptor-opcional'}>
-                                            {['03','05','06'].includes(tipo) ? 'Faltante (requerido para CCF)' : 'No configurada'}
+                                        : <span className={['03','04','05','06'].includes(tipo) ? 'receptor-faltante' : 'receptor-opcional'}>
+                                            {['03','04','05','06'].includes(tipo) ? 'Faltante (requerido para CCF/NR)' : 'No configurada'}
                                         </span>}
                                 </span>
                                 <span className="receptor-label">Dirección</span>
                                 <span className="receptor-valor">
                                     {clienteData.direccion
                                         ? `${clienteData.departamento} / ${clienteData.municipio} · ${clienteData.direccion}`
-                                        : <span className={['03','05','06'].includes(tipo) ? 'receptor-faltante' : 'receptor-opcional'}>
-                                            {['03','05','06'].includes(tipo) ? 'Faltante (requerido para CCF)' : 'No configurada'}
+                                        : <span className={['03','04','05','06'].includes(tipo) ? 'receptor-faltante' : 'receptor-opcional'}>
+                                            {['03','04','05','06'].includes(tipo) ? 'Faltante (requerido para CCF/NR)' : 'No configurada'}
                                         </span>}
                                 </span>
                                 <span className="receptor-label">Contacto</span>

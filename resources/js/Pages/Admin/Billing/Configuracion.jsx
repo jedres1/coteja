@@ -6,11 +6,14 @@ import AppLayout from '@/Layouts/AppLayout';
 const DTE_TYPES = [
     { code: '01', label: 'Factura' },
     { code: '03', label: 'Comprobante de Crédito Fiscal' },
+    { code: '04', label: 'Nota de Remisión' },
     { code: '05', label: 'Nota de Crédito' },
     { code: '06', label: 'Nota de Débito' },
     { code: '07', label: 'Comprobante de Retención' },
+    { code: '08', label: 'Comprobante de Liquidación' },
     { code: '11', label: 'Factura de Exportación' },
     { code: '14', label: 'Factura de Sujeto Excluido' },
+    { code: '15', label: 'Comprobante de Donación' },
 ];
 
 function SectionTitle({ children }) {
