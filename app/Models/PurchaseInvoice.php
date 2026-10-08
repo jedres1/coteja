@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use Database\Factories\PurchaseInvoiceFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PurchaseInvoice extends Model
 {
-    use SoftDeletes;
+    /** @use HasFactory<PurchaseInvoiceFactory> */
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'created_by',

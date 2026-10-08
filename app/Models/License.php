@@ -2,10 +2,15 @@
 
 namespace App\Models;
 
+use Database\Factories\LicenseFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class License extends Model
 {
+    /** @use HasFactory<LicenseFactory> */
+    use HasFactory;
+
     protected $fillable = [
         'customer_id',
         'company_id',

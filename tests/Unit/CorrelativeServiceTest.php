@@ -17,13 +17,14 @@ class CorrelativeServiceTest extends TestCase
         Schema::dropIfExists('billing_dte_correlatives');
         Schema::create('billing_dte_correlatives', function (Blueprint $table) {
             $table->id();
+            $table->unsignedBigInteger('customer_id')->nullable();
             $table->string('document_type', 2);
             $table->unsignedSmallInteger('year');
             $table->string('establishment', 4)->default('');
             $table->string('point_of_sale', 4)->default('');
             $table->unsignedBigInteger('next_number')->default(1);
             $table->timestamps();
-            $table->unique(['document_type', 'year', 'establishment', 'point_of_sale']);
+            $table->unique(['document_type', 'year', 'establishment', 'point_of_sale', 'customer_id']);
         });
     }
 

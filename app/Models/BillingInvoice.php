@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use Database\Factories\BillingInvoiceFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class BillingInvoice extends Model
 {
-    use SoftDeletes;
+    /** @use HasFactory<BillingInvoiceFactory> */
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'tenant_customer_id',

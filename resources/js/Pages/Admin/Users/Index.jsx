@@ -347,11 +347,13 @@ export default function UsersIndex({ users, search, role, modules, customers, co
 
                                 {/* Empresas */}
                                 <td>
-                                    {user.accessibleCompanies?.length > 0
-                                        ? user.accessibleCompanies.map((c) => (
-                                            <span key={c.id} style={{ display: 'block', fontSize: 13 }}>{c.business_name}</span>
-                                        ))
-                                        : <span className="muted">—</span>
+                                    {(user.role === 'admin' || user.role === 'consultant')
+                                        ? <span style={{ fontSize: 12, color: '#6b7280', fontStyle: 'italic' }}>Todas las empresas</span>
+                                        : user.accessibleCompanies?.length > 0
+                                            ? user.accessibleCompanies.map((c) => (
+                                                <span key={c.id} style={{ display: 'block', fontSize: 13 }}>{c.business_name}</span>
+                                            ))
+                                            : <span className="muted">—</span>
                                     }
                                 </td>
 
