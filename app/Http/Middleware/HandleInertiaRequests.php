@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Customer;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -50,8 +51,24 @@ class HandleInertiaRequests extends Middleware
                     return null;
                 }
                 $customer = Customer::find($tenantId, ['id', 'name']);
-                return $customer ? ['id' => $customer->id, 'name' => $customer->name] : null;
+                if (! $customer) {
+                    return null;
+                }
+                $modules = User::where('customer_id', $tenantId)
+                    ->whereNotNull('module_accesses')
+                    ->pluck('module_accesses')
+                    ->flatten()
+                    ->unique()
+                    ->values()
+                    ->toArray();
+                return ['id' => $customer->id, 'name' => $customer->name, 'modules' => $modules];
             },
+            'availableCustomers' => $user && $user->isAdmin()
+                ? Customer::where('status', 'active')->orderBy('name')
+                    ->get(['id', 'name'])
+                    ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])
+                    ->toArray()
+                : [],
         ]);
     }
 }

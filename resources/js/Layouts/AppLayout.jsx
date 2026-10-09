@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, router, usePage } from '@inertiajs/react';
 import { route } from 'ziggy-js';
+import TenantSelector from '@/Components/Billing/TenantSelector';
 
 function NavGroup({ label, children, routePatterns = [] }) {
     const { url } = usePage();
@@ -43,7 +44,7 @@ function NavLink({ href, children, routePattern, isActive }) {
 }
 
 export default function AppLayout({ title, children }) {
-    const { auth, flash } = usePage().props;
+    const { auth, flash, billingTenant, availableCustomers = [] } = usePage().props;
     const user = auth?.user;
     const [darkMode, setDarkMode] = useState(() => {
         const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('coteja-theme') : null;
@@ -65,7 +66,11 @@ export default function AppLayout({ title, children }) {
 
     const isAdmin = user?.is_admin;
     const canAccessAdmin = user?.can_access_admin;
-    const mod = user?.modules ?? {};
+    // Cuando hay empresa activa, los módulos visibles son los de esa empresa; si no, los del usuario
+    const tenantModules = billingTenant?.modules ?? null;
+    const mod = tenantModules
+        ? Object.fromEntries(['purchases','banking','accounting','payroll','billing','inventory'].map(m => [m, tenantModules.includes(m)]))
+        : (user?.modules ?? {});
     const { url } = usePage();
     const onPayrollIndex = (() => { try { return route().current('admin.payroll.index'); } catch { return false; } })();
     const isPayrollEmployees = onPayrollIndex && !url.includes('tab=nominas');
@@ -92,69 +97,84 @@ export default function AppLayout({ title, children }) {
 
                             {isAdmin && (
                                 <>
-                                    <NavGroup
-                                        label="Administración de negocio"
-                                        routePatterns={['admin.users.*','admin.companies.*','admin.plans.*','admin.licenses.*','admin.payments.*','admin.releases.*','admin.backups.*']}
-                                    >
-                                        <NavLink href={route('admin.users.index')} routePattern="admin.users.*">Usuarios y acceso</NavLink>
-                                        <NavLink href={route('admin.companies.index')} routePattern="admin.companies.*">Empresas</NavLink>
-                                        <NavLink href={route('admin.plans.index')} routePattern="admin.plans.*">Planes</NavLink>
-                                        <NavLink href={route('admin.licenses.index')} routePattern="admin.licenses.*">Licencias</NavLink>
-                                        <NavLink href={route('admin.payments.index')} routePattern="admin.payments.*">Cobros</NavLink>
-                                        <NavLink href={route('admin.releases.index')} routePattern="admin.releases.*">Descargas</NavLink>
-                                        <NavLink href={route('admin.backups.index')} routePattern="admin.backups.*">Backups</NavLink>
-                                    </NavGroup>
+                                    {/* Administración de negocio: siempre visible para admin, oculto si hay empresa activa */}
+                                    {!billingTenant && (
+                                        <NavGroup
+                                            label="Administración de negocio"
+                                            routePatterns={['admin.users.*','admin.companies.*','admin.plans.*','admin.licenses.*','admin.payments.*','admin.releases.*','admin.backups.*']}
+                                        >
+                                            <NavLink href={route('admin.users.index')} routePattern="admin.users.*">Usuarios y acceso</NavLink>
+                                            <NavLink href={route('admin.companies.index')} routePattern="admin.companies.*">Empresas</NavLink>
+                                            <NavLink href={route('admin.plans.index')} routePattern="admin.plans.*">Planes</NavLink>
+                                            <NavLink href={route('admin.licenses.index')} routePattern="admin.licenses.*">Licencias</NavLink>
+                                            <NavLink href={route('admin.payments.index')} routePattern="admin.payments.*">Cobros</NavLink>
+                                            <NavLink href={route('admin.releases.index')} routePattern="admin.releases.*">Descargas</NavLink>
+                                            <NavLink href={route('admin.backups.index')} routePattern="admin.backups.*">Backups</NavLink>
+                                        </NavGroup>
+                                    )}
 
-                                    <NavGroup label="Compras" routePatterns={['admin.purchase-invoices.*','admin.suppliers.*']}>
-                                        <NavLink href={route('admin.purchase-invoices.pending-approval')} routePattern="admin.purchase-invoices.pending-approval">Extraer facturas</NavLink>
-                                        <NavLink href={route('admin.purchase-invoices.index')} routePattern="admin.purchase-invoices.index">Facturas de compra</NavLink>
-                                        <NavLink href={route('admin.purchase-invoices.accounts-payable')} routePattern="admin.purchase-invoices.accounts-payable">Cuentas por pagar</NavLink>
-                                        <NavLink href={route('admin.suppliers.index')} routePattern="admin.suppliers.*">Proveedores</NavLink>
-                                        <NavLink href={route('admin.purchase-invoices.settings')} routePattern="admin.purchase-invoices.settings">Configuración</NavLink>
-                                    </NavGroup>
+                                    {mod.purchases && (
+                                        <NavGroup label="Compras" routePatterns={['admin.purchase-invoices.*','admin.suppliers.*']}>
+                                            <NavLink href={route('admin.purchase-invoices.pending-approval')} routePattern="admin.purchase-invoices.pending-approval">Extraer facturas</NavLink>
+                                            <NavLink href={route('admin.purchase-invoices.index')} routePattern="admin.purchase-invoices.index">Facturas de compra</NavLink>
+                                            <NavLink href={route('admin.purchase-invoices.accounts-payable')} routePattern="admin.purchase-invoices.accounts-payable">Cuentas por pagar</NavLink>
+                                            <NavLink href={route('admin.suppliers.index')} routePattern="admin.suppliers.*">Proveedores</NavLink>
+                                            <NavLink href={route('admin.purchase-invoices.settings')} routePattern="admin.purchase-invoices.settings">Configuración</NavLink>
+                                        </NavGroup>
+                                    )}
 
-                                    <NavGroup label="Control de bancos" routePatterns={['admin.bank-transactions.*']}>
-                                        <NavLink href={route('admin.bank-transactions.accounts')} routePattern="admin.bank-transactions.accounts">Cuentas bancarias</NavLink>
-                                        <NavLink href={route('admin.bank-transactions.transactions')} routePattern="admin.bank-transactions.transactions">Transacciones</NavLink>
-                                        <NavLink href={route('admin.bank-transactions.reconciliations')} routePattern="admin.bank-transactions.reconciliations*">Conciliación</NavLink>
-                                    </NavGroup>
+                                    {mod.banking && (
+                                        <NavGroup label="Control de bancos" routePatterns={['admin.bank-transactions.*']}>
+                                            <NavLink href={route('admin.bank-transactions.accounts')} routePattern="admin.bank-transactions.accounts">Cuentas bancarias</NavLink>
+                                            <NavLink href={route('admin.bank-transactions.transactions')} routePattern="admin.bank-transactions.transactions">Transacciones</NavLink>
+                                            <NavLink href={route('admin.bank-transactions.reconciliations')} routePattern="admin.bank-transactions.reconciliations*">Conciliación</NavLink>
+                                        </NavGroup>
+                                    )}
 
-                                    <NavGroup label="Contabilidad" routePatterns={['admin.accounting.*']}>
-                                        <NavLink href={route('admin.accounting.diario.index')} routePattern="admin.accounting.diario.*">Diario contable</NavLink>
-                                        <NavLink href={route('admin.accounting.catalogo')} routePattern="admin.accounting.catalogo">Catálogo de cuentas</NavLink>
-                                        <NavLink href={route('admin.accounting.saldos')} routePattern="admin.accounting.saldos">Saldos por período</NavLink>
-                                        <NavLink href={route('admin.accounting.balanza-comprobacion')} routePattern="admin.accounting.balanza-comprobacion">Balanza de Comprobación</NavLink>
-                                        <NavLink href={route('admin.accounting.libro-mayor')} routePattern="admin.accounting.libro-mayor">Libro Mayor</NavLink>
-                                        <NavLink href={route('admin.accounting.balance-general')} routePattern="admin.accounting.balance-general">Balance General</NavLink>
-                                        <NavLink href={route('admin.accounting.estado-resultados')} routePattern="admin.accounting.estado-resultados">Estado de Resultados</NavLink>
-                                        <NavLink href={route('admin.accounting.periodos')} routePattern="admin.accounting.periodos">Períodos contables</NavLink>
-                                        <NavLink href={route('admin.accounting.configuracion')} routePattern="admin.accounting.configuracion">Configuración</NavLink>
-                                    </NavGroup>
+                                    {mod.accounting && (
+                                        <NavGroup label="Contabilidad" routePatterns={['admin.accounting.*']}>
+                                            <NavLink href={route('admin.accounting.diario.index')} routePattern="admin.accounting.diario.*">Diario contable</NavLink>
+                                            <NavLink href={route('admin.accounting.catalogo')} routePattern="admin.accounting.catalogo">Catálogo de cuentas</NavLink>
+                                            <NavLink href={route('admin.accounting.saldos')} routePattern="admin.accounting.saldos">Saldos por período</NavLink>
+                                            <NavLink href={route('admin.accounting.balanza-comprobacion')} routePattern="admin.accounting.balanza-comprobacion">Balanza de Comprobación</NavLink>
+                                            <NavLink href={route('admin.accounting.libro-mayor')} routePattern="admin.accounting.libro-mayor">Libro Mayor</NavLink>
+                                            <NavLink href={route('admin.accounting.balance-general')} routePattern="admin.accounting.balance-general">Balance General</NavLink>
+                                            <NavLink href={route('admin.accounting.estado-resultados')} routePattern="admin.accounting.estado-resultados">Estado de Resultados</NavLink>
+                                            <NavLink href={route('admin.accounting.periodos')} routePattern="admin.accounting.periodos">Períodos contables</NavLink>
+                                            <NavLink href={route('admin.accounting.configuracion')} routePattern="admin.accounting.configuracion">Configuración</NavLink>
+                                        </NavGroup>
+                                    )}
 
-                                    <NavGroup label="Nómina" routePatterns={['admin.payroll.*']}>
-                                        <NavLink href={route('admin.payroll.index')} isActive={isPayrollEmployees}>Empleados</NavLink>
-                                        <NavLink href={route('admin.payroll.index', { tab: 'nominas' })} isActive={isPayrollPeriods}>Períodos de Nómina</NavLink>
-                                        <NavLink href={route('admin.payroll.concepts.index')} routePattern="admin.payroll.concepts.*">Gestión de conceptos</NavLink>
-                                        <NavLink href={route('admin.payroll.settings.index')} routePattern="admin.payroll.settings.*">Configuración</NavLink>
-                                    </NavGroup>
+                                    {mod.payroll && (
+                                        <NavGroup label="Nómina" routePatterns={['admin.payroll.*']}>
+                                            <NavLink href={route('admin.payroll.index')} isActive={isPayrollEmployees}>Empleados</NavLink>
+                                            <NavLink href={route('admin.payroll.index', { tab: 'nominas' })} isActive={isPayrollPeriods}>Períodos de Nómina</NavLink>
+                                            <NavLink href={route('admin.payroll.concepts.index')} routePattern="admin.payroll.concepts.*">Gestión de conceptos</NavLink>
+                                            <NavLink href={route('admin.payroll.settings.index')} routePattern="admin.payroll.settings.*">Configuración</NavLink>
+                                        </NavGroup>
+                                    )}
 
-                                    <NavGroup label="Inventarios" routePatterns={['admin.inventory.*','admin.factura-sv.billing.productos']}>
-                                        <NavLink href={route('admin.inventory.movements')} routePattern="admin.inventory.movements">Movimientos</NavLink>
-                                        <NavLink href={route('admin.factura-sv.billing.productos')} routePattern="admin.factura-sv.billing.productos">Productos</NavLink>
-                                        <NavLink href={route('admin.inventory.product-types')} routePattern="admin.inventory.product-types">Tipos de producto</NavLink>
-                                        <NavLink href={route('admin.inventory.warehouses')} routePattern="admin.inventory.warehouses">Bodegas</NavLink>
-                                        <NavLink href={route('admin.inventory.parameters')} routePattern="admin.inventory.parameters">Parámetros</NavLink>
-                                    </NavGroup>
+                                    {mod.inventory && (
+                                        <NavGroup label="Inventarios" routePatterns={['admin.inventory.*','admin.factura-sv.billing.productos']}>
+                                            <NavLink href={route('admin.inventory.movements')} routePattern="admin.inventory.movements">Movimientos</NavLink>
+                                            <NavLink href={route('admin.factura-sv.billing.productos')} routePattern="admin.factura-sv.billing.productos">Productos</NavLink>
+                                            <NavLink href={route('admin.inventory.product-types')} routePattern="admin.inventory.product-types">Tipos de producto</NavLink>
+                                            <NavLink href={route('admin.inventory.warehouses')} routePattern="admin.inventory.warehouses">Bodegas</NavLink>
+                                            <NavLink href={route('admin.inventory.parameters')} routePattern="admin.inventory.parameters">Parámetros</NavLink>
+                                        </NavGroup>
+                                    )}
 
-                                    <NavGroup label="Facturación" routePatterns={['admin.customers.*','admin.factura-sv.billing.*']}>
-                                        <NavLink href={route('admin.factura-sv.billing.dashboard')} routePattern="admin.factura-sv.billing.dashboard">Dashboard</NavLink>
-                                        <NavLink href={route('admin.factura-sv.billing.facturas')} routePattern="admin.factura-sv.billing.facturas">Facturas</NavLink>
-                                        <NavLink href={route('admin.customers.index')} routePattern="admin.customers.*">Clientes</NavLink>
-                                        <NavLink href={route('admin.factura-sv.billing.nueva-factura')} routePattern="admin.factura-sv.billing.nueva-factura">Nueva Factura</NavLink>
-                                        <NavLink href={route('admin.factura-sv.billing.cuentas-por-cobrar')} routePattern="admin.factura-sv.billing.cuentas-por-cobrar">Cuentas por cobrar</NavLink>
-                                        <NavLink href={route('admin.factura-sv.billing.productos')} routePattern="admin.factura-sv.billing.productos">Servicios</NavLink>
-                                        <NavLink href={route('admin.factura-sv.billing.configuracion')} routePattern="admin.factura-sv.billing.configuracion">Configuración</NavLink>
-                                    </NavGroup>
+                                    {mod.billing && (
+                                        <NavGroup label="Facturación" routePatterns={['admin.customers.*','admin.factura-sv.billing.*']}>
+                                            <NavLink href={route('admin.factura-sv.billing.dashboard')} routePattern="admin.factura-sv.billing.dashboard">Dashboard</NavLink>
+                                            <NavLink href={route('admin.factura-sv.billing.facturas')} routePattern="admin.factura-sv.billing.facturas">Facturas</NavLink>
+                                            <NavLink href={route('admin.customers.index')} routePattern="admin.customers.*">Clientes</NavLink>
+                                            <NavLink href={route('admin.factura-sv.billing.nueva-factura')} routePattern="admin.factura-sv.billing.nueva-factura">Nueva Factura</NavLink>
+                                            <NavLink href={route('admin.factura-sv.billing.cuentas-por-cobrar')} routePattern="admin.factura-sv.billing.cuentas-por-cobrar">Cuentas por cobrar</NavLink>
+                                            <NavLink href={route('admin.factura-sv.billing.productos')} routePattern="admin.factura-sv.billing.productos">Servicios</NavLink>
+                                            <NavLink href={route('admin.factura-sv.billing.configuracion')} routePattern="admin.factura-sv.billing.configuracion">Configuración</NavLink>
+                                        </NavGroup>
+                                    )}
                                 </>
                             )}
                         </>
@@ -230,6 +250,20 @@ export default function AppLayout({ title, children }) {
             </aside>
 
             <main className="main">
+                <div className="topbar">
+                    <div className="topbar-user">
+                        <span className="topbar-name">{user?.name}</span>
+                        <span className="topbar-email">{user?.email}</span>
+                    </div>
+                    {isAdmin && (
+                        <TenantSelector
+                            billingTenant={billingTenant}
+                            availableCustomers={availableCustomers}
+                            setRoute="admin.factura-sv.billing.empresa.set"
+                            clearRoute="admin.factura-sv.billing.empresa.clear"
+                        />
+                    )}
+                </div>
                 {flash?.status && <div className="notice">{flash.status}</div>}
                 {flash?.error && <div className="errors">{flash.error}</div>}
                 {children}

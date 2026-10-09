@@ -38,6 +38,10 @@ body.dark-mode .side { background: #020617; }
 
 /* Main content */
 .main { padding: 24px; }
+.topbar { display: flex; align-items: center; gap: 16px; padding: 10px 24px; background: var(--panel); border-bottom: 1px solid var(--line); margin: -24px -24px 24px -24px; flex-wrap: wrap; }
+.topbar-user { display: flex; flex-direction: column; margin-right: auto; }
+.topbar-name { font-weight: 700; font-size: 14px; color: var(--ink); }
+.topbar-email { font-size: 12px; color: var(--muted); }
 .top { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 20px; }
 .top h1 { margin: 0; font-size: 26px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
