@@ -367,15 +367,19 @@ class PurchaseInvoiceController extends Controller
 
     public function index(Request $request)
     {
-        $search = trim((string) $request->query('search', ''));
+        $search     = trim((string) $request->query('search', ''));
         $supplierId = $request->query('supplier_id');
+        $from       = trim((string) $request->query('from', ''));
+        $to         = trim((string) $request->query('to', ''));
         $customerIds = $this->accessibleCustomerIds($request);
 
         return Inertia::render('Admin/PurchaseInvoices/Index', [
             'invoices' => PurchaseInvoice::with(['supplier', 'customer'])
                 ->whereNotIn('status', ['extracted', 'rejected'])
                 ->when($customerIds !== null, fn ($q) => $q->whereIn('customer_id', $customerIds))
-                ->when($supplierId, fn ($query) => $query->where('supplier_id', $supplierId))
+                ->when($supplierId, fn ($q) => $q->where('supplier_id', $supplierId))
+                ->when($from !== '', fn ($q) => $q->whereDate('purchase_date', '>=', $from))
+                ->when($to   !== '', fn ($q) => $q->whereDate('purchase_date', '<=', $to))
                 ->when($search !== '', function ($query) use ($search) {
                     $query->where(function ($query) use ($search) {
                         $query->where('invoice_number', 'like', "%{$search}%")
@@ -393,10 +397,12 @@ class PurchaseInvoiceController extends Controller
                 ->latest()
                 ->paginate(15)
                 ->withQueryString(),
-            'suppliers' => Supplier::orderBy('name')->get(),
-            'customers' => Customer::orderBy('name')->get(),
-            'search' => $search,
-            'supplierId' => $supplierId,
+            'suppliers'   => Supplier::orderBy('name')->get(),
+            'customers'   => Customer::orderBy('name')->get(),
+            'search'      => $search,
+            'supplierId'  => $supplierId,
+            'from'        => $from,
+            'to'          => $to,
         ]);
     }
 

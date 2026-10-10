@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Head, router, Link } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
@@ -67,9 +67,14 @@ function InvoiceDetail({ invoice }) {
     );
 }
 
-export default function PurchaseInvoicesIndex({ invoices, search, supplierId, suppliers }) {
+export default function PurchaseInvoicesIndex({ invoices, search, supplierId, suppliers, from: fromProp = '', to: toProp = '' }) {
+    const today        = new Date().toISOString().split('T')[0];
+    const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+
     const [searchVal, setSearchVal]     = useState(search ?? '');
     const [supplierVal, setSupplierVal] = useState(supplierId ? String(supplierId) : '');
+    const [fromVal, setFromVal]         = useState(fromProp || firstOfMonth);
+    const [toVal, setToVal]             = useState(toProp   || today);
     const [viewItem, setViewItem]       = useState(null);
 
     const fmt = (n) => n != null
@@ -80,17 +85,20 @@ export default function PurchaseInvoicesIndex({ invoices, search, supplierId, su
         e.preventDefault();
         router.get(
             route('admin.purchase-invoices.index'),
-            { search: searchVal, supplierId: supplierVal },
+            { search: searchVal, supplier_id: supplierVal, from: fromVal, to: toVal },
             { preserveState: true }
         );
+    }
+
+    function clearFilters() {
+        setSearchVal(''); setSupplierVal(''); setFromVal(firstOfMonth); setToVal(today);
+        router.get(route('admin.purchase-invoices.index'), { from: firstOfMonth, to: today });
     }
 
     function handleDelete(invoice) {
         if (!confirm(`¿Eliminar la factura ${invoice.invoice_number}? Esta acción no se puede deshacer.`)) return;
         router.delete(route('admin.purchase-invoices.destroy', invoice.id));
     }
-
-    const hasFilter = !!(search || supplierId);
 
     return (
         <AppLayout>
@@ -123,14 +131,16 @@ export default function PurchaseInvoicesIndex({ invoices, search, supplierId, su
                             ))}
                         </select>
                     </label>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                        <button type="submit" className="btn">Buscar</button>
-                        {hasFilter && (
-                            <Link href={route('admin.purchase-invoices.index')} className="btn secondary">
-                                Limpiar
-                            </Link>
-                        )}
-                    </div>
+                    <label style={{ flex: '0 1 160px', margin: 0 }}>
+                        Desde
+                        <input type="date" value={fromVal} onChange={(e) => setFromVal(e.target.value)} />
+                    </label>
+                    <label style={{ flex: '0 1 160px', margin: 0 }}>
+                        Hasta
+                        <input type="date" value={toVal} onChange={(e) => setToVal(e.target.value)} />
+                    </label>
+                    <button type="submit" className="btn">Filtrar</button>
+                    <button type="button" className="btn secondary" onClick={clearFilters}>Limpiar</button>
                 </form>
             </div>
 
