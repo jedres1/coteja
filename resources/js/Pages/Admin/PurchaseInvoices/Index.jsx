@@ -150,35 +150,215 @@ function CreateForm({ suppliers, onCancel }) {
     );
 }
 
-function InvoiceDetail({ invoice }) {
-    const fmt = (n) => n != null ? Number(n).toLocaleString('es-SV', { minimumFractionDigits: 2 }) : '—';
+// ─── DteDetailView ────────────────────────────────────────────────────────────
+
+const TIPOS_DTE = {
+    '01': 'Factura consumidor final',
+    '03': 'CCF',
+    '04': 'Nota de remisión',
+    '05': 'Nota de crédito',
+    '06': 'Nota de débito',
+    '07': 'Comp. de retención',
+    '11': 'Fact. sujeto excluido',
+    '14': 'Fact. de exportación',
+};
+
+const METODOS_PAGO = {
+    '01': 'Billetes y monedas',
+    '02': 'Tarjeta débito',
+    '03': 'Tarjeta crédito',
+    '04': 'Cheque',
+    '05': 'Transferencia bancaria',
+    '06': 'Cupones',
+    '07': 'Vales',
+    '08': 'Otros',
+};
+
+function DteSection({ title, children }) {
+    return (
+        <section style={{ marginBottom: 14, padding: '10px 12px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
+            <div style={{ fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6b7280', marginBottom: 8 }}>
+                {title}
+            </div>
+            {children}
+        </section>
+    );
+}
+
+function DteDetailView({ invoice }) {
+    const fmt = (n) => n != null ? Number(n).toLocaleString('es-SV', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
+
+    const dte = (() => {
+        const raw = invoice.extracted_document_body;
+        if (!raw) return null;
+        try { return typeof raw === 'string' ? JSON.parse(raw) : raw; }
+        catch { return null; }
+    })();
+
+    if (!dte) {
+        return (
+            <div style={{ fontSize: 13 }}>
+                <DteSection title="Factura">
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px' }}>
+                        <div><span style={{ color: '#6b7280', fontSize: 12 }}>Proveedor</span><br /><strong>{invoice.supplier?.name ?? '—'}</strong></div>
+                        <div><span style={{ color: '#6b7280', fontSize: 12 }}>NIT / NRC</span><br />{invoice.supplier?.document_number ?? '—'}</div>
+                        <div><span style={{ color: '#6b7280', fontSize: 12 }}>Fecha de compra</span><br />{invoice.purchase_date ?? '—'}</div>
+                        <div><span style={{ color: '#6b7280', fontSize: 12 }}>Vencimiento</span><br />{invoice.due_date ?? '—'}</div>
+                        <div><span style={{ color: '#6b7280', fontSize: 12 }}>Tipo</span><br />{TIPOS_DTE[invoice.document_type] ?? invoice.document_type ?? '—'}</div>
+                        <div><span style={{ color: '#6b7280', fontSize: 12 }}>Método de pago</span><br />{invoice.payment_method ?? '—'}</div>
+                        <div><span style={{ color: '#6b7280', fontSize: 12 }}>Subtotal</span><br /><span style={{ fontFamily: 'monospace' }}>{fmt(invoice.subtotal)}</span></div>
+                        <div><span style={{ color: '#6b7280', fontSize: 12 }}>IVA</span><br /><span style={{ fontFamily: 'monospace' }}>{fmt(invoice.iva)}</span></div>
+                        <div><span style={{ color: '#6b7280', fontSize: 12 }}>Total</span><br /><strong style={{ fontFamily: 'monospace', fontSize: 15 }}>{fmt(invoice.total)}</strong></div>
+                        <div><span style={{ color: '#6b7280', fontSize: 12 }}>Estado de pago</span><br />
+                            <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, ...(PAYMENT_COLOR[invoice.payment_status] ?? {}) }}>
+                                {PAYMENT_LABEL[invoice.payment_status] ?? invoice.payment_status}
+                            </span>
+                        </div>
+                    </div>
+                    {invoice.notes && (
+                        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #e2e8f0' }}>
+                            <span style={{ color: '#6b7280', fontSize: 12 }}>Notas</span>
+                            <p style={{ margin: '4px 0 0', fontSize: 13 }}>{invoice.notes}</p>
+                        </div>
+                    )}
+                </DteSection>
+            </div>
+        );
+    }
+
+    const id       = dte.identificacion  ?? {};
+    const emisor   = dte.emisor          ?? {};
+    const receptor = dte.receptor        ?? {};
+    const items    = dte.cuerpoDocumento ?? [];
+    const res      = dte.resumen         ?? {};
 
     return (
-        <>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-                <div><span style={{ fontSize: 12, color: '#6b7280' }}>Proveedor</span><br /><strong>{invoice.supplier?.name ?? '—'}</strong></div>
-                <div><span style={{ fontSize: 12, color: '#6b7280' }}>NIT / NRC</span><br /><span style={{ fontSize: 13 }}>{invoice.supplier?.document_number ?? '—'}</span></div>
-                <div><span style={{ fontSize: 12, color: '#6b7280' }}>Fecha de compra</span><br /><span style={{ fontSize: 13 }}>{invoice.purchase_date ?? '—'}</span></div>
-                <div><span style={{ fontSize: 12, color: '#6b7280' }}>Vencimiento</span><br /><span style={{ fontSize: 13 }}>{invoice.due_date ?? '—'}</span></div>
-                <div><span style={{ fontSize: 12, color: '#6b7280' }}>Tipo</span><br /><span style={{ fontSize: 13 }}>{DOC_LABELS[invoice.document_type] ?? invoice.document_type ?? '—'}</span></div>
-                <div><span style={{ fontSize: 12, color: '#6b7280' }}>Método de pago</span><br /><span style={{ fontSize: 13 }}>{invoice.payment_method ?? '—'}</span></div>
-                <div><span style={{ fontSize: 12, color: '#6b7280' }}>Subtotal</span><br /><span style={{ fontFamily: 'monospace' }}>{fmt(invoice.subtotal)}</span></div>
-                <div><span style={{ fontSize: 12, color: '#6b7280' }}>IVA</span><br /><span style={{ fontFamily: 'monospace' }}>{fmt(invoice.iva)}</span></div>
-                <div><span style={{ fontSize: 12, color: '#6b7280' }}>Total</span><br /><strong style={{ fontFamily: 'monospace', fontSize: 15 }}>{fmt(invoice.total)}</strong></div>
-                <div><span style={{ fontSize: 12, color: '#6b7280' }}>Estado de pago</span><br />
-                    <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, ...(PAYMENT_COLOR[invoice.payment_status] ?? {}) }}>
-                        {PAYMENT_LABEL[invoice.payment_status] ?? invoice.payment_status}
-                    </span>
-                </div>
+        <div style={{ fontSize: 13, maxHeight: '75vh', overflowY: 'auto', paddingRight: 4 }}>
+
+            {/* Estado de pago (sistema interno) */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                <span style={{ color: '#6b7280', fontSize: 12 }}>Estado de pago:</span>
+                <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, ...(PAYMENT_COLOR[invoice.payment_status] ?? {}) }}>
+                    {PAYMENT_LABEL[invoice.payment_status] ?? invoice.payment_status}
+                </span>
+                {invoice.notes && (
+                    <span style={{ color: '#6b7280', fontSize: 12, marginLeft: 8 }}>Notas: {invoice.notes}</span>
+                )}
             </div>
 
-            {invoice.notes && (
-                <div style={{ marginBottom: 12 }}>
-                    <span style={{ fontSize: 12, color: '#6b7280' }}>Notas</span>
-                    <p style={{ margin: '4px 0 0', fontSize: 13 }}>{invoice.notes}</p>
+            {/* Identificación */}
+            <DteSection title="Identificación">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px' }}>
+                    <div><span style={{ color: '#6b7280', fontSize: 12 }}>Tipo DTE</span><br />{TIPOS_DTE[id.tipoDte] ?? id.tipoDte ?? '—'}</div>
+                    <div><span style={{ color: '#6b7280', fontSize: 12 }}>Fecha / Hora</span><br />{`${id.fecEmi ?? ''} ${id.horEmi ?? ''}`.trim() || '—'}</div>
+                    <div style={{ gridColumn: '1/-1' }}><span style={{ color: '#6b7280', fontSize: 12 }}>Número de control</span><br /><span style={{ fontFamily: 'monospace', fontSize: 12 }}>{id.numeroControl ?? '—'}</span></div>
+                    <div style={{ gridColumn: '1/-1' }}><span style={{ color: '#6b7280', fontSize: 12 }}>Código de generación</span><br /><span style={{ fontFamily: 'monospace', fontSize: 11, wordBreak: 'break-all' }}>{id.codigoGeneracion ?? '—'}</span></div>
                 </div>
+            </DteSection>
+
+            {/* Emisor / Receptor */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+                <DteSection title="Emisor">
+                    <div style={{ fontWeight: 600, marginBottom: 4 }}>{emisor.nombre ?? '—'}</div>
+                    {emisor.nombreComercial && emisor.nombreComercial !== emisor.nombre && (
+                        <div style={{ color: '#6b7280', marginBottom: 4 }}>{emisor.nombreComercial}</div>
+                    )}
+                    <div style={{ fontSize: 12, color: '#6b7280' }}>NIT: <span style={{ color: '#111' }}>{emisor.nit ?? '—'}</span></div>
+                    <div style={{ fontSize: 12, color: '#6b7280' }}>NRC: <span style={{ color: '#111' }}>{emisor.nrc ?? '—'}</span></div>
+                    {emisor.correo && <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{emisor.correo}</div>}
+                    {emisor.telefono && <div style={{ fontSize: 12, color: '#6b7280' }}>{emisor.telefono}</div>}
+                </DteSection>
+                <DteSection title="Receptor">
+                    <div style={{ fontWeight: 600, marginBottom: 4 }}>{receptor.nombre ?? '—'}</div>
+                    <div style={{ fontSize: 12, color: '#6b7280' }}>Doc: <span style={{ color: '#111' }}>{receptor.numDocumento ?? '—'}</span></div>
+                    {receptor.nrc && <div style={{ fontSize: 12, color: '#6b7280' }}>NRC: <span style={{ color: '#111' }}>{receptor.nrc}</span></div>}
+                    {receptor.correo && <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{receptor.correo}</div>}
+                    {receptor.telefono && <div style={{ fontSize: 12, color: '#6b7280' }}>{receptor.telefono}</div>}
+                </DteSection>
+            </div>
+
+            {/* Detalle de líneas */}
+            {items.length > 0 && (
+                <DteSection title={`Detalle (${items.length} línea${items.length !== 1 ? 's' : ''})`}>
+                    <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                        <thead>
+                            <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                                <th style={{ textAlign: 'left', padding: '3px 6px 5px', color: '#6b7280', fontWeight: 600 }}>Descripción</th>
+                                <th style={{ textAlign: 'right', padding: '3px 6px 5px', color: '#6b7280', fontWeight: 600, whiteSpace: 'nowrap' }}>Cant.</th>
+                                <th style={{ textAlign: 'right', padding: '3px 6px 5px', color: '#6b7280', fontWeight: 600, whiteSpace: 'nowrap' }}>P. Unit.</th>
+                                <th style={{ textAlign: 'right', padding: '3px 6px 5px', color: '#6b7280', fontWeight: 600, whiteSpace: 'nowrap' }}>Desc.</th>
+                                <th style={{ textAlign: 'right', padding: '3px 6px 5px', color: '#6b7280', fontWeight: 600, whiteSpace: 'nowrap' }}>Gravado</th>
+                                <th style={{ textAlign: 'right', padding: '3px 6px 5px', color: '#6b7280', fontWeight: 600 }}>IVA</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {items.map((item, i) => (
+                                <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                    <td style={{ padding: '5px 6px', verticalAlign: 'top' }}>
+                                        {item.codigo && <span style={{ fontSize: 11, color: '#6b7280', marginRight: 4 }}>[{item.codigo}]</span>}
+                                        {item.descripcion}
+                                    </td>
+                                    <td style={{ textAlign: 'right', padding: '5px 6px', fontFamily: 'monospace' }}>{item.cantidad}</td>
+                                    <td style={{ textAlign: 'right', padding: '5px 6px', fontFamily: 'monospace' }}>{fmt(item.precioUni)}</td>
+                                    <td style={{ textAlign: 'right', padding: '5px 6px', fontFamily: 'monospace' }}>
+                                        {item.montoDescu > 0 ? fmt(item.montoDescu) : <span style={{ color: '#d1d5db' }}>—</span>}
+                                    </td>
+                                    <td style={{ textAlign: 'right', padding: '5px 6px', fontFamily: 'monospace' }}>{fmt(item.ventaGravada)}</td>
+                                    <td style={{ textAlign: 'right', padding: '5px 6px', fontFamily: 'monospace' }}>{fmt(item.ivaItem)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </DteSection>
             )}
-        </>
+
+            {/* Resumen */}
+            <DteSection title="Resumen">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '3px 24px', maxWidth: 340, marginLeft: 'auto' }}>
+                    {res.subTotalVentas > 0 && <>
+                        <div style={{ color: '#6b7280' }}>Subtotal ventas</div>
+                        <div style={{ textAlign: 'right', fontFamily: 'monospace' }}>{fmt(res.subTotalVentas)}</div>
+                    </>}
+                    {res.totalDescu > 0 && <>
+                        <div style={{ color: '#6b7280' }}>Descuento</div>
+                        <div style={{ textAlign: 'right', fontFamily: 'monospace', color: '#dc2626' }}>-{fmt(res.totalDescu)}</div>
+                    </>}
+                    {res.totalGravada > 0 && <>
+                        <div style={{ color: '#6b7280' }}>Total gravado</div>
+                        <div style={{ textAlign: 'right', fontFamily: 'monospace' }}>{fmt(res.totalGravada)}</div>
+                    </>}
+                    {res.totalExenta > 0 && <>
+                        <div style={{ color: '#6b7280' }}>Total exento</div>
+                        <div style={{ textAlign: 'right', fontFamily: 'monospace' }}>{fmt(res.totalExenta)}</div>
+                    </>}
+                    {res.totalNoSuj > 0 && <>
+                        <div style={{ color: '#6b7280' }}>Total no sujeto</div>
+                        <div style={{ textAlign: 'right', fontFamily: 'monospace' }}>{fmt(res.totalNoSuj)}</div>
+                    </>}
+                    <div style={{ color: '#6b7280' }}>IVA</div>
+                    <div style={{ textAlign: 'right', fontFamily: 'monospace' }}>{fmt(res.totalIva)}</div>
+                    <div style={{ fontWeight: 700, paddingTop: 6, borderTop: '1px solid #e2e8f0', marginTop: 4 }}>Total a pagar</div>
+                    <div style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, fontSize: 15, paddingTop: 6, borderTop: '1px solid #e2e8f0', marginTop: 4 }}>{fmt(res.totalPagar)}</div>
+                </div>
+                {res.totalLetras && (
+                    <div style={{ marginTop: 10, color: '#6b7280', fontStyle: 'italic', fontSize: 12, borderTop: '1px solid #e2e8f0', paddingTop: 8 }}>
+                        {res.totalLetras}
+                    </div>
+                )}
+                {res.pagos?.length > 0 && (
+                    <div style={{ marginTop: 8, fontSize: 12 }}>
+                        <span style={{ color: '#6b7280' }}>Forma de pago: </span>
+                        {res.pagos.map((p, i) => (
+                            <span key={i}>
+                                {METODOS_PAGO[p.codigo] ?? p.codigo} — {fmt(p.montoPago)}
+                                {p.referencia ? ` (Ref: ${p.referencia})` : ''}
+                                {i < res.pagos.length - 1 ? ', ' : ''}
+                            </span>
+                        ))}
+                    </div>
+                )}
+            </DteSection>
+        </div>
     );
 }
 
@@ -276,6 +456,7 @@ export default function PurchaseInvoicesIndex({ invoices, search, supplierId, su
                         <tr>
                             <th>Fecha</th>
                             <th>Proveedor</th>
+                            <th>Receptor</th>
                             <th>Tipo / N°</th>
                             <th style={{ textAlign: 'right' }}>Subtotal</th>
                             <th style={{ textAlign: 'right' }}>IVA</th>
@@ -288,7 +469,7 @@ export default function PurchaseInvoicesIndex({ invoices, search, supplierId, su
                     <tbody>
                         {invoices.data.length === 0 && (
                             <tr>
-                                <td colSpan={9} className="empty">Sin facturas registradas</td>
+                                <td colSpan={10} className="empty">Sin facturas registradas</td>
                             </tr>
                         )}
                         {invoices.data.map((inv) => (
@@ -304,6 +485,12 @@ export default function PurchaseInvoicesIndex({ invoices, search, supplierId, su
                                     {inv.supplier?.document_number && (
                                         <div style={{ fontSize: 11, color: '#6b7280' }}>{inv.supplier.document_number}</div>
                                     )}
+                                </td>
+                                <td>
+                                    {inv.receptor_name
+                                        ? <div style={{ fontSize: 13 }}>{inv.receptor_name}</div>
+                                        : <span style={{ color: '#6b7280' }}>—</span>
+                                    }
                                 </td>
                                 <td>
                                     <div style={{ fontSize: 12, color: '#6b7280' }}>{DOC_LABELS[inv.document_type] ?? inv.document_type}</div>
@@ -349,8 +536,8 @@ export default function PurchaseInvoicesIndex({ invoices, search, supplierId, su
             </div>
 
             {viewItem && (
-                <Modal title={`Factura ${viewItem.invoice_number}`} onClose={() => setViewItem(null)} maxWidth={560}>
-                    <InvoiceDetail invoice={viewItem} />
+                <Modal title={`Factura ${viewItem.invoice_number}`} onClose={() => setViewItem(null)} maxWidth={820}>
+                    <DteDetailView invoice={viewItem} />
                 </Modal>
             )}
         </AppLayout>

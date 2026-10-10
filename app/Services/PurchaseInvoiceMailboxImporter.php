@@ -567,7 +567,18 @@ class PurchaseInvoiceMailboxImporter
     {
         $content = trim($content);
         $content = preg_replace('/^\xEF\xBB\xBF/', '', $content);
-        $content = mb_convert_encoding($content, 'UTF-8', 'UTF-8');
+
+        // Detect Windows-1252 double-encoding: some email clients encode a UTF-8 file
+        // as if its bytes were Windows-1252 characters and then re-encode to UTF-8.
+        // The round-trip test is reliable: if converting back to Win-1252 produces
+        // valid JSON, the original content was double-encoded.
+        $candidate = mb_convert_encoding($content, 'Windows-1252', 'UTF-8');
+        if ($candidate !== $content) {
+            json_decode($candidate);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $content = $candidate;
+            }
+        }
 
         json_decode($content);
 

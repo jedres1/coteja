@@ -31,6 +31,8 @@ class PurchaseInvoice extends Model
         'extracted_document_body',
     ];
 
+    protected $appends = ['receptor_name'];
+
     protected $casts = [
         'purchase_date' => 'date',
         'due_date' => 'date',
@@ -38,6 +40,15 @@ class PurchaseInvoice extends Model
         'iva' => 'decimal:2',
         'total' => 'decimal:2',
     ];
+
+    public function getReceptorNameAttribute(): ?string
+    {
+        if (blank($this->extracted_document_body)) return null;
+        $body = is_array($this->extracted_document_body)
+            ? $this->extracted_document_body
+            : json_decode($this->extracted_document_body, true);
+        return $body['receptor']['nombre'] ?? null;
+    }
 
     public function supplier()
     {

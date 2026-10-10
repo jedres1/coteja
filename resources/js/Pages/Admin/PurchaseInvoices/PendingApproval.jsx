@@ -5,36 +5,206 @@ import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
 import Modal from '@/Components/Modal';
 
-// ─── DocumentDataView ─────────────────────────────────────────────────────────
+// ─── DteDetailView ────────────────────────────────────────────────────────────
 
-function DocumentDataView({ data }) {
-    if (!data) return <p className="muted">Sin datos de documento.</p>;
+const TIPOS_DTE = {
+    '01': 'Factura consumidor final',
+    '03': 'CCF',
+    '04': 'Nota de remisión',
+    '05': 'Nota de crédito',
+    '06': 'Nota de débito',
+    '07': 'Comp. de retención',
+    '11': 'Fact. sujeto excluido',
+    '14': 'Fact. de exportación',
+};
 
-    const parsed = typeof data === 'string' ? (() => { try { return JSON.parse(data); } catch { return null; } })() : data;
+const METODOS_PAGO = {
+    '01': 'Billetes y monedas',
+    '02': 'Tarjeta débito',
+    '03': 'Tarjeta crédito',
+    '04': 'Cheque',
+    '05': 'Transferencia bancaria',
+    '06': 'Cupones',
+    '07': 'Vales',
+    '08': 'Otros',
+};
 
-    if (!parsed) {
-        return <pre style={{ whiteSpace: 'pre-wrap', fontSize: 13, wordBreak: 'break-all' }}>{String(data)}</pre>;
+function Section({ title, children }) {
+    return (
+        <section style={{ marginBottom: 14, padding: '10px 12px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
+            <div style={{ fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6b7280', marginBottom: 8 }}>
+                {title}
+            </div>
+            {children}
+        </section>
+    );
+}
+
+function Row({ label, value, mono = false, full = false }) {
+    return (
+        <>
+            <div style={full ? { gridColumn: '1/-1', color: '#6b7280', fontSize: 12 } : { color: '#6b7280', fontSize: 12 }}>{label}</div>
+            {!full && (
+                <div style={{ fontFamily: mono ? 'monospace' : undefined, fontSize: 13, wordBreak: 'break-all' }}>{value ?? '—'}</div>
+            )}
+            {full && (
+                <div style={{ gridColumn: '1/-1', fontFamily: mono ? 'monospace' : undefined, fontSize: 12, wordBreak: 'break-all', marginTop: -4 }}>{value ?? '—'}</div>
+            )}
+        </>
+    );
+}
+
+function DteDetailView({ invoice }) {
+    const fmt = (n) => n != null ? Number(n).toLocaleString('es-SV', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
+
+    const dte = (() => {
+        const raw = invoice.extracted_document_body;
+        if (!raw) return null;
+        try { return typeof raw === 'string' ? JSON.parse(raw) : raw; }
+        catch { return null; }
+    })();
+
+    if (!dte) {
+        return (
+            <div style={{ fontSize: 13 }}>
+                <Section title="Factura">
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px' }}>
+                        <Row label="Proveedor" value={invoice.supplier?.name} />
+                        <Row label="Fecha" value={invoice.purchase_date} />
+                        <Row label="Número" value={invoice.invoice_number} mono />
+                        <Row label="Subtotal" value={fmt(invoice.subtotal)} mono />
+                        <Row label="IVA" value={fmt(invoice.iva)} mono />
+                        <Row label="Total" value={fmt(invoice.total)} mono />
+                    </div>
+                </Section>
+                <p className="muted" style={{ fontSize: 12 }}>No hay datos DTE adjuntos para esta factura.</p>
+            </div>
+        );
     }
 
+    const id      = dte.identificacion   ?? {};
+    const emisor  = dte.emisor           ?? {};
+    const receptor = dte.receptor        ?? {};
+    const items   = dte.cuerpoDocumento  ?? [];
+    const res     = dte.resumen          ?? {};
+
     return (
-        <div style={{ maxHeight: 420, overflowY: 'auto' }}>
-            <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
-                <tbody>
-                    {Object.entries(parsed).map(([key, val]) => (
-                        <tr key={key} style={{ borderBottom: '1px solid var(--border, #e5e7eb)' }}>
-                            <td style={{ padding: '6px 10px 6px 0', fontWeight: 600, whiteSpace: 'nowrap', verticalAlign: 'top', color: '#6b7280', width: '35%' }}>
-                                {key}
-                            </td>
-                            <td style={{ padding: '6px 0', verticalAlign: 'top', wordBreak: 'break-all' }}>
-                                {typeof val === 'object' && val !== null
-                                    ? <pre style={{ margin: 0, fontSize: 12 }}>{JSON.stringify(val, null, 2)}</pre>
-                                    : String(val ?? '—')
-                                }
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+        <div style={{ fontSize: 13, maxHeight: '75vh', overflowY: 'auto', paddingRight: 4 }}>
+
+            {/* Identificación */}
+            <Section title="Identificación">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px' }}>
+                    <Row label="Tipo DTE" value={TIPOS_DTE[id.tipoDte] ?? id.tipoDte} />
+                    <Row label="Fecha / Hora" value={`${id.fecEmi ?? ''} ${id.horEmi ?? ''}`.trim()} />
+                    <Row label="Número de control" value={id.numeroControl} mono full />
+                    <Row label="Código de generación" value={id.codigoGeneracion} mono full />
+                </div>
+            </Section>
+
+            {/* Emisor / Receptor */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+                <Section title="Emisor">
+                    <div style={{ fontWeight: 600, marginBottom: 4 }}>{emisor.nombre ?? '—'}</div>
+                    {emisor.nombreComercial && emisor.nombreComercial !== emisor.nombre && (
+                        <div style={{ color: '#6b7280', marginBottom: 4 }}>{emisor.nombreComercial}</div>
+                    )}
+                    <div style={{ fontSize: 12, color: '#6b7280' }}>NIT: <span style={{ color: '#111' }}>{emisor.nit ?? '—'}</span></div>
+                    <div style={{ fontSize: 12, color: '#6b7280' }}>NRC: <span style={{ color: '#111' }}>{emisor.nrc ?? '—'}</span></div>
+                    {emisor.correo && <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{emisor.correo}</div>}
+                    {emisor.telefono && <div style={{ fontSize: 12, color: '#6b7280' }}>{emisor.telefono}</div>}
+                </Section>
+                <Section title="Receptor">
+                    <div style={{ fontWeight: 600, marginBottom: 4 }}>{receptor.nombre ?? '—'}</div>
+                    <div style={{ fontSize: 12, color: '#6b7280' }}>Doc: <span style={{ color: '#111' }}>{receptor.numDocumento ?? '—'}</span></div>
+                    {receptor.nrc && <div style={{ fontSize: 12, color: '#6b7280' }}>NRC: <span style={{ color: '#111' }}>{receptor.nrc}</span></div>}
+                    {receptor.correo && <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{receptor.correo}</div>}
+                    {receptor.telefono && <div style={{ fontSize: 12, color: '#6b7280' }}>{receptor.telefono}</div>}
+                </Section>
+            </div>
+
+            {/* Detalle de líneas */}
+            {items.length > 0 && (
+                <Section title={`Detalle (${items.length} línea${items.length !== 1 ? 's' : ''})`}>
+                    <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                        <thead>
+                            <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                                <th style={{ textAlign: 'left', padding: '3px 6px 5px', color: '#6b7280', fontWeight: 600 }}>Descripción</th>
+                                <th style={{ textAlign: 'right', padding: '3px 6px 5px', color: '#6b7280', fontWeight: 600, whiteSpace: 'nowrap' }}>Cant.</th>
+                                <th style={{ textAlign: 'right', padding: '3px 6px 5px', color: '#6b7280', fontWeight: 600, whiteSpace: 'nowrap' }}>P. Unit.</th>
+                                <th style={{ textAlign: 'right', padding: '3px 6px 5px', color: '#6b7280', fontWeight: 600, whiteSpace: 'nowrap' }}>Desc.</th>
+                                <th style={{ textAlign: 'right', padding: '3px 6px 5px', color: '#6b7280', fontWeight: 600, whiteSpace: 'nowrap' }}>Gravado</th>
+                                <th style={{ textAlign: 'right', padding: '3px 6px 5px', color: '#6b7280', fontWeight: 600 }}>IVA</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {items.map((item, i) => (
+                                <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                    <td style={{ padding: '5px 6px', verticalAlign: 'top' }}>
+                                        {item.codigo && (
+                                            <span style={{ fontSize: 11, color: '#6b7280', marginRight: 4 }}>[{item.codigo}]</span>
+                                        )}
+                                        {item.descripcion}
+                                    </td>
+                                    <td style={{ textAlign: 'right', padding: '5px 6px', fontFamily: 'monospace' }}>{item.cantidad}</td>
+                                    <td style={{ textAlign: 'right', padding: '5px 6px', fontFamily: 'monospace' }}>{fmt(item.precioUni)}</td>
+                                    <td style={{ textAlign: 'right', padding: '5px 6px', fontFamily: 'monospace' }}>
+                                        {item.montoDescu > 0 ? fmt(item.montoDescu) : <span style={{ color: '#d1d5db' }}>—</span>}
+                                    </td>
+                                    <td style={{ textAlign: 'right', padding: '5px 6px', fontFamily: 'monospace' }}>{fmt(item.ventaGravada)}</td>
+                                    <td style={{ textAlign: 'right', padding: '5px 6px', fontFamily: 'monospace' }}>{fmt(item.ivaItem)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </Section>
+            )}
+
+            {/* Resumen */}
+            <Section title="Resumen">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '3px 24px', maxWidth: 340, marginLeft: 'auto' }}>
+                    {res.subTotalVentas > 0 && <>
+                        <div style={{ color: '#6b7280' }}>Subtotal ventas</div>
+                        <div style={{ textAlign: 'right', fontFamily: 'monospace' }}>{fmt(res.subTotalVentas)}</div>
+                    </>}
+                    {res.totalDescu > 0 && <>
+                        <div style={{ color: '#6b7280' }}>Descuento</div>
+                        <div style={{ textAlign: 'right', fontFamily: 'monospace', color: '#dc2626' }}>-{fmt(res.totalDescu)}</div>
+                    </>}
+                    {res.totalGravada > 0 && <>
+                        <div style={{ color: '#6b7280' }}>Total gravado</div>
+                        <div style={{ textAlign: 'right', fontFamily: 'monospace' }}>{fmt(res.totalGravada)}</div>
+                    </>}
+                    {res.totalExenta > 0 && <>
+                        <div style={{ color: '#6b7280' }}>Total exento</div>
+                        <div style={{ textAlign: 'right', fontFamily: 'monospace' }}>{fmt(res.totalExenta)}</div>
+                    </>}
+                    {res.totalNoSuj > 0 && <>
+                        <div style={{ color: '#6b7280' }}>Total no sujeto</div>
+                        <div style={{ textAlign: 'right', fontFamily: 'monospace' }}>{fmt(res.totalNoSuj)}</div>
+                    </>}
+                    <div style={{ color: '#6b7280' }}>IVA</div>
+                    <div style={{ textAlign: 'right', fontFamily: 'monospace' }}>{fmt(res.totalIva)}</div>
+                    <div style={{ fontWeight: 700, paddingTop: 6, borderTop: '1px solid #e2e8f0', marginTop: 4 }}>Total a pagar</div>
+                    <div style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, fontSize: 15, paddingTop: 6, borderTop: '1px solid #e2e8f0', marginTop: 4 }}>{fmt(res.totalPagar)}</div>
+                </div>
+                {res.totalLetras && (
+                    <div style={{ marginTop: 10, color: '#6b7280', fontStyle: 'italic', fontSize: 12, borderTop: '1px solid #e2e8f0', paddingTop: 8 }}>
+                        {res.totalLetras}
+                    </div>
+                )}
+                {res.pagos?.length > 0 && (
+                    <div style={{ marginTop: 8, fontSize: 12 }}>
+                        <span style={{ color: '#6b7280' }}>Forma de pago: </span>
+                        {res.pagos.map((p, i) => (
+                            <span key={i}>
+                                {METODOS_PAGO[p.codigo] ?? p.codigo} — {fmt(p.montoPago)}
+                                {p.referencia ? ` (Ref: ${p.referencia})` : ''}
+                                {i < res.pagos.length - 1 ? ', ' : ''}
+                            </span>
+                        ))}
+                    </div>
+                )}
+            </Section>
         </div>
     );
 }
@@ -222,6 +392,7 @@ export default function PendingApproval({ invoices, total, showAll }) {
                             </th>
                             <th>Fecha</th>
                             <th>Proveedor</th>
+                            <th>Receptor</th>
                             <th>Tipo / Número</th>
                             <th>Subtotal</th>
                             <th>IVA</th>
@@ -234,7 +405,7 @@ export default function PendingApproval({ invoices, total, showAll }) {
                     <tbody>
                         {invoices.data.length === 0 && (
                             <tr>
-                                <td colSpan={showAll ? 10 : 9} className="empty">Sin registros</td>
+                                <td colSpan={showAll ? 11 : 10} className="empty">Sin registros</td>
                             </tr>
                         )}
                         {invoices.data.map((invoice) => (
@@ -249,6 +420,12 @@ export default function PendingApproval({ invoices, total, showAll }) {
                                 </td>
                                 <td className="muted">{invoice.date}</td>
                                 <td style={{ fontWeight: 600 }}>{invoice.supplier?.name}</td>
+                                <td>
+                                    {invoice.receptor_name
+                                        ? <span style={{ fontSize: 13 }}>{invoice.receptor_name}</span>
+                                        : <span className="muted">—</span>
+                                    }
+                                </td>
                                 <td>
                                     <span>{documentTypes[invoice.document_type] ?? invoice.document_type}</span>
                                     <br />
@@ -318,9 +495,9 @@ export default function PendingApproval({ invoices, total, showAll }) {
                 <Modal
                     title={`Documento — ${viewItem.invoice_number}`}
                     onClose={() => setViewItem(null)}
-                    maxWidth={700}
+                    maxWidth={820}
                 >
-                    <DocumentDataView data={viewItem.document_data} />
+                    <DteDetailView invoice={viewItem} />
                 </Modal>
             )}
         </AppLayout>
