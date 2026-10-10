@@ -133,11 +133,12 @@ function buildInitialForm(settings, correlativos) {
 
 export default function Configuracion({ settings, correlativos, currentYear, availableCustomers = [] }) {
     const { auth } = usePage().props;
-    const [unlocked, setUnlocked]     = useState(false);
-    const [activities, setActivities] = useState([]);
-    const [geo, setGeo]               = useState({ departamentos: [] });
-    const [testMsg, setTestMsg]       = useState(null);
-    const [toast, setToast]           = useState(null);
+    const [unlocked, setUnlocked]       = useState(false);
+    const [showWarning, setShowWarning] = useState(false);
+    const [activities, setActivities]   = useState([]);
+    const [geo, setGeo]                 = useState({ departamentos: [] });
+    const [testMsg, setTestMsg]         = useState(null);
+    const [toast, setToast]             = useState(null);
 
     function showToast(msg, ok = true) {
         setToast({ msg, ok });
@@ -286,7 +287,7 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
             correlativos: form.data.correlativos,
         };
         form.transform(() => payload).post(route('admin.factura-sv.configuracion.guardar'), {
-            onSuccess: () => showToast('Configuración guardada correctamente.'),
+            onSuccess: () => { setUnlocked(false); showToast('Configuración guardada correctamente.'); },
             onError:   () => showToast('Error al guardar. Revisa los campos.', false),
         });
     }
@@ -319,21 +320,42 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
                     type="button"
                     className={`btn${unlocked ? '' : ' secondary'}`}
                     style={{ whiteSpace: 'nowrap' }}
-                    onClick={() => setUnlocked((v) => !v)}
+                    onClick={() => unlocked ? setUnlocked(false) : setShowWarning(true)}
                 >
                     {unlocked ? '🔓 Bloquear' : '🔒 Desbloquear'}
                 </button>
             </div>
 
-            {unlocked && (
-                <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 6, padding: '12px 16px', marginBottom: 16 }}>
-                    <p style={{ margin: '0 0 6px', fontWeight: 700, color: '#dc2626' }}>Advertencia de configuración activa</p>
-                    <p style={{ margin: '0 0 6px', fontSize: 13, color: '#7f1d1d' }}>Cambiar estos datos puede provocar rechazos de Hacienda, errores de firma o números de control incorrectos.</p>
-                    <ul style={{ margin: 0, paddingLeft: 20, fontSize: 12, color: '#7f1d1d' }}>
-                        <li>Verifica NIT, NRC, actividad económica y dirección antes de emitir documentos.</li>
-                        <li>No alteres correlativos salvo que Hacienda indique que el número ya existe.</li>
-                        <li>Si cambias credenciales o certificado, prueba Hacienda y el firmador antes de generar facturas.</li>
-                    </ul>
+            {/* Warning confirmation modal */}
+            {showWarning && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ background: '#fff', borderRadius: 10, padding: '28px 32px', maxWidth: 480, width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}>
+                        <p style={{ margin: '0 0 8px', fontWeight: 700, fontSize: 16, color: '#dc2626' }}>Advertencia — edición de parámetros</p>
+                        <p style={{ margin: '0 0 12px', fontSize: 13, color: '#374151' }}>
+                            Cambiar estos datos puede provocar rechazos de Hacienda, errores de firma o números de control incorrectos.
+                        </p>
+                        <ul style={{ margin: '0 0 20px', paddingLeft: 20, fontSize: 12, color: '#7f1d1d' }}>
+                            <li>Verifica NIT, NRC, actividad económica y dirección antes de emitir documentos.</li>
+                            <li>No alteres correlativos salvo que Hacienda indique que el número ya existe.</li>
+                            <li>Si cambias credenciales o certificado, prueba Hacienda y el firmador antes de generar facturas.</li>
+                        </ul>
+                        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                            <button
+                                type="button"
+                                className="btn secondary"
+                                onClick={() => setShowWarning(false)}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                className="btn"
+                                onClick={() => { setShowWarning(false); setUnlocked(true); }}
+                            >
+                                Aceptar
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
