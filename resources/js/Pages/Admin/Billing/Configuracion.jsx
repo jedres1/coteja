@@ -16,6 +16,34 @@ const DTE_TYPES = [
     { code: '15', label: 'Comprobante de Donación' },
 ];
 
+const DTE_GROUPS = [
+    {
+        group: 'Facturas',
+        items: [
+            { code: '01', label: 'Factura' },
+            { code: '11', label: 'Factura de Exportación' },
+            { code: '14', label: 'Factura de Sujeto Excluido' },
+        ],
+    },
+    {
+        group: 'Comprobantes',
+        items: [
+            { code: '03', label: 'Comprobante de Crédito Fiscal' },
+            { code: '07', label: 'Comprobante de Retención' },
+            { code: '08', label: 'Comprobante de Liquidación' },
+            { code: '15', label: 'Comprobante de Donación' },
+        ],
+    },
+    {
+        group: 'Notas',
+        items: [
+            { code: '04', label: 'Nota de Remisión' },
+            { code: '05', label: 'Nota de Crédito' },
+            { code: '06', label: 'Nota de Débito' },
+        ],
+    },
+];
+
 function SectionTitle({ children }) {
     return (
         <h4 style={{ margin: '24px 0 12px', fontSize: 14, fontWeight: 700, color: '#374151', borderBottom: '1px solid #e5e7eb', paddingBottom: 6 }}>
@@ -429,20 +457,29 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
 
                         {/* ── Documentos ── */}
                         <SectionTitle>Documentos a Generar</SectionTitle>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '8px 16px', marginBottom: 8 }}>
-                            {DTE_TYPES.map((t) => (
-                                <label key={t.code} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: disabled ? 'not-allowed' : 'pointer' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={form.data.documentos.includes(t.code)}
-                                        onChange={() => toggleDoc(t.code)}
-                                    />
-                                    <span style={{ fontFamily: 'monospace', fontWeight: 700, minWidth: 24 }}>{t.code}</span>
-                                    <span>{t.label}</span>
-                                </label>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0 24px', marginBottom: 8 }}>
+                            {DTE_GROUPS.map(({ group, items }) => (
+                                <div key={group}>
+                                    <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                        {group}
+                                    </p>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                        {items.map((t) => (
+                                            <label key={t.code} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: disabled ? 'not-allowed' : 'pointer' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={form.data.documentos.includes(t.code)}
+                                                    onChange={() => toggleDoc(t.code)}
+                                                />
+                                                <span style={{ fontFamily: 'monospace', fontWeight: 700, minWidth: 24 }}>{t.code}</span>
+                                                <span>{t.label}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
                             ))}
                         </div>
-                        <p style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                        <p style={{ fontSize: 12, color: '#6b7280', marginTop: 8 }}>
                             Los tipos seleccionados aparecerán en la creación de documentos y el filtro de facturas.
                         </p>
 
