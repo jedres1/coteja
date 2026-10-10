@@ -9,7 +9,7 @@ class PurchaseInvoicePolicy
 {
     public function delete(User $user, PurchaseInvoice $invoice): bool
     {
-        return $user->isAdmin() && ! in_array($invoice->status, ['approved', 'accounted'], true);
+        return $user->isAdmin();
     }
 
     public function approve(User $user, PurchaseInvoice $invoice): bool

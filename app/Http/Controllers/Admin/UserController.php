@@ -51,7 +51,10 @@ class UserController extends Controller
         unset($data['company_ids']);
 
         $user = User::create($data);
-        $user->accessibleCompanies()->sync($companyIds);
+        $allCompanyIds = $data['customer_id']
+            ? Company::where('customer_id', $data['customer_id'])->pluck('id')->all()
+            : $companyIds;
+        $user->accessibleCompanies()->sync($allCompanyIds);
 
         return back()->with('status', 'Usuario creado.');
     }
@@ -74,7 +77,10 @@ class UserController extends Controller
         unset($data['company_ids']);
 
         $user->update($data);
-        $user->accessibleCompanies()->sync($companyIds);
+        $allCompanyIds = $data['customer_id']
+            ? Company::where('customer_id', $data['customer_id'])->pluck('id')->all()
+            : $companyIds;
+        $user->accessibleCompanies()->sync($allCompanyIds);
 
         return back()->with('status', 'Usuario actualizado.');
     }

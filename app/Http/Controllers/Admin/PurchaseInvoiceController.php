@@ -488,7 +488,11 @@ class PurchaseInvoiceController extends Controller
     public function destroy(PurchaseInvoice $purchaseInvoice)
     {
         $this->authorize('delete', $purchaseInvoice);
-        $purchaseInvoice->delete();
+
+        DB::transaction(function () use ($purchaseInvoice) {
+            $purchaseInvoice->journalEntry()->delete();
+            $purchaseInvoice->delete();
+        });
 
         return back()->with('status', 'Factura de compra eliminada.');
     }

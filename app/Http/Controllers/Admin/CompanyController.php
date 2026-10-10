@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\Customer;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -20,16 +21,32 @@ class CompanyController extends Controller
 
     public function store(Request $request)
     {
-        Company::create($this->validated($request));
+        $company = Company::create($this->validated($request));
+
+        $this->syncCustomerUsers($company);
 
         return back()->with('status', 'Empresa creada.');
     }
 
     public function update(Request $request, Company $company)
     {
+        $previousCustomerId = $company->customer_id;
         $company->update($this->validated($request));
 
+        if ($company->wasChanged('customer_id')) {
+            $oldUserIds = User::where('customer_id', $previousCustomerId)->pluck('id');
+            $company->users()->detach($oldUserIds);
+        }
+
+        $this->syncCustomerUsers($company);
+
         return back()->with('status', 'Empresa actualizada.');
+    }
+
+    private function syncCustomerUsers(Company $company): void
+    {
+        $userIds = User::where('customer_id', $company->customer_id)->pluck('id');
+        $company->users()->syncWithoutDetaching($userIds);
     }
 
     private function validated(Request $request): array
