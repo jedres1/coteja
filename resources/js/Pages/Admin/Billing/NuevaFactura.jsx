@@ -755,6 +755,14 @@ export default function NuevaFactura({ customers, products, settings, correlativ
                                 <option value={3}>Otro</option>
                             </select>
                         </label>
+                        <label className="form-group">Fecha de emisión
+                            <input
+                                type="date"
+                                value={new Date().toISOString().split('T')[0]}
+                                readOnly
+                                style={{ background: '#f9fafb', color: '#374151', cursor: 'default' }}
+                            />
+                        </label>
                     </div>
 
                     {selectedCustomer && (

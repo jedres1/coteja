@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
@@ -26,6 +26,16 @@ const STATUS_COLOR = {
     rejected: { background: '#fef2f2', color: '#dc2626' },
 };
 
+const DOC_TYPE_OPTIONS = [
+    { value: '01', label: '01 - Factura consumidor final' },
+    { value: '03', label: '03 - Comprobante de Crédito Fiscal' },
+    { value: '05', label: '05 - Nota de Crédito' },
+    { value: '06', label: '06 - Nota de Débito' },
+    { value: '11', label: '11 - Factura de Exportación' },
+    { value: '14', label: '14 - Factura Sujeto Excluido' },
+    { value: '99', label: '99 - Otro' },
+];
+
 const badge = (map, key) => {
     const style = map[key] ?? { background: '#f3f4f6', color: '#374151' };
     return (
@@ -34,6 +44,111 @@ const badge = (map, key) => {
         </span>
     );
 };
+
+function CreateForm({ suppliers, onCancel }) {
+    const today = new Date().toISOString().split('T')[0];
+    const { data, setData, post, processing, errors, reset } = useForm({
+        supplier_id:    '',
+        document_type:  '03',
+        invoice_number: '',
+        purchase_date:  today,
+        due_date:       '',
+        subtotal:       '',
+        iva:            '',
+        total:          '',
+        payment_method: '',
+        payment_status: 'pending',
+        status:         'registered',
+        notes:          '',
+    });
+
+    function handleSubmit(e) {
+        e.preventDefault();
+        post(route('admin.purchase-invoices.store'), {
+            onSuccess: () => { reset(); onCancel(); },
+        });
+    }
+
+    const g = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 };
+    const err = (f) => errors[f] && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors[f]}</span>;
+
+    return (
+        <form onSubmit={handleSubmit} noValidate>
+            <div style={g}>
+                <label style={{ margin: 0 }}>
+                    Proveedor <span style={{ color: '#ef4444' }}>*</span>
+                    <select value={data.supplier_id} onChange={(e) => setData('supplier_id', e.target.value)} required>
+                        <option value="">— Seleccionar —</option>
+                        {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                    {err('supplier_id')}
+                </label>
+                <label style={{ margin: 0 }}>
+                    Tipo de documento <span style={{ color: '#ef4444' }}>*</span>
+                    <select value={data.document_type} onChange={(e) => setData('document_type', e.target.value)}>
+                        {DOC_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                    {err('document_type')}
+                </label>
+                <label style={{ margin: 0 }}>
+                    N° de factura <span style={{ color: '#ef4444' }}>*</span>
+                    <input type="text" value={data.invoice_number} onChange={(e) => setData('invoice_number', e.target.value)} placeholder="Número de documento" />
+                    {err('invoice_number')}
+                </label>
+                <label style={{ margin: 0 }}>
+                    Fecha de compra <span style={{ color: '#ef4444' }}>*</span>
+                    <input type="date" value={data.purchase_date} onChange={(e) => setData('purchase_date', e.target.value)} />
+                    {err('purchase_date')}
+                </label>
+                <label style={{ margin: 0 }}>
+                    Fecha de vencimiento
+                    <input type="date" value={data.due_date} onChange={(e) => setData('due_date', e.target.value)} />
+                    {err('due_date')}
+                </label>
+                <label style={{ margin: 0 }}>
+                    Subtotal <span style={{ color: '#ef4444' }}>*</span>
+                    <input type="number" step="0.01" min="0" value={data.subtotal} onChange={(e) => setData('subtotal', e.target.value)} />
+                    {err('subtotal')}
+                </label>
+                <label style={{ margin: 0 }}>
+                    IVA <span style={{ color: '#ef4444' }}>*</span>
+                    <input type="number" step="0.01" min="0" value={data.iva} onChange={(e) => setData('iva', e.target.value)} />
+                    {err('iva')}
+                </label>
+                <label style={{ margin: 0 }}>
+                    Total <span style={{ color: '#ef4444' }}>*</span>
+                    <input type="number" step="0.01" min="0" value={data.total} onChange={(e) => setData('total', e.target.value)} />
+                    {err('total')}
+                </label>
+                <label style={{ margin: 0 }}>
+                    Método de pago
+                    <input type="text" value={data.payment_method} onChange={(e) => setData('payment_method', e.target.value)} placeholder="Transferencia, cheque…" />
+                    {err('payment_method')}
+                </label>
+                <label style={{ margin: 0 }}>
+                    Estado de pago
+                    <select value={data.payment_status} onChange={(e) => setData('payment_status', e.target.value)}>
+                        <option value="pending">Pendiente</option>
+                        <option value="partial">Parcial</option>
+                        <option value="paid">Pagado</option>
+                    </select>
+                    {err('payment_status')}
+                </label>
+                <label style={{ margin: 0, gridColumn: '1 / -1' }}>
+                    Notas
+                    <input type="text" value={data.notes} onChange={(e) => setData('notes', e.target.value)} />
+                    {err('notes')}
+                </label>
+            </div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                <button type="submit" className="btn" disabled={processing}>
+                    {processing ? 'Guardando…' : 'Registrar factura'}
+                </button>
+                <button type="button" className="btn secondary" onClick={onCancel}>Cancelar</button>
+            </div>
+        </form>
+    );
+}
 
 function InvoiceDetail({ invoice }) {
     const fmt = (n) => n != null ? Number(n).toLocaleString('es-SV', { minimumFractionDigits: 2 }) : '—';
@@ -71,6 +186,7 @@ export default function PurchaseInvoicesIndex({ invoices, search, supplierId, su
     const today        = new Date().toISOString().split('T')[0];
     const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
 
+    const [showCreate, setShowCreate]   = useState(false);
     const [searchVal, setSearchVal]     = useState(search ?? '');
     const [supplierVal, setSupplierVal] = useState(supplierId ? String(supplierId) : '');
     const [fromVal, setFromVal]         = useState(fromProp || firstOfMonth);
@@ -106,10 +222,20 @@ export default function PurchaseInvoicesIndex({ invoices, search, supplierId, su
 
             <div className="top">
                 <h1>Facturas de compra</h1>
-                <a href={route('admin.purchase-invoices.export')} className="btn secondary">
-                    Exportar
-                </a>
+                <div style={{ display: 'flex', gap: 8 }}>
+                    <a href={route('admin.purchase-invoices.export')} className="btn secondary">Exportar</a>
+                    <button type="button" className="btn" onClick={() => setShowCreate((v) => !v)}>
+                        {showCreate ? 'Cancelar' : '+ Nueva factura'}
+                    </button>
+                </div>
             </div>
+
+            {showCreate && (
+                <div className="card" style={{ marginBottom: 16 }}>
+                    <h2 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 600 }}>Registrar factura de compra</h2>
+                    <CreateForm suppliers={suppliers ?? []} onCancel={() => setShowCreate(false)} />
+                </div>
+            )}
 
             <div className="card" style={{ marginBottom: 16 }}>
                 <form onSubmit={handleSearch} style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
