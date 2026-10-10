@@ -45,6 +45,11 @@ class FacturaElectronicaSVController extends Controller
     public function accountsReceivablePage(Request $request)
     {
         $tenantId = $this->activeTenantId($request);
+
+        // Aplica el mes corriente como rango por defecto si no se envían parámetros
+        if (! $request->query('from')) $request->merge(['from' => now()->startOfMonth()->toDateString()]);
+        if (! $request->query('to'))   $request->merge(['to'   => now()->toDateString()]);
+
         $query    = $this->buildReceivableQuery($request, $tenantId);
         $all      = $this->buildReceivableBaseQuery($request, $tenantId);
 
@@ -58,8 +63,8 @@ class FacturaElectronicaSVController extends Controller
             'invoices'           => $query->paginate(15)->through(fn (BillingInvoice $invoice) => $this->formatReceivableItem($invoice)),
             'filters'            => [
                 'search'         => trim((string) $request->query('search', '')),
-                'from'           => $request->query('from', ''),
-                'to'             => $request->query('to', ''),
+                'from'           => $request->query('from'),
+                'to'             => $request->query('to'),
                 'payment_status' => $request->query('payment_status', ''),
             ],
             'availableCustomers' => $availableCustomers,
@@ -89,6 +94,11 @@ class FacturaElectronicaSVController extends Controller
         $tenantId = $this->activeTenantId($request);
         $search   = trim((string) $request->query('search', ''));
         $today    = now()->toDateString();
+
+        // Aplica el mes corriente como rango por defecto si no se envían parámetros
+        if (! $request->query('from')) $request->merge(['from' => now()->startOfMonth()->toDateString()]);
+        if (! $request->query('to'))   $request->merge(['to'   => $today]);
+
         $scope    = fn ($q) => $q->when($tenantId !== null, fn ($q) => $q->where('tenant_customer_id', $tenantId));
 
         $invoices = $this->buildFacturasQuery($request, $tenantId)->paginate(15);
@@ -110,8 +120,8 @@ class FacturaElectronicaSVController extends Controller
             'invoices'             => $invoices->through(fn (BillingInvoice $invoice) => $this->formatFacturaItem($invoice)),
             'filters'              => [
                 'search' => $search,
-                'from'   => $request->query('from', ''),
-                'to'     => $request->query('to', ''),
+                'from'   => $request->query('from'),
+                'to'     => $request->query('to'),
                 'status' => $request->query('status', ''),
                 'type'   => $request->query('type', ''),
             ],
