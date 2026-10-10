@@ -195,6 +195,8 @@ function AccountLabel({ account }) {
 }
 
 export default function Configuracion({ packages, accounts, costCenters }) {
+    const [unlocked, setUnlocked]           = useState(false);
+    const [showWarning, setShowWarning]     = useState(false);
     const [showCreatePkg, setShowCreatePkg] = useState(false);
     const [editPkg, setEditPkg]             = useState(null);
     const [showCreateCC, setShowCreateCC]   = useState(false);
@@ -217,11 +219,51 @@ export default function Configuracion({ packages, accounts, costCenters }) {
                 <h1>Configuración contable</h1>
             </div>
 
+            <div className="card" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+                <div>
+                    <p style={{ margin: 0, fontWeight: 600 }}>
+                        {unlocked ? 'Configuración desbloqueada' : 'Configuración bloqueada'}
+                    </p>
+                    <p style={{ margin: '2px 0 0', fontSize: 12, color: '#6b7280' }}>
+                        {unlocked
+                            ? 'Edita solo si es necesario modificar estos parámetros.'
+                            : 'Los parámetros permanecen protegidos para evitar cambios accidentales.'}
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    className={`btn${unlocked ? '' : ' secondary'}`}
+                    style={{ whiteSpace: 'nowrap' }}
+                    onClick={() => unlocked ? setUnlocked(false) : setShowWarning(true)}
+                >
+                    {unlocked ? '🔓 Bloquear' : '🔒 Desbloquear'}
+                </button>
+            </div>
+
+            {showWarning && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ background: '#fff', borderRadius: 10, padding: '28px 32px', maxWidth: 460, width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}>
+                        <p style={{ margin: '0 0 8px', fontWeight: 700, fontSize: 16, color: '#dc2626' }}>Advertencia — edición de parámetros</p>
+                        <p style={{ margin: '0 0 12px', fontSize: 13, color: '#374151' }}>
+                            Cambiar estos parámetros puede afectar el funcionamiento del sistema.
+                        </p>
+                        <ul style={{ margin: '0 0 20px', paddingLeft: 20, fontSize: 12, color: '#7f1d1d' }}>
+                            <li>Verifica los valores antes de guardar.</li>
+                            <li>Los cambios tienen efecto inmediato.</li>
+                        </ul>
+                        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                            <button type="button" className="btn secondary" onClick={() => setShowWarning(false)}>Cancelar</button>
+                            <button type="button" className="btn" onClick={() => { setShowWarning(false); setUnlocked(true); }}>Aceptar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* ── Paquetes contables ─────────────────────────────────────── */}
             <div style={{ marginBottom: 32 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                     <h2 style={{ margin: 0, fontSize: 17 }}>Paquetes contables</h2>
-                    <button className="btn" type="button" onClick={() => setShowCreatePkg(true)}>
+                    <button className="btn" type="button" disabled={!unlocked} onClick={() => setShowCreatePkg(true)}>
                         + Nuevo paquete
                     </button>
                 </div>
@@ -271,13 +313,15 @@ export default function Configuracion({ packages, accounts, costCenters }) {
                                                 type="button"
                                                 className="btn secondary"
                                                 style={{ fontSize: 12, padding: '3px 10px' }}
+                                                disabled={!unlocked}
                                                 onClick={() => setEditPkg(pkg)}
                                             >
                                                 Editar
                                             </button>
                                             <button
                                                 type="button"
-                                                style={{ fontSize: 12, padding: '3px 10px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 6, cursor: 'pointer' }}
+                                                style={{ fontSize: 12, padding: '3px 10px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 6, cursor: !unlocked ? 'not-allowed' : 'pointer', opacity: !unlocked ? 0.5 : 1 }}
+                                                disabled={!unlocked}
                                                 onClick={() => handleDeletePkg(pkg)}
                                             >
                                                 Eliminar
@@ -295,7 +339,7 @@ export default function Configuracion({ packages, accounts, costCenters }) {
             <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                     <h2 style={{ margin: 0, fontSize: 17 }}>Centros de costo</h2>
-                    <button className="btn" type="button" onClick={() => setShowCreateCC(true)}>
+                    <button className="btn" type="button" disabled={!unlocked} onClick={() => setShowCreateCC(true)}>
                         + Nuevo centro
                     </button>
                 </div>
@@ -329,13 +373,15 @@ export default function Configuracion({ packages, accounts, costCenters }) {
                                                 type="button"
                                                 className="btn secondary"
                                                 style={{ fontSize: 12, padding: '3px 10px' }}
+                                                disabled={!unlocked}
                                                 onClick={() => setEditCC(cc)}
                                             >
                                                 Editar
                                             </button>
                                             <button
                                                 type="button"
-                                                style={{ fontSize: 12, padding: '3px 10px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 6, cursor: 'pointer' }}
+                                                style={{ fontSize: 12, padding: '3px 10px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 6, cursor: !unlocked ? 'not-allowed' : 'pointer', opacity: !unlocked ? 0.5 : 1 }}
+                                                disabled={!unlocked}
                                                 onClick={() => handleDeleteCC(cc)}
                                             >
                                                 Eliminar

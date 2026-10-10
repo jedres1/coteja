@@ -3,7 +3,7 @@ import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import { useState } from 'react';
 
-function MailboxForm({ host, port, username, password, mailbox, onlyUnseen, limit }) {
+function MailboxForm({ host, port, username, password, mailbox, onlyUnseen, limit, disabled, onSaved }) {
     const { data, setData, post, processing, errors, recentlySuccessful } = useForm({
         mailbox_host:        host ?? '',
         mailbox_port:        port ?? '',
@@ -16,14 +16,15 @@ function MailboxForm({ host, port, username, password, mailbox, onlyUnseen, limi
 
     function handleSubmit(e) {
         e.preventDefault();
-        post(route('admin.purchase-invoices.settings.update'));
+        post(route('admin.purchase-invoices.settings.update'), { onSuccess: () => onSaved?.() });
     }
 
     return (
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
             <h2 style={{ marginTop: 0, marginBottom: 20, fontSize: 15, fontWeight: 600 }}>
                 Configuración de correo / IMAP
             </h2>
+            <fieldset disabled={disabled} style={{ border: 'none', padding: 0, margin: 0 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <label style={{ margin: 0 }}>
                     Host IMAP
@@ -102,8 +103,9 @@ function MailboxForm({ host, port, username, password, mailbox, onlyUnseen, limi
                     Solo correos no leídos
                 </label>
             </div>
+            </fieldset>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 20 }}>
-                <button type="submit" className="btn" disabled={processing}>
+                <button type="submit" className="btn" disabled={disabled || processing}>
                     {processing ? 'Guardando...' : 'Guardar configuración de correo'}
                 </button>
                 {recentlySuccessful && (
@@ -114,7 +116,7 @@ function MailboxForm({ host, port, username, password, mailbox, onlyUnseen, limi
     );
 }
 
-function AccountingForm({ purchasePackage, payablePackage, accountingAccounts, costCenters }) {
+function AccountingForm({ purchasePackage, payablePackage, accountingAccounts, costCenters, disabled, onSaved }) {
     const { data, setData, post, processing, errors, recentlySuccessful } = useForm({
         purchase_debit_account_id:  purchasePackage?.debit_account_id  ? String(purchasePackage.debit_account_id)  : '',
         purchase_credit_account_id: purchasePackage?.credit_account_id ? String(purchasePackage.credit_account_id) : '',
@@ -126,7 +128,7 @@ function AccountingForm({ purchasePackage, payablePackage, accountingAccounts, c
 
     function handleSubmit(e) {
         e.preventDefault();
-        post(route('admin.purchase-invoices.settings.accounting'));
+        post(route('admin.purchase-invoices.settings.accounting'), { onSuccess: () => onSaved?.() });
     }
 
     const accountOpts = (accountingAccounts ?? []).map((a) => (
@@ -142,14 +144,14 @@ function AccountingForm({ purchasePackage, payablePackage, accountingAccounts, c
     );
 
     return (
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
             <h2 style={{ marginTop: 0, marginBottom: 4, fontSize: 15, fontWeight: 600 }}>
                 Cuentas contables
             </h2>
             <p style={{ margin: '0 0 16px', fontSize: 13, color: '#6b7280' }}>
                 Partida de compras (CP) y partida de cuentas por pagar (CXP).
             </p>
-
+            <fieldset disabled={disabled} style={{ border: 'none', padding: 0, margin: 0 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <div style={{ gridColumn: '1 / -1', fontWeight: 600, fontSize: 13, borderBottom: '1px solid #e5e7eb', paddingBottom: 6 }}>
                     Compras (CP)
@@ -211,9 +213,9 @@ function AccountingForm({ purchasePackage, payablePackage, accountingAccounts, c
                     </label>
                 )}
             </div>
-
+            </fieldset>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 20 }}>
-                <button type="submit" className="btn" disabled={processing}>
+                <button type="submit" className="btn" disabled={disabled || processing}>
                     {processing ? 'Guardando...' : 'Guardar cuentas contables'}
                 </button>
                 {recentlySuccessful && (
@@ -229,7 +231,11 @@ export default function Settings({
     accountingAccounts, costCenters, purchasePackage, payablePackage,
     missingPurchaseEntries, missingPayableEntries,
 }) {
-    const [generating, setGenerating] = useState(false);
+    const [unlocked, setUnlocked]       = useState(false);
+    const [showWarning, setShowWarning] = useState(false);
+    const [generating, setGenerating]   = useState(false);
+
+    function handleSaved() { setUnlocked(false); }
 
     function handleGenerateMissing() {
         if (!confirm('¿Generar partidas contables faltantes? Esto puede tardar unos segundos.')) return;
@@ -251,24 +257,61 @@ export default function Settings({
                 <h1>Configuración de compras</h1>
             </div>
 
+            {/* Lock panel */}
+            <div className="card" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+                <div>
+                    <p style={{ margin: 0, fontWeight: 600 }}>
+                        {unlocked ? 'Configuración desbloqueada' : 'Configuración bloqueada'}
+                    </p>
+                    <p style={{ margin: '2px 0 0', fontSize: 12, color: '#6b7280' }}>
+                        {unlocked
+                            ? 'Edita solo si vas a corregir datos de correo o cuentas contables.'
+                            : 'Los parámetros permanecen protegidos para evitar cambios accidentales.'}
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    className={`btn${unlocked ? '' : ' secondary'}`}
+                    style={{ whiteSpace: 'nowrap' }}
+                    onClick={() => unlocked ? setUnlocked(false) : setShowWarning(true)}
+                >
+                    {unlocked ? '🔓 Bloquear' : '🔒 Desbloquear'}
+                </button>
+            </div>
+
+            {/* Warning modal */}
+            {showWarning && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ background: '#fff', borderRadius: 10, padding: '28px 32px', maxWidth: 460, width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}>
+                        <p style={{ margin: '0 0 8px', fontWeight: 700, fontSize: 16, color: '#dc2626' }}>Advertencia — edición de parámetros</p>
+                        <p style={{ margin: '0 0 12px', fontSize: 13, color: '#374151' }}>
+                            Cambiar estos datos puede afectar la importación de facturas por correo o las partidas contables generadas automáticamente.
+                        </p>
+                        <ul style={{ margin: '0 0 20px', paddingLeft: 20, fontSize: 12, color: '#7f1d1d' }}>
+                            <li>Verifica el host, puerto y credenciales IMAP antes de guardar.</li>
+                            <li>Cambiar cuentas contables afecta las partidas generadas desde este momento.</li>
+                        </ul>
+                        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                            <button type="button" className="btn secondary" onClick={() => setShowWarning(false)}>Cancelar</button>
+                            <button type="button" className="btn" onClick={() => { setShowWarning(false); setUnlocked(true); }}>Aceptar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="card" style={{ marginBottom: 16 }}>
                 <MailboxForm
-                    host={host}
-                    port={port}
-                    username={username}
-                    password={password}
-                    mailbox={mailbox}
-                    onlyUnseen={onlyUnseen}
-                    limit={limit}
+                    host={host} port={port} username={username} password={password}
+                    mailbox={mailbox} onlyUnseen={onlyUnseen} limit={limit}
+                    disabled={!unlocked} onSaved={handleSaved}
                 />
             </div>
 
             <div className="card" style={{ marginBottom: 16 }}>
                 <AccountingForm
-                    purchasePackage={purchasePackage}
-                    payablePackage={payablePackage}
-                    accountingAccounts={accountingAccounts}
-                    costCenters={costCenters}
+                    purchasePackage={purchasePackage} payablePackage={payablePackage}
+                    accountingAccounts={accountingAccounts} costCenters={costCenters}
+                    disabled={!unlocked} onSaved={handleSaved}
                 />
             </div>
 
