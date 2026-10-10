@@ -286,7 +286,8 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
             documentos: form.data.documentos,
             correlativos: form.data.correlativos,
         };
-        form.transform(() => payload).post(route('admin.factura-sv.configuracion.guardar'), {
+        form.transform(() => payload);
+        form.post(route('admin.factura-sv.configuracion.guardar'), {
             onSuccess: () => { setUnlocked(false); showToast('Configuración guardada correctamente.'); },
             onError:   () => showToast('Error al guardar. Revisa los campos.', false),
         });
