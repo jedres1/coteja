@@ -429,15 +429,16 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
 
                         {/* ── Documentos ── */}
                         <SectionTitle>Documentos a Generar</SectionTitle>
-                        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '8px 16px', marginBottom: 8 }}>
                             {DTE_TYPES.map((t) => (
-                                <label key={t.code} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: disabled ? 'not-allowed' : 'pointer' }}>
+                                <label key={t.code} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: disabled ? 'not-allowed' : 'pointer' }}>
                                     <input
                                         type="checkbox"
                                         checked={form.data.documentos.includes(t.code)}
                                         onChange={() => toggleDoc(t.code)}
                                     />
-                                    {t.code} - {t.label}
+                                    <span style={{ fontFamily: 'monospace', fontWeight: 700, minWidth: 24 }}>{t.code}</span>
+                                    <span>{t.label}</span>
                                 </label>
                             ))}
                         </div>
