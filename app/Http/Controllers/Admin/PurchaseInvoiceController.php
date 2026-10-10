@@ -426,6 +426,7 @@ class PurchaseInvoiceController extends Controller
             $summary = $importer->import(
                 $request->input('from'),
                 $request->input('to'),
+                $this->activeTenantId($request),
             );
         } catch (RuntimeException $exception) {
             return back()->withErrors($exception->getMessage());
@@ -521,6 +522,14 @@ class PurchaseInvoiceController extends Controller
             ['No. Factura', 'Proveedor', 'Cliente', 'Fecha', 'Vencimiento', 'Subtotal', 'IVA', 'Total', 'Estado', 'Estado Pago'],
             $rows
         );
+    }
+
+    private function activeTenantId(Request $request): ?int
+    {
+        $user = $request->user();
+        if (! $user) return null;
+        if ($user->role === 'customer') return $user->customer_id;
+        return $request->session()->get('billing_tenant_id');
     }
 
     /** Devuelve los customer_ids accesibles para el usuario. Null significa sin restricción (admin). */

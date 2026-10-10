@@ -30,10 +30,10 @@ class PurchaseInvoiceMailboxImporter
         ];
     }
 
-    public function import(?string $from = null, ?string $to = null): array
+    public function import(?string $from = null, ?string $to = null, ?int $customerId = null): array
     {
         $config = $this->resolveConfig();
-        $configuredTaxIdentifier = $this->configuredTaxIdentifier();
+        $configuredTaxIdentifier = $this->configuredTaxIdentifier($customerId);
 
         if (blank($config['username']) || blank($config['password'])) {
             throw new RuntimeException('Configure PURCHASE_INVOICE_MAIL_USERNAME y PURCHASE_INVOICE_MAIL_PASSWORD para extraer facturas.');
@@ -205,9 +205,9 @@ class PurchaseInvoiceMailboxImporter
             ->exists();
     }
 
-    private function configuredTaxIdentifier(): string
+    private function configuredTaxIdentifier(?int $customerId = null): string
     {
-        $settings = BillingSetting::allAsArray();
+        $settings = BillingSetting::allAsArray($customerId);
         $identifier = data_get($settings, 'emisor.nit')
             ?: data_get($settings, 'emisor.dui')
             ?: data_get($settings, 'firma.nit')
