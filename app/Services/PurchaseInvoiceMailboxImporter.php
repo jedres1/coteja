@@ -33,13 +33,9 @@ class PurchaseInvoiceMailboxImporter
     public function import(?string $from = null, ?string $to = null, ?int $customerId = null): array
     {
         $config = $this->resolveConfig();
-        $configuredTaxIdentifier = $this->configuredTaxIdentifier($customerId);
 
         if (blank($config['username']) || blank($config['password'])) {
             throw new RuntimeException('Configure PURCHASE_INVOICE_MAIL_USERNAME y PURCHASE_INVOICE_MAIL_PASSWORD para extraer facturas.');
-        }
-        if (blank($configuredTaxIdentifier)) {
-            throw new RuntimeException('Configure el NIT o DUI del contribuyente en Factura Electrónica antes de extraer facturas.');
         }
 
         $summary = [
@@ -59,7 +55,8 @@ class PurchaseInvoiceMailboxImporter
             $this->command('SELECT '.$this->quote($config['mailbox'] ?: 'INBOX'));
 
             $queryTokens = [];
-            if ($config['only_unseen']) {
+            $hasDateRange = ! blank($from) || ! blank($to);
+            if ($config['only_unseen'] && ! $hasDateRange) {
                 $queryTokens[] = 'UNSEEN';
             }
 
@@ -86,9 +83,9 @@ class PurchaseInvoiceMailboxImporter
                     $messageProcessed = false;
 
                     foreach ($jsonAttachments as $attachment) {
-                        $result = $this->importJson($attachment['content'], $attachment['filename'], $uid, $configuredTaxIdentifier, $summary);
+                        $result = $this->importJson($attachment['content'], $attachment['filename'], $uid, $summary);
                         $summary[$result]++;
-                        $messageProcessed = $messageProcessed || in_array($result, ['imported', 'duplicates', 'filtered'], true);
+                        $messageProcessed = $messageProcessed || in_array($result, ['imported', 'duplicates'], true);
                     }
 
                     if ($messageProcessed) {
@@ -205,23 +202,6 @@ class PurchaseInvoiceMailboxImporter
             ->exists();
     }
 
-    private function configuredTaxIdentifier(?int $customerId = null): string
-    {
-        $settings = BillingSetting::allAsArray($customerId);
-        $identifier = data_get($settings, 'emisor.nit')
-            ?: data_get($settings, 'emisor.dui')
-            ?: data_get($settings, 'firma.nit')
-            ?: data_get($settings, 'firma.dui')
-            ?: data_get($settings, 'electron_raw_config.nit')
-            ?: data_get($settings, 'electron_raw_config.firmador_usuario');
-
-        return $this->normalizeTaxIdentifier($identifier);
-    }
-
-    private function normalizeTaxIdentifier(mixed $identifier): string
-    {
-        return preg_replace('/\D+/', '', (string) $identifier);
-    }
 
     private function inspectJson(string $content, string $filename, array &$details): void
     {
@@ -271,12 +251,11 @@ class PurchaseInvoiceMailboxImporter
         }
     }
 
-    private function importJson(string $content, string $filename, string $uid, string $configuredTaxIdentifier, array &$summary): string
+    private function importJson(string $content, string $filename, string $uid, array &$summary): string
     {
         $data = json_decode($this->cleanJsonContent($content), true, 512, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE);
         $identification = $data['identificacion'] ?? [];
         $issuer = $data['emisor'] ?? [];
-        $receiver = $data['receptor'] ?? [];
         $summary_data = $data['resumen'] ?? [];
 
         $numeroControl = $identification['numeroControl'] ?? null;
@@ -286,25 +265,6 @@ class PurchaseInvoiceMailboxImporter
 
         if (blank($invoiceNumber) || blank($supplierName)) {
             throw new RuntimeException("El adjunto {$filename} no contiene identificacion.numeroControl o emisor.nombre.");
-        }
-
-        $receiverIdentifier = $this->normalizeTaxIdentifier(
-            $receiver['numDocumento'] ?? $receiver['nit'] ?? $receiver['dui'] ?? null
-        );
-
-        if (blank($receiverIdentifier) || ! hash_equals($configuredTaxIdentifier, $receiverIdentifier)) {
-            $summary['details'][] = [
-                'filename' => $filename,
-                'supplier' => $supplierName,
-                'numeroControl' => $numeroControl,
-                'codigoGeneracion' => $codigoGeneracion,
-                'status' => 'FILTRADA',
-                'razon' => blank($receiverIdentifier)
-                    ? 'El DTE no incluye identificador del receptor.'
-                    : 'El NIT/DUI del receptor no coincide con el contribuyente configurado.',
-            ];
-
-            return 'filtered';
         }
 
         if ($this->hasDuplicateInvoice(null, $invoiceNumber, $codigoGeneracion)) {
