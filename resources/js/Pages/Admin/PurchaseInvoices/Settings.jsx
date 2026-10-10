@@ -24,7 +24,8 @@ function MailboxForm({ host, port, username, password, mailbox, onlyUnseen, limi
             <h2 style={{ marginTop: 0, marginBottom: 20, fontSize: 15, fontWeight: 600 }}>
                 Configuración de correo / IMAP
             </h2>
-            <fieldset disabled={disabled} style={{ border: 'none', padding: 0, margin: 0 }}>
+            <div style={{ position: 'relative' }}>
+            <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <label style={{ margin: 0 }}>
                     Host IMAP
@@ -104,6 +105,10 @@ function MailboxForm({ host, port, username, password, mailbox, onlyUnseen, limi
                 </label>
             </div>
             </fieldset>
+            {disabled && (
+                <div style={{ position: 'absolute', inset: 0, background: 'rgba(248,250,252,0.55)', zIndex: 1, pointerEvents: 'all', cursor: 'not-allowed', borderRadius: 4 }} />
+            )}
+            </div>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 20 }}>
                 <button type="submit" className="btn" disabled={disabled || processing}>
                     {processing ? 'Guardando...' : 'Guardar configuración de correo'}
@@ -151,7 +156,8 @@ function AccountingForm({ purchasePackage, payablePackage, accountingAccounts, c
             <p style={{ margin: '0 0 16px', fontSize: 13, color: '#6b7280' }}>
                 Partida de compras (CP) y partida de cuentas por pagar (CXP).
             </p>
-            <fieldset disabled={disabled} style={{ border: 'none', padding: 0, margin: 0 }}>
+            <div style={{ position: 'relative' }}>
+            <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <div style={{ gridColumn: '1 / -1', fontWeight: 600, fontSize: 13, borderBottom: '1px solid #e5e7eb', paddingBottom: 6 }}>
                     Compras (CP)
@@ -214,6 +220,10 @@ function AccountingForm({ purchasePackage, payablePackage, accountingAccounts, c
                 )}
             </div>
             </fieldset>
+            {disabled && (
+                <div style={{ position: 'absolute', inset: 0, background: 'rgba(248,250,252,0.55)', zIndex: 1, pointerEvents: 'all', cursor: 'not-allowed', borderRadius: 4 }} />
+            )}
+            </div>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 20 }}>
                 <button type="submit" className="btn" disabled={disabled || processing}>
                     {processing ? 'Guardando...' : 'Guardar cuentas contables'}

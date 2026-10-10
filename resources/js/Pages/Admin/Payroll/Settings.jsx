@@ -89,7 +89,8 @@ export default function PayrollSettings({ settings, accounts }) {
                         Tasas y parámetros
                     </h2>
 
-                    <fieldset disabled={!hasPayroll || !unlocked} style={{ border: 'none', padding: 0, margin: 0 }}>
+                    <div style={{ position: 'relative' }}>
+                    <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                             <label style={{ margin: 0 }}>
                                 Tasa IGSS empleado (%)
@@ -187,6 +188,10 @@ export default function PayrollSettings({ settings, accounts }) {
                             </label>
                         </div>
                     </fieldset>
+                    {(!hasPayroll || !unlocked) && (
+                        <div style={{ position: 'absolute', inset: 0, background: 'rgba(248,250,252,0.55)', zIndex: 1, pointerEvents: 'all', cursor: 'not-allowed', borderRadius: 4 }} />
+                    )}
+                    </div>
 
                     <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 24 }}>
                         <button type="submit" className="btn" disabled={!hasPayroll || !unlocked || processing}>

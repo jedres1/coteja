@@ -384,7 +384,8 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
 
             <form onSubmit={handleSubmit} noValidate>
                 <div className="card" style={{ marginBottom: 16 }}>
-                    <fieldset disabled={disabled} style={{ border: 'none', padding: 0, margin: 0 }}>
+                    <div style={{ position: 'relative' }}>
+                    <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
 
                         {/* ── Empresa ── */}
                         <SectionTitle>Información de la Empresa</SectionTitle>
@@ -514,12 +515,11 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
                                     </p>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                         {items.map((t) => (
-                                            <div key={t.code} style={{ display: 'grid', gridTemplateColumns: '16px 28px 1fr', alignItems: 'center', columnGap: 6, fontSize: 13, cursor: disabled ? 'not-allowed' : 'pointer' }}>
+                                            <div key={t.code} style={{ display: 'grid', gridTemplateColumns: '16px 28px 1fr', alignItems: 'center', columnGap: 6, fontSize: 13, cursor: 'pointer' }}>
                                                 <input
                                                     type="checkbox"
                                                     checked={form.data.documentos.includes(t.code)}
                                                     onChange={() => toggleDoc(t.code)}
-                                                    disabled={disabled}
                                                     style={{ margin: 0, cursor: 'inherit' }}
                                                 />
                                                 <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#374151' }}>{t.code}</span>
@@ -674,6 +674,10 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
                         </p>
 
                     </fieldset>
+                    {disabled && (
+                        <div style={{ position: 'absolute', inset: 0, background: 'rgba(248,250,252,0.55)', zIndex: 1, pointerEvents: 'all', cursor: 'not-allowed', borderRadius: 4 }} />
+                    )}
+                    </div>
                 </div>
 
                 {/* Test result */}
