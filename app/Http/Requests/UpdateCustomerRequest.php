@@ -22,6 +22,7 @@ class UpdateCustomerRequest extends FormRequest
             'activity_description' => ['nullable', 'string', 'max:255'],
             'address_department'   => ['required', 'string', 'size:2'],
             'address_municipality' => ['required', 'string', 'between:2,4'],
+            'address_district'     => ['nullable', 'string', 'max:50'],
             'address'              => ['required', 'string', 'max:500'],
             'preferred_dte_type'   => ['required', 'in:01,03,05,06,07,11,14'],
             'billing_email'        => ['nullable', 'email', 'max:255'],

@@ -20,6 +20,7 @@ class SaveSupplierRequest extends FormRequest
             'activity_description' => ['nullable', 'string', 'max:255'],
             'address_department'   => ['required', 'string', 'size:2'],
             'address_municipality' => ['required', 'string', 'between:2,4'],
+            'address_district'     => ['nullable', 'string', 'max:50'],
             'address'              => ['required', 'string', 'max:500'],
             'billing_email'        => ['nullable', 'email', 'max:255'],
             'billing_phone'        => ['nullable', 'string', 'max:50'],
