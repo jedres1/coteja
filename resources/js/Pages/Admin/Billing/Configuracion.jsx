@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { Head, useForm, usePage } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
-import TenantSelector from '@/Components/Billing/TenantSelector';
 
 const DTE_TYPES = [
     { code: '01', label: 'Factura' },
@@ -105,7 +104,7 @@ function buildInitialForm(settings, correlativos) {
 }
 
 export default function Configuracion({ settings, correlativos, currentYear, availableCustomers = [] }) {
-    const { auth, billingTenant } = usePage().props;
+    const { auth } = usePage().props;
     const [unlocked, setUnlocked]     = useState(false);
     const [activities, setActivities] = useState([]);
     const [geo, setGeo]               = useState({ departamentos: [] });
@@ -267,15 +266,6 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
     return (
         <AppLayout>
             <Head title="Configuración facturación" />
-
-            {auth?.user?.is_admin && (
-                <TenantSelector
-                    billingTenant={billingTenant}
-                    availableCustomers={availableCustomers}
-                    setRoute="billing.empresa.set"
-                    clearRoute="billing.empresa.clear"
-                />
-            )}
 
             <div className="top">
                 <h1>Configuración facturación</h1>
