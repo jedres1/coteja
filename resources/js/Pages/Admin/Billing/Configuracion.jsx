@@ -457,23 +457,25 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
 
                         {/* ── Documentos ── */}
                         <SectionTitle>Documentos a Generar</SectionTitle>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0 24px', marginBottom: 8 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 8 }}>
                             {DTE_GROUPS.map(({ group, items }) => (
-                                <div key={group}>
-                                    <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                <div key={group} style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6, padding: '10px 14px' }}>
+                                    <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                         {group}
                                     </p>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                         {items.map((t) => (
-                                            <label key={t.code} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: disabled ? 'not-allowed' : 'pointer' }}>
+                                            <div key={t.code} style={{ display: 'grid', gridTemplateColumns: '16px 28px 1fr', alignItems: 'center', columnGap: 6, fontSize: 13, cursor: disabled ? 'not-allowed' : 'pointer' }}>
                                                 <input
                                                     type="checkbox"
                                                     checked={form.data.documentos.includes(t.code)}
                                                     onChange={() => toggleDoc(t.code)}
+                                                    disabled={disabled}
+                                                    style={{ margin: 0, cursor: 'inherit' }}
                                                 />
-                                                <span style={{ fontFamily: 'monospace', fontWeight: 700, minWidth: 24 }}>{t.code}</span>
-                                                <span>{t.label}</span>
-                                            </label>
+                                                <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#374151' }}>{t.code}</span>
+                                                <span style={{ color: '#374151' }}>{t.label}</span>
+                                            </div>
                                         ))}
                                     </div>
                                 </div>
