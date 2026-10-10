@@ -231,8 +231,11 @@ export default function Settings({
     accountingAccounts, costCenters, purchasePackage, payablePackage,
     missingPurchaseEntries, missingPayableEntries,
 }) {
-    const { auth } = usePage().props;
-    const hasAccounting = auth?.user?.modules?.accounting ?? false;
+    const { auth, billingTenant } = usePage().props;
+    const tenantModules = billingTenant?.modules ?? null;
+    const hasAccounting = tenantModules
+        ? tenantModules.includes('accounting')
+        : (auth?.user?.modules?.accounting ?? false);
 
     const [unlocked, setUnlocked]       = useState(false);
     const [showWarning, setShowWarning] = useState(false);

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Head, useForm, router } from '@inertiajs/react';
+import { Head, useForm, router, usePage } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Modal from '@/Components/Modal';
@@ -195,6 +195,12 @@ function AccountLabel({ account }) {
 }
 
 export default function Configuracion({ packages, accounts, costCenters }) {
+    const { auth, billingTenant } = usePage().props;
+    const tenantModules = billingTenant?.modules ?? null;
+    const hasAccounting = tenantModules
+        ? tenantModules.includes('accounting')
+        : (auth?.user?.modules?.accounting ?? false);
+
     const [unlocked, setUnlocked]           = useState(false);
     const [showWarning, setShowWarning]     = useState(false);
     const [showCreatePkg, setShowCreatePkg] = useState(false);
@@ -222,25 +228,32 @@ export default function Configuracion({ packages, accounts, costCenters }) {
             <div className="card" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
                 <div>
                     <p style={{ margin: 0, fontWeight: 600 }}>
-                        {unlocked ? 'Configuración desbloqueada' : 'Configuración bloqueada'}
+                        {!hasAccounting ? 'Sin acceso al módulo de Contabilidad' : unlocked ? 'Configuración desbloqueada' : 'Configuración bloqueada'}
                     </p>
                     <p style={{ margin: '2px 0 0', fontSize: 12, color: '#6b7280' }}>
-                        {unlocked
-                            ? 'Edita solo si es necesario modificar estos parámetros.'
-                            : 'Los parámetros permanecen protegidos para evitar cambios accidentales.'}
+                        {!hasAccounting
+                            ? 'Esta configuración requiere el módulo de Contabilidad habilitado.'
+                            : unlocked
+                                ? 'Edita solo si es necesario modificar estos parámetros.'
+                                : 'Los parámetros permanecen protegidos para evitar cambios accidentales.'}
                     </p>
                 </div>
-                <button
-                    type="button"
-                    className={`btn${unlocked ? '' : ' secondary'}`}
-                    style={{ whiteSpace: 'nowrap' }}
-                    onClick={() => unlocked ? setUnlocked(false) : setShowWarning(true)}
-                >
-                    {unlocked ? '🔓 Bloquear' : '🔒 Desbloquear'}
-                </button>
+                {hasAccounting && (
+                    <button
+                        type="button"
+                        className={`btn${unlocked ? '' : ' secondary'}`}
+                        style={{ whiteSpace: 'nowrap' }}
+                        onClick={() => unlocked ? setUnlocked(false) : setShowWarning(true)}
+                    >
+                        {unlocked ? '🔓 Bloquear' : '🔒 Desbloquear'}
+                    </button>
+                )}
+                {!hasAccounting && (
+                    <span style={{ fontSize: 13, color: '#9ca3af', whiteSpace: 'nowrap' }}>🔒 Bloqueado</span>
+                )}
             </div>
 
-            {showWarning && (
+            {showWarning && hasAccounting && (
                 <div style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <div style={{ background: '#fff', borderRadius: 10, padding: '28px 32px', maxWidth: 460, width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}>
                         <p style={{ margin: '0 0 8px', fontWeight: 700, fontSize: 16, color: '#dc2626' }}>Advertencia — edición de parámetros</p>
@@ -263,7 +276,7 @@ export default function Configuracion({ packages, accounts, costCenters }) {
             <div style={{ marginBottom: 32 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                     <h2 style={{ margin: 0, fontSize: 17 }}>Paquetes contables</h2>
-                    <button className="btn" type="button" disabled={!unlocked} onClick={() => setShowCreatePkg(true)}>
+                    <button className="btn" type="button" disabled={!hasAccounting || !unlocked} onClick={() => setShowCreatePkg(true)}>
                         + Nuevo paquete
                     </button>
                 </div>
@@ -313,7 +326,7 @@ export default function Configuracion({ packages, accounts, costCenters }) {
                                                 type="button"
                                                 className="btn secondary"
                                                 style={{ fontSize: 12, padding: '3px 10px' }}
-                                                disabled={!unlocked}
+                                                disabled={!hasAccounting || !unlocked}
                                                 onClick={() => setEditPkg(pkg)}
                                             >
                                                 Editar
@@ -321,7 +334,7 @@ export default function Configuracion({ packages, accounts, costCenters }) {
                                             <button
                                                 type="button"
                                                 style={{ fontSize: 12, padding: '3px 10px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 6, cursor: !unlocked ? 'not-allowed' : 'pointer', opacity: !unlocked ? 0.5 : 1 }}
-                                                disabled={!unlocked}
+                                                disabled={!hasAccounting || !unlocked}
                                                 onClick={() => handleDeletePkg(pkg)}
                                             >
                                                 Eliminar
@@ -339,7 +352,7 @@ export default function Configuracion({ packages, accounts, costCenters }) {
             <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                     <h2 style={{ margin: 0, fontSize: 17 }}>Centros de costo</h2>
-                    <button className="btn" type="button" disabled={!unlocked} onClick={() => setShowCreateCC(true)}>
+                    <button className="btn" type="button" disabled={!hasAccounting || !unlocked} onClick={() => setShowCreateCC(true)}>
                         + Nuevo centro
                     </button>
                 </div>
@@ -373,7 +386,7 @@ export default function Configuracion({ packages, accounts, costCenters }) {
                                                 type="button"
                                                 className="btn secondary"
                                                 style={{ fontSize: 12, padding: '3px 10px' }}
-                                                disabled={!unlocked}
+                                                disabled={!hasAccounting || !unlocked}
                                                 onClick={() => setEditCC(cc)}
                                             >
                                                 Editar
@@ -381,7 +394,7 @@ export default function Configuracion({ packages, accounts, costCenters }) {
                                             <button
                                                 type="button"
                                                 style={{ fontSize: 12, padding: '3px 10px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 6, cursor: !unlocked ? 'not-allowed' : 'pointer', opacity: !unlocked ? 0.5 : 1 }}
-                                                disabled={!unlocked}
+                                                disabled={!hasAccounting || !unlocked}
                                                 onClick={() => handleDeleteCC(cc)}
                                             >
                                                 Eliminar

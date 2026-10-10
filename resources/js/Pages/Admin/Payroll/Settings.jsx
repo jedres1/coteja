@@ -1,9 +1,15 @@
 import { useState } from 'react';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm, usePage } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 
 export default function PayrollSettings({ settings, accounts }) {
+    const { auth, billingTenant } = usePage().props;
+    const tenantModules = billingTenant?.modules ?? null;
+    const hasPayroll = tenantModules
+        ? tenantModules.includes('payroll')
+        : (auth?.user?.modules?.payroll ?? false);
+
     const [unlocked, setUnlocked]       = useState(false);
     const [showWarning, setShowWarning] = useState(false);
 
@@ -32,25 +38,33 @@ export default function PayrollSettings({ settings, accounts }) {
             <div className="card" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
                 <div>
                     <p style={{ margin: 0, fontWeight: 600 }}>
-                        {unlocked ? 'Configuración desbloqueada' : 'Configuración bloqueada'}
+                        {!hasPayroll
+                            ? 'Sin acceso al módulo de Nómina'
+                            : unlocked ? 'Configuración desbloqueada' : 'Configuración bloqueada'}
                     </p>
                     <p style={{ margin: '2px 0 0', fontSize: 12, color: '#6b7280' }}>
-                        {unlocked
-                            ? 'Edita solo si es necesario modificar estos parámetros.'
-                            : 'Los parámetros permanecen protegidos para evitar cambios accidentales.'}
+                        {!hasPayroll
+                            ? 'Estos parámetros requieren acceso al módulo de Nómina.'
+                            : unlocked
+                                ? 'Edita solo si es necesario modificar estos parámetros.'
+                                : 'Los parámetros permanecen protegidos para evitar cambios accidentales.'}
                     </p>
                 </div>
-                <button
-                    type="button"
-                    className={`btn${unlocked ? '' : ' secondary'}`}
-                    style={{ whiteSpace: 'nowrap' }}
-                    onClick={() => unlocked ? setUnlocked(false) : setShowWarning(true)}
-                >
-                    {unlocked ? '🔓 Bloquear' : '🔒 Desbloquear'}
-                </button>
+                {hasPayroll ? (
+                    <button
+                        type="button"
+                        className={`btn${unlocked ? '' : ' secondary'}`}
+                        style={{ whiteSpace: 'nowrap' }}
+                        onClick={() => unlocked ? setUnlocked(false) : setShowWarning(true)}
+                    >
+                        {unlocked ? '🔓 Bloquear' : '🔒 Desbloquear'}
+                    </button>
+                ) : (
+                    <span style={{ whiteSpace: 'nowrap', fontSize: 13, color: '#9ca3af' }}>🔒 Bloqueado</span>
+                )}
             </div>
 
-            {showWarning && (
+            {hasPayroll && showWarning && (
                 <div style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <div style={{ background: '#fff', borderRadius: 10, padding: '28px 32px', maxWidth: 460, width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}>
                         <p style={{ margin: '0 0 8px', fontWeight: 700, fontSize: 16, color: '#dc2626' }}>Advertencia — edición de parámetros</p>
@@ -75,7 +89,7 @@ export default function PayrollSettings({ settings, accounts }) {
                         Tasas y parámetros
                     </h2>
 
-                    <fieldset disabled={!unlocked} style={{ border: 'none', padding: 0, margin: 0 }}>
+                    <fieldset disabled={!hasPayroll || !unlocked} style={{ border: 'none', padding: 0, margin: 0 }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                             <label style={{ margin: 0 }}>
                                 Tasa IGSS empleado (%)
@@ -175,7 +189,7 @@ export default function PayrollSettings({ settings, accounts }) {
                     </fieldset>
 
                     <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 24 }}>
-                        <button type="submit" className="btn" disabled={!unlocked || processing}>
+                        <button type="submit" className="btn" disabled={!hasPayroll || !unlocked || processing}>
                             {processing ? 'Guardando...' : 'Guardar configuración'}
                         </button>
                         {recentlySuccessful && (
