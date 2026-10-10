@@ -289,19 +289,23 @@ class PurchaseInvoiceController extends Controller
     {
         $this->authorize('approve', $purchaseInvoice);
 
-        try {
-            $periods->validateDateOrFail($purchaseInvoice->purchase_date ?? now());
-        } catch (AccountingPeriodException $e) {
-            return back()->withErrors($e->getMessage());
-        }
+        if ($this->isAccountingConfigured()) {
+            try {
+                $periods->validateDateOrFail($purchaseInvoice->purchase_date ?? now());
+            } catch (AccountingPeriodException $e) {
+                return back()->withErrors($e->getMessage());
+            }
 
-        try {
-            DB::transaction(function () use ($accounting, $purchaseInvoice, $request) {
-                $accounting->createFromPurchase($purchaseInvoice->load('supplier'), $request->user()?->id);
-                $purchaseInvoice->update(['status' => 'approved']);
-            });
-        } catch (RuntimeException $exception) {
-            return back()->withErrors($exception->getMessage());
+            try {
+                DB::transaction(function () use ($accounting, $purchaseInvoice, $request) {
+                    $accounting->createFromPurchase($purchaseInvoice->load('supplier'), $request->user()?->id);
+                    $purchaseInvoice->update(['status' => 'approved']);
+                });
+            } catch (RuntimeException $exception) {
+                return back()->withErrors($exception->getMessage());
+            }
+        } else {
+            $purchaseInvoice->update(['status' => 'approved']);
         }
 
         return back()->with('status', 'Factura aprobada y enviada a Cuentas por pagar.');
@@ -328,22 +332,29 @@ class PurchaseInvoiceController extends Controller
         $blocked = 0;
         $updated = 0;
 
-        foreach ($invoices as $invoice) {
-            try {
-                $periods->validateDateOrFail($invoice->purchase_date ?? now());
-            } catch (AccountingPeriodException $e) {
-                $blocked++;
-                continue;
-            }
+        $accountingOn = $this->isAccountingConfigured();
 
-            try {
-                DB::transaction(function () use ($accounting, $invoice, $request) {
-                    $accounting->createFromPurchase($invoice, $request->user()?->id);
-                    $invoice->update(['status' => 'approved']);
-                });
+        foreach ($invoices as $invoice) {
+            if ($accountingOn) {
+                try {
+                    $periods->validateDateOrFail($invoice->purchase_date ?? now());
+                } catch (AccountingPeriodException $e) {
+                    $blocked++;
+                    continue;
+                }
+
+                try {
+                    DB::transaction(function () use ($accounting, $invoice, $request) {
+                        $accounting->createFromPurchase($invoice, $request->user()?->id);
+                        $invoice->update(['status' => 'approved']);
+                    });
+                    $updated++;
+                } catch (\Throwable) {
+                    $blocked++;
+                }
+            } else {
+                $invoice->update(['status' => 'approved']);
                 $updated++;
-            } catch (\Throwable) {
-                $blocked++;
             }
         }
 
@@ -522,6 +533,12 @@ class PurchaseInvoiceController extends Controller
             ['No. Factura', 'Proveedor', 'Cliente', 'Fecha', 'Vencimiento', 'Subtotal', 'IVA', 'Total', 'Estado', 'Estado Pago'],
             $rows
         );
+    }
+
+    private function isAccountingConfigured(): bool
+    {
+        $cp = \App\Models\AccountingPackage::where('code', 'CP')->where('is_active', true)->first();
+        return $cp && ! blank($cp->debit_account_id) && ! blank($cp->credit_account_id);
     }
 
     private function activeTenantId(Request $request): ?int
