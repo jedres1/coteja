@@ -4,7 +4,6 @@ import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
 import Modal from '@/Components/Modal';
-import TenantSelector from '@/Components/Billing/TenantSelector';
 
 const DTE_TYPES = [
     { code: '01', label: 'Factura' },
@@ -633,11 +632,13 @@ function ContingenciaForm({ contingenciaInvoices, onClose }) {
     );
 }
 
-export default function Facturas({ stats, invoices, filters, contingenciaInvoices = [], availableCustomers = [] }) {
-    const { auth, billingTenant } = usePage().props;
+export default function Facturas({ stats, invoices, filters, contingenciaInvoices = [] }) {
+    const { auth } = usePage().props;
     const [search, setSearch]         = useState(filters?.search ?? '');
-    const [from, setFrom]             = useState(filters?.from ?? '');
-    const [to, setTo]                 = useState(filters?.to ?? '');
+    const today         = new Date().toISOString().split('T')[0];
+    const firstOfMonth  = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    const [from, setFrom]             = useState(filters?.from ?? firstOfMonth);
+    const [to, setTo]                 = useState(filters?.to ?? today);
     const [status, setStatus]         = useState(filters?.status ?? '');
     const [type, setType]             = useState(filters?.type ?? '');
     const [detailInv, setDetailInv]   = useState(null);
@@ -687,15 +688,6 @@ export default function Facturas({ stats, invoices, filters, contingenciaInvoice
     return (
         <AppLayout>
             <Head title="Facturas electrónicas" />
-
-            {auth?.user?.is_admin && (
-                <TenantSelector
-                    billingTenant={billingTenant}
-                    availableCustomers={availableCustomers}
-                    setRoute="billing.empresa.set"
-                    clearRoute="billing.empresa.clear"
-                />
-            )}
 
             <div className="top">
                 <h1>Facturas electrónicas</h1>

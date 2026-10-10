@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm, router } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
@@ -82,8 +82,24 @@ function PayForm({ invoice, onSuccess, onCancel }) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function AccountsPayable({ invoices }) {
+export default function AccountsPayable({ invoices, search: searchProp = '', from: fromProp = '', to: toProp = '' }) {
+    const today        = new Date().toISOString().split('T')[0];
+    const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+
     const [payItem, setPayItem] = useState(null);
+    const [search, setSearch]   = useState(searchProp);
+    const [from, setFrom]       = useState(fromProp || firstOfMonth);
+    const [to, setTo]           = useState(toProp   || today);
+
+    function applyFilters(e) {
+        e.preventDefault();
+        router.get(route('admin.purchase-invoices.accounts-payable'), { search, from, to }, { preserveState: true });
+    }
+
+    function clearFilters() {
+        setSearch(''); setFrom(firstOfMonth); setTo(today);
+        router.get(route('admin.purchase-invoices.accounts-payable'), { from: firstOfMonth, to: today });
+    }
 
     const fmt = (n) =>
         n != null
@@ -107,6 +123,25 @@ export default function AccountsPayable({ invoices }) {
 
             <div className="top">
                 <h1>Cuentas por pagar</h1>
+            </div>
+
+            <div className="card" style={{ marginBottom: 16 }}>
+                <form onSubmit={applyFilters} style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                    <label style={{ flex: '1 1 200px', margin: 0 }}>
+                        Buscar
+                        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Proveedor, número…" />
+                    </label>
+                    <label style={{ flex: '0 1 160px', margin: 0 }}>
+                        Desde
+                        <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+                    </label>
+                    <label style={{ flex: '0 1 160px', margin: 0 }}>
+                        Hasta
+                        <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+                    </label>
+                    <button type="submit" className="btn">Filtrar</button>
+                    <button type="button" className="btn secondary" onClick={clearFilters}>Limpiar</button>
+                </form>
             </div>
 
             <div className="card table-scroll">

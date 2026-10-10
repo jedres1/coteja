@@ -42,9 +42,11 @@ function DocumentDataView({ data }) {
 // ─── ExtractForm ──────────────────────────────────────────────────────────────
 
 function ExtractForm() {
+    const today        = new Date().toISOString().split('T')[0];
+    const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
     const { data, setData, post, processing, errors } = useForm({
-        from_date: '',
-        to_date:   '',
+        from_date: firstOfMonth,
+        to_date:   today,
     });
 
     function handleSubmit(e) {

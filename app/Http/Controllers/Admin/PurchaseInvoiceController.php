@@ -167,11 +167,15 @@ class PurchaseInvoiceController extends Controller
     public function accountsPayable(Request $request)
     {
         $search = trim((string) $request->query('search', ''));
+        $from   = trim((string) $request->query('from', ''));
+        $to     = trim((string) $request->query('to', ''));
         $customerIds = $this->accessibleCustomerIds($request);
 
         $baseQuery = fn () => PurchaseInvoice::whereIn('payment_status', ['pending', 'partial'])
             ->whereNotIn('status', ['extracted', 'rejected'])
             ->when($customerIds !== null, fn ($q) => $q->whereIn('customer_id', $customerIds))
+            ->when($from !== '', fn ($q) => $q->whereDate('date', '>=', $from))
+            ->when($to   !== '', fn ($q) => $q->whereDate('date', '<=', $to))
             ->when($search !== '', function ($q) use ($search) {
                 $q->where(function ($q) use ($search) {
                     $q->where('total', 'like', "%{$search}%")
@@ -197,7 +201,7 @@ class PurchaseInvoiceController extends Controller
 
         $bankAccounts = BankAccount::where('is_active', true)->orderBy('bank_name')->orderBy('name')->get();
 
-        return Inertia::render('Admin/PurchaseInvoices/AccountsPayable', compact('invoices', 'totals', 'search', 'bankAccounts'));
+        return Inertia::render('Admin/PurchaseInvoices/AccountsPayable', compact('invoices', 'totals', 'search', 'from', 'to', 'bankAccounts'));
     }
 
     public function markPaid(Request $request, PurchaseInvoice $purchaseInvoice, AccountingEntryService $accounting)

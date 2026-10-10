@@ -1,11 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Head, useForm, router, Link } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
 import Modal from '@/Components/Modal';
-import { useDepartmentMunicipality } from '@/hooks/useDepartmentMunicipality';
-
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const DOCUMENT_TYPES = {
@@ -27,31 +25,32 @@ const STATUSES = {
 function SupplierForm({ supplier, geography, onSuccess, onCancel }) {
     const isEdit = !!supplier;
 
-    const { departmentId, setDepartmentId, municipalities } = useDepartmentMunicipality(
-        geography,
-        supplier?.municipality_id
-    );
-
     const { data, setData, post, put, processing, errors } = useForm({
-        name:              supplier?.name ?? '',
-        email:             supplier?.email ?? '',
-        phone:             supplier?.phone ?? '',
-        status:            supplier?.status ?? 'active',
-        document_type:     supplier?.document_type ?? '',
-        document_number:   supplier?.document_number ?? '',
-        nrc:               supplier?.nrc ?? '',
-        business_activity: supplier?.business_activity ?? '',
-        municipality_id:   supplier?.municipality_id ? String(supplier.municipality_id) : '',
+        name:                 supplier?.name ?? '',
+        email:                supplier?.email ?? '',
+        phone:                supplier?.phone ?? '',
+        status:               supplier?.status ?? 'active',
+        document_type:        supplier?.document_type ?? '',
+        document_number:      supplier?.document_number ?? '',
+        nrc:                  supplier?.nrc ?? '',
+        business_activity:    supplier?.business_activity ?? '',
+        address_department:   supplier?.address_department ?? '',
+        address_municipality: supplier?.address_municipality ?? '',
     });
 
+    const [activities, setActivities] = useState([]);
+    useEffect(() => {
+        fetch('/catalogs/actividades-economicas.json')
+            .then((r) => r.json())
+            .then((d) => setActivities(Array.isArray(d) ? d : []))
+            .catch(() => {});
+    }, []);
+
+    const depts = geography?.departamentos ?? [];
+    const munis = data.address_department ? (geography?.municipios?.[data.address_department] ?? []) : [];
+
     function handleDeptChange(e) {
-        const newDeptId = e.target.value;
-        const dept = (geography?.departments ?? []).find((d) => String(d.id) === newDeptId);
-        const validIds = (dept?.municipalities ?? []).map((m) => String(m.id));
-        if (data.municipality_id && !validIds.includes(data.municipality_id)) {
-            setData('municipality_id', '');
-        }
-        setDepartmentId(newDeptId);
+        setData({ ...data, address_department: e.target.value, address_municipality: '' });
     }
 
     function handleSubmit(e) {
@@ -153,35 +152,43 @@ function SupplierForm({ supplier, geography, onSuccess, onCancel }) {
                         type="text"
                         value={data.business_activity}
                         onChange={(e) => setData('business_activity', e.target.value)}
+                        list="supplier-activities-list"
+                        placeholder="Buscar por código o descripción…"
                     />
+                    <datalist id="supplier-activities-list">
+                        {activities.map((a) => (
+                            <option key={a.codigo} value={`${a.codigo} - ${a.descripcion}`} />
+                        ))}
+                    </datalist>
                     {errors.business_activity && <p className="field-error">{errors.business_activity}</p>}
                 </label>
 
-                {/* Department (filter only – not saved) */}
+                {/* Department */}
                 <label>
                     Departamento
-                    <select value={departmentId} onChange={handleDeptChange}>
+                    <select value={data.address_department} onChange={handleDeptChange}>
                         <option value="">— Seleccionar departamento —</option>
-                        {(geography?.departments ?? []).map((d) => (
-                            <option key={d.id} value={String(d.id)}>{d.name}</option>
+                        {depts.map((d) => (
+                            <option key={d.codigo} value={d.codigo}>{d.codigo} - {d.nombre}</option>
                         ))}
                     </select>
+                    {errors.address_department && <p className="field-error">{errors.address_department}</p>}
                 </label>
 
                 {/* Municipality */}
                 <label>
                     Municipio
                     <select
-                        value={data.municipality_id}
-                        onChange={(e) => setData('municipality_id', e.target.value)}
-                        disabled={!departmentId}
+                        value={data.address_municipality}
+                        onChange={(e) => setData('address_municipality', e.target.value)}
+                        disabled={!data.address_department}
                     >
                         <option value="">— Seleccionar municipio —</option>
-                        {municipalities.map((m) => (
-                            <option key={m.id} value={String(m.id)}>{m.name}</option>
+                        {munis.map((m) => (
+                            <option key={m.codigo} value={m.codigo}>{m.codigo} - {m.nombre}</option>
                         ))}
                     </select>
-                    {errors.municipality_id && <p className="field-error">{errors.municipality_id}</p>}
+                    {errors.address_municipality && <p className="field-error">{errors.address_municipality}</p>}
                 </label>
             </div>
 

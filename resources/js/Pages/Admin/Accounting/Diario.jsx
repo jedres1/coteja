@@ -16,8 +16,10 @@ const STATUS_STYLE  = {
 export default function Diario({ entries, stats, search, status, from, to }) {
     const [searchVal, setSearchVal] = useState(search ?? '');
     const [statusVal, setStatusVal] = useState(status ?? '');
-    const [fromVal, setFromVal]     = useState(from ?? '');
-    const [toVal, setToVal]         = useState(to ?? '');
+    const today         = new Date().toISOString().split('T')[0];
+    const firstOfMonth  = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    const [fromVal, setFromVal]     = useState(from ?? firstOfMonth);
+    const [toVal, setToVal]         = useState(to ?? today);
 
     function applyFilters(e) {
         e.preventDefault();

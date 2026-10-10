@@ -114,8 +114,10 @@ function TransactionForm({ bankAccounts, onCancel }) {
 
 export default function Transactions({ transactions, bankAccounts, from, to, bankAccountId }) {
     const [showCreate, setShowCreate] = useState(false);
-    const [fromVal, setFromVal]       = useState(from ?? '');
-    const [toVal, setToVal]           = useState(to ?? '');
+    const today         = new Date().toISOString().split('T')[0];
+    const firstOfMonth  = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    const [fromVal, setFromVal]       = useState(from ?? firstOfMonth);
+    const [toVal, setToVal]           = useState(to ?? today);
     const [accountVal, setAccountVal] = useState(bankAccountId ? String(bankAccountId) : '');
     const [typeVal, setTypeVal]       = useState('');
 

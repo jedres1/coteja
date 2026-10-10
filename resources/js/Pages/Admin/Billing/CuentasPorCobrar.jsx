@@ -4,7 +4,6 @@ import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
 import Modal from '@/Components/Modal';
-import TenantSelector from '@/Components/Billing/TenantSelector';
 
 const PAYMENT_STATUS_LABEL = { pendiente: 'Pendiente', parcial: 'Parcial', pagado: 'Pagado' };
 const PAYMENT_STATUS_STYLE = {
@@ -103,11 +102,13 @@ function PaymentForm({ invoice, onClose }) {
     );
 }
 
-export default function CuentasPorCobrar({ stats, invoices, filters, availableCustomers = [] }) {
-    const { auth, billingTenant } = usePage().props;
+export default function CuentasPorCobrar({ stats, invoices, filters }) {
+    const { auth } = usePage().props;
     const [search, setSearch]         = useState(filters?.search ?? '');
-    const [from, setFrom]             = useState(filters?.from ?? '');
-    const [to, setTo]                 = useState(filters?.to ?? '');
+    const today         = new Date().toISOString().split('T')[0];
+    const firstOfMonth  = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    const [from, setFrom]             = useState(filters?.from ?? firstOfMonth);
+    const [to, setTo]                 = useState(filters?.to ?? today);
     const [paymentStatus, setPaymentStatus] = useState(filters?.payment_status ?? '');
     const [payModal, setPayModal]     = useState(null);
 
@@ -130,15 +131,6 @@ export default function CuentasPorCobrar({ stats, invoices, filters, availableCu
     return (
         <AppLayout>
             <Head title="Cuentas por cobrar" />
-
-            {auth?.user?.is_admin && (
-                <TenantSelector
-                    billingTenant={billingTenant}
-                    availableCustomers={availableCustomers}
-                    setRoute="billing.empresa.set"
-                    clearRoute="billing.empresa.clear"
-                />
-            )}
 
             <div className="top">
                 <h1>Cuentas por cobrar</h1>

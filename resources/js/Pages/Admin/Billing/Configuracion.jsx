@@ -137,6 +137,12 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
     const [activities, setActivities] = useState([]);
     const [geo, setGeo]               = useState({ departamentos: [] });
     const [testMsg, setTestMsg]       = useState(null);
+    const [toast, setToast]           = useState(null);
+
+    function showToast(msg, ok = true) {
+        setToast({ msg, ok });
+        setTimeout(() => setToast(null), 3500);
+    }
     const [testOk, setTestOk]         = useState(null);
     const logoInputRef                = useRef(null);
     const certInputRef                = useRef(null);
@@ -167,21 +173,16 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
         form.setData('documentos', current.includes(code) ? current.filter((c) => c !== code) : [...current, code]);
     }
 
-    // Geo cascade
+    // Geo cascade — JSON: { departamentos: [], municipios: { "01": [...] }, distritos: { "0101": [...] } }
     const depts = geo.departamentos ?? [];
-    const selectedDept = depts.find((d) => d.codigo === form.data.emisor.departamento);
-    const munis = selectedDept?.municipios ?? [];
-    const selectedMuni = munis.find((m) => m.codigo === form.data.emisor.municipio);
-    const districts = selectedMuni?.distritos ?? [];
+    const munis = form.data.emisor.departamento ? (geo.municipios?.[form.data.emisor.departamento] ?? []) : [];
+    const districts = form.data.emisor.municipio ? (geo.distritos?.[form.data.emisor.municipio] ?? []) : [];
 
     function handleDeptChange(e) {
-        setE('departamento', e.target.value);
-        setE('municipio', '');
-        setE('distrito', '');
+        form.setData('emisor', { ...form.data.emisor, departamento: e.target.value, municipio: '', distrito: '' });
     }
     function handleMuniChange(e) {
-        setE('municipio', e.target.value);
-        setE('distrito', '');
+        form.setData('emisor', { ...form.data.emisor, municipio: e.target.value, distrito: '' });
     }
 
     // Activity datalist
@@ -284,7 +285,10 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
             documentos: form.data.documentos,
             correlativos: form.data.correlativos,
         };
-        form.transform(() => payload).post(route('admin.factura-sv.configuracion.guardar'));
+        form.transform(() => payload).post(route('admin.factura-sv.configuracion.guardar'), {
+            onSuccess: () => showToast('Configuración guardada correctamente.'),
+            onError:   () => showToast('Error al guardar. Revisa los campos.', false),
+        });
     }
 
     const disabled = !unlocked;
@@ -647,6 +651,20 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
                     </button>
                 </div>
             </form>
+
+            {toast && (
+                <div style={{
+                    position: 'fixed', bottom: 28, right: 28, zIndex: 9999,
+                    padding: '12px 20px', borderRadius: 8, fontSize: 14, fontWeight: 600,
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+                    background: toast.ok ? '#f0fdf4' : '#fef2f2',
+                    color:      toast.ok ? '#15803d'  : '#dc2626',
+                    border:     `1px solid ${toast.ok ? '#bbf7d0' : '#fca5a5'}`,
+                    transition: 'opacity 0.3s',
+                }}>
+                    {toast.ok ? '✓' : '✕'} {toast.msg}
+                </div>
+            )}
         </AppLayout>
     );
 }
