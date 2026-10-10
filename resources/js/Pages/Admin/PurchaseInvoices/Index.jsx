@@ -45,10 +45,12 @@ const badge = (map, key) => {
     );
 };
 
-function CreateForm({ suppliers, onCancel }) {
+function CreateForm({ suppliers, customers, onCancel }) {
     const today = new Date().toISOString().split('T')[0];
     const { data, setData, post, processing, errors, reset } = useForm({
         supplier_id:    '',
+        customer_id:    '',
+        company_id:     '',
         document_type:  '03',
         invoice_number: '',
         purchase_date:  today,
@@ -61,6 +63,8 @@ function CreateForm({ suppliers, onCancel }) {
         status:         'registered',
         notes:          '',
     });
+
+    const companies = customers.find((c) => String(c.id) === String(data.customer_id))?.companies ?? [];
 
     function handleSubmit(e) {
         e.preventDefault();
@@ -75,6 +79,22 @@ function CreateForm({ suppliers, onCancel }) {
     return (
         <form onSubmit={handleSubmit} noValidate>
             <div style={g}>
+                <label style={{ margin: 0 }}>
+                    Cliente
+                    <select value={data.customer_id} onChange={(e) => { setData('customer_id', e.target.value); setData('company_id', ''); }}>
+                        <option value="">— Sin cliente —</option>
+                        {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                    {err('customer_id')}
+                </label>
+                <label style={{ margin: 0 }}>
+                    Empresa
+                    <select value={data.company_id} onChange={(e) => setData('company_id', e.target.value)} disabled={!data.customer_id}>
+                        <option value="">— Sin empresa —</option>
+                        {companies.map((c) => <option key={c.id} value={c.id}>{c.business_name}</option>)}
+                    </select>
+                    {err('company_id')}
+                </label>
                 <label style={{ margin: 0 }}>
                     Proveedor <span style={{ color: '#ef4444' }}>*</span>
                     <select value={data.supplier_id} onChange={(e) => setData('supplier_id', e.target.value)} required>
@@ -362,7 +382,7 @@ function DteDetailView({ invoice }) {
     );
 }
 
-export default function PurchaseInvoicesIndex({ invoices, search, supplierId, suppliers, from: fromProp = '', to: toProp = '' }) {
+export default function PurchaseInvoicesIndex({ invoices, search, supplierId, suppliers, customers, from: fromProp = '', to: toProp = '' }) {
     const today        = new Date().toISOString().split('T')[0];
     const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
 
@@ -413,7 +433,7 @@ export default function PurchaseInvoicesIndex({ invoices, search, supplierId, su
             {showCreate && (
                 <div className="card" style={{ marginBottom: 16 }}>
                     <h2 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 600 }}>Registrar factura de compra</h2>
-                    <CreateForm suppliers={suppliers ?? []} onCancel={() => setShowCreate(false)} />
+                    <CreateForm suppliers={suppliers ?? []} customers={customers ?? []} onCancel={() => setShowCreate(false)} />
                 </div>
             )}
 

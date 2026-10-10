@@ -81,6 +81,9 @@ class PortalController extends Controller
             'activeCompany' => $activeCompany,
             'search' => $search,
             'invoices' => BillingInvoice::where('customer_id', $customer->id)
+                ->where(fn ($q) => $q
+                    ->where('company_id', $activeCompany->id)
+                    ->orWhereNull('company_id'))
                 ->when($search !== '', function ($query) use ($search) {
                     $query->where(function ($query) use ($search) {
                         $query->where('number_control', 'like', "%{$search}%")
@@ -113,6 +116,9 @@ class PortalController extends Controller
             'search' => $search,
             'invoices' => PurchaseInvoice::with('supplier')
                 ->where('customer_id', $customer->id)
+                ->where(fn ($q) => $q
+                    ->where('company_id', $activeCompany->id)
+                    ->orWhereNull('company_id'))
                 ->when($search !== '', function ($query) use ($search) {
                     $query->where(function ($query) use ($search) {
                         $query->where('invoice_number', 'like', "%{$search}%")

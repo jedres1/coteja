@@ -17,6 +17,7 @@ class PurchaseInvoice extends Model
         'updated_by',
         'supplier_id',
         'customer_id',
+        'company_id',
         'document_type',
         'invoice_number',
         'purchase_date',
@@ -58,6 +59,11 @@ class PurchaseInvoice extends Model
     public function customer()
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
     }
 
     public function bankTransactions()

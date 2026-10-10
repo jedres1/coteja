@@ -411,7 +411,7 @@ class PurchaseInvoiceController extends Controller
                 ->paginate(15)
                 ->withQueryString(),
             'suppliers'   => Supplier::orderBy('name')->get(),
-            'customers'   => Customer::orderBy('name')->get(),
+            'customers'   => Customer::with('companies')->orderBy('name')->get(),
             'search'      => $search,
             'supplierId'  => $supplierId,
             'from'        => $from,
@@ -570,6 +570,7 @@ class PurchaseInvoiceController extends Controller
         return $request->validate([
             'supplier_id' => ['required', 'exists:suppliers,id'],
             'customer_id' => ['nullable', 'exists:customers,id'],
+            'company_id'  => ['nullable', 'exists:companies,id'],
             'document_type' => ['required', 'in:01,03,05,06,11,14,99'],
             'invoice_number' => [
                 'required',

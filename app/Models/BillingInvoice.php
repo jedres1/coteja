@@ -21,6 +21,7 @@ class BillingInvoice extends Model
         'document_type',
         'issued_at',
         'customer_id',
+        'company_id',
         'customer_name',
         'subtotal',
         'iva',
@@ -65,6 +66,11 @@ class BillingInvoice extends Model
     public function customer()
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
     }
 
     public function payments()
