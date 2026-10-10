@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Head, useForm, usePage } from '@inertiajs/react';
+import { Head, useForm, usePage, router } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 
@@ -135,6 +135,7 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
     const { auth } = usePage().props;
     const [unlocked, setUnlocked]       = useState(false);
     const [showWarning, setShowWarning] = useState(false);
+    const [saving, setSaving]           = useState(false);
     const [activities, setActivities]   = useState([]);
     const [geo, setGeo]                 = useState({ departamentos: [] });
     const [testMsg, setTestMsg]         = useState(null);
@@ -266,30 +267,51 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
 
     function handleSubmit(e) {
         e.preventDefault();
+
+        // Validación de campos obligatorios
+        const missing = [];
+        if (!form.data.emisor.nit?.trim())            missing.push('NIT / DUI');
+        if (!form.data.emisor.nombre_empresa?.trim()) missing.push('Nombre de la empresa');
+        if (!form.data.emisor.direccion?.trim())      missing.push('Dirección complementaria');
+        if (missing.length) {
+            showToast(`Campos requeridos vacíos: ${missing.join(', ')}`, false);
+            return;
+        }
+
         const payload = {
             emisor: {
                 ...form.data.emisor,
-                codigo_establecimiento: form.data.emisor.codigo_establecimiento.toUpperCase(),
-                punto_venta: form.data.emisor.punto_venta.toUpperCase(),
+                codigo_establecimiento: (form.data.emisor.codigo_establecimiento || 'M001').toUpperCase(),
+                punto_venta:            (form.data.emisor.punto_venta            || 'P001').toUpperCase(),
             },
             hacienda: { ...form.data.hacienda },
             firma: {
-                tipo: form.data.firma.tipo,
-                firmador_usuario: form.data.firma.firmadorUsuario,
-                firmador_url: form.data.firma.firmadorUrl,
-                certificado_path: form.data.firma.certificado_path,
+                tipo:                 form.data.firma.tipo,
+                firmador_usuario:     form.data.firma.firmadorUsuario,
+                firmador_url:         form.data.firma.firmadorUrl,
+                certificado_path:     form.data.firma.certificado_path,
                 certificado_password: form.data.firma.password,
-                firmador_pin: form.data.firma.password,
+                firmador_pin:         form.data.firma.password,
             },
-            correo: { ...form.data.correo },
-            backup: { ...form.data.backup },
-            documentos: form.data.documentos,
+            correo:       { ...form.data.correo },
+            backup:       { ...form.data.backup },
+            documentos:   form.data.documentos,
             correlativos: form.data.correlativos,
         };
-        form.transform(() => payload);
-        form.post(route('admin.factura-sv.configuracion.guardar'), {
-            onSuccess: () => { setUnlocked(false); showToast('Configuración guardada correctamente.'); },
-            onError:   () => showToast('Error al guardar. Revisa los campos.', false),
+
+        setSaving(true);
+        router.post(route('admin.factura-sv.configuracion.guardar'), payload, {
+            onSuccess: () => {
+                setSaving(false);
+                setUnlocked(false);
+                showToast('Configuración guardada correctamente.');
+            },
+            onError: (errors) => {
+                setSaving(false);
+                const msgs = Object.values(errors).flat().join(' | ');
+                showToast(msgs ? `Error: ${msgs}` : 'Error al guardar. Revisa los campos.', false);
+            },
+            onFinish: () => setSaving(false),
         });
     }
 
@@ -360,7 +382,7 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
                 </div>
             )}
 
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} noValidate>
                 <div className="card" style={{ marginBottom: 16 }}>
                     <fieldset disabled={disabled} style={{ border: 'none', padding: 0, margin: 0 }}>
 
@@ -669,8 +691,8 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
                     <button type="button" className="btn secondary" disabled={disabled} onClick={testHacienda}>
                         Probar Hacienda
                     </button>
-                    <button type="submit" className="btn" disabled={disabled || form.processing}>
-                        {form.processing ? 'Guardando…' : 'Guardar Configuración'}
+                    <button type="submit" className="btn" disabled={disabled || saving}>
+                        {saving ? 'Guardando…' : 'Guardar Configuración'}
                     </button>
                 </div>
             </form>
