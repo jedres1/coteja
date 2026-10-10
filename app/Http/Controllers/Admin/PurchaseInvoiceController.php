@@ -55,6 +55,8 @@ class PurchaseInvoiceController extends Controller
 
     public function accountingSettingsUpdate(Request $request)
     {
+        abort_unless($request->user()?->hasModuleAccess('accounting'), 403, 'Requiere acceso al módulo de Contabilidad.');
+
         $activeAccount = Rule::exists('accounting_accounts', 'id')->where('is_active', true);
         $activeCostCenter = Rule::exists('cost_centers', 'id')->where('is_active', true);
         $data = $request->validate([

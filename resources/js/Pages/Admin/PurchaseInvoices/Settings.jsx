@@ -1,4 +1,4 @@
-import { Head, useForm, router } from '@inertiajs/react';
+import { Head, useForm, router, usePage } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import { useState } from 'react';
@@ -231,6 +231,9 @@ export default function Settings({
     accountingAccounts, costCenters, purchasePackage, payablePackage,
     missingPurchaseEntries, missingPayableEntries,
 }) {
+    const { auth } = usePage().props;
+    const hasAccounting = auth?.user?.modules?.accounting ?? false;
+
     const [unlocked, setUnlocked]       = useState(false);
     const [showWarning, setShowWarning] = useState(false);
     const [generating, setGenerating]   = useState(false);
@@ -307,13 +310,21 @@ export default function Settings({
                 />
             </div>
 
-            <div className="card" style={{ marginBottom: 16 }}>
-                <AccountingForm
-                    purchasePackage={purchasePackage} payablePackage={payablePackage}
-                    accountingAccounts={accountingAccounts} costCenters={costCenters}
-                    disabled={!unlocked} onSaved={handleSaved}
-                />
-            </div>
+            {hasAccounting ? (
+                <div className="card" style={{ marginBottom: 16 }}>
+                    <AccountingForm
+                        purchasePackage={purchasePackage} payablePackage={payablePackage}
+                        accountingAccounts={accountingAccounts} costCenters={costCenters}
+                        disabled={!unlocked} onSaved={handleSaved}
+                    />
+                </div>
+            ) : (
+                <div className="card" style={{ marginBottom: 16, padding: '14px 18px' }}>
+                    <p style={{ margin: 0, fontSize: 13, color: '#6b7280' }}>
+                        Las cuentas contables de compras requieren acceso al módulo de Contabilidad.
+                    </p>
+                </div>
+            )}
 
             <div className="card">
                 <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15, fontWeight: 600 }}>
