@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Head, useForm, router } from '@inertiajs/react';
+import { Head, useForm, router, usePage } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 
@@ -17,7 +17,7 @@ const emptyConcept = {
     account_id: '',
 };
 
-function ConceptForm({ concept, accounts, onCancel }) {
+function ConceptForm({ concept, accounts, hasAccounting, onCancel }) {
     const isEditing = !!concept;
     const { data, setData, processing, errors, reset } = useForm(
         isEditing
@@ -46,7 +46,7 @@ function ConceptForm({ concept, accounts, onCancel }) {
 
     return (
         <form onSubmit={handleSubmit}>
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 2fr', gap: 12, alignItems: 'start' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: hasAccounting ? '2fr 1fr 1fr 1fr 2fr' : '2fr 1fr 1fr 1fr', gap: 12, alignItems: 'start' }}>
                 <label style={{ margin: 0 }}>
                     Nombre <span style={{ color: '#ef4444' }}>*</span>
                     <input
@@ -83,16 +83,18 @@ function ConceptForm({ concept, accounts, onCancel }) {
                     </select>
                     {errors.is_mandatory && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.is_mandatory}</span>}
                 </label>
-                <label style={{ margin: 0 }}>
-                    Cuenta contable
-                    <select value={data.account_id} onChange={(e) => setData('account_id', e.target.value)}>
-                        <option value="">— Sin cuenta —</option>
-                        {accounts.map((a) => (
-                            <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
-                        ))}
-                    </select>
-                    {errors.account_id && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.account_id}</span>}
-                </label>
+                {hasAccounting && (
+                    <label style={{ margin: 0 }}>
+                        Cuenta contable
+                        <select value={data.account_id} onChange={(e) => setData('account_id', e.target.value)}>
+                            <option value="">— Sin cuenta —</option>
+                            {accounts.map((a) => (
+                                <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                            ))}
+                        </select>
+                        {errors.account_id && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.account_id}</span>}
+                    </label>
+                )}
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
                 <button type="submit" className="btn" disabled={processing}>
@@ -105,6 +107,12 @@ function ConceptForm({ concept, accounts, onCancel }) {
 }
 
 export default function Concepts({ concepts, accounts }) {
+    const { auth, billingTenant } = usePage().props;
+    const tenantModules = billingTenant?.modules ?? null;
+    const hasAccounting = tenantModules
+        ? tenantModules.includes('accounting')
+        : (auth?.user?.modules?.accounting ?? false);
+
     const [showForm, setShowForm] = useState(false);
     const [editingConcept, setEditingConcept] = useState(null);
 
@@ -139,6 +147,7 @@ export default function Concepts({ concepts, accounts }) {
                     <ConceptForm
                         concept={editingConcept}
                         accounts={accounts}
+                        hasAccounting={hasAccounting}
                         onCancel={closeForm}
                     />
                 </div>
@@ -164,14 +173,14 @@ export default function Concepts({ concepts, accounts }) {
                             <th>Tipo</th>
                             <th>Gravable</th>
                             <th>Obligatorio</th>
-                            <th>Cuenta contable</th>
+                            {hasAccounting && <th>Cuenta contable</th>}
                             <th>Acción</th>
                         </tr>
                     </thead>
                     <tbody>
                         {(!concepts || concepts.length === 0) && (
                             <tr>
-                                <td colSpan={6} className="empty">Sin conceptos registrados</td>
+                                <td colSpan={hasAccounting ? 6 : 5} className="empty">Sin conceptos registrados</td>
                             </tr>
                         )}
                         {concepts && concepts.map((concept) => {
@@ -214,11 +223,13 @@ export default function Concepts({ concepts, accounts }) {
                                             {concept.is_mandatory ? 'Sí' : 'No'}
                                         </span>
                                     </td>
-                                    <td style={{ fontFamily: 'monospace', fontSize: 13 }}>
-                                        {concept.account
-                                            ? `${concept.account.code} - ${concept.account.name}`
-                                            : '—'}
-                                    </td>
+                                    {hasAccounting && (
+                                        <td style={{ fontFamily: 'monospace', fontSize: 13 }}>
+                                            {concept.account
+                                                ? `${concept.account.code} - ${concept.account.name}`
+                                                : '—'}
+                                        </td>
+                                    )}
                                     <td>
                                         <div style={{ display: 'flex', gap: 6 }}>
                                             <button

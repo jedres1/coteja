@@ -208,6 +208,17 @@ class PayrollController extends Controller
 
     public function applyPeriod(Request $request, PayrollPeriod $period)
     {
+        if (! $request->user()->hasModuleAccess('accounting')) {
+            if ($period->status === 'aplicado') {
+                return back()->withErrors('El período ya fue aplicado.');
+            }
+            if ($period->lines()->doesntExist()) {
+                return back()->withErrors('El período no tiene líneas de nómina.');
+            }
+            $period->update(['status' => 'aplicado', 'applied_at' => now(), 'applied_by' => auth()->id()]);
+            return back()->with('status', 'Nómina aplicada.');
+        }
+
         try {
             $service = new PayrollEntryService();
             $entry   = $service->createFromPayroll($period, auth()->id());

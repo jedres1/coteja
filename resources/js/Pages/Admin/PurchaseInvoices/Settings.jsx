@@ -339,23 +339,25 @@ export default function Settings({
                 </div>
             )}
 
-            <div className="card">
-                <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15, fontWeight: 600 }}>
-                    Partidas contables faltantes
-                </h2>
-                <p style={{ margin: '0 0 12px', fontSize: 13, color: '#6b7280' }}>
-                    Facturas aprobadas sin partida de compra: <strong>{missingPurchaseEntries ?? 0}</strong>.{' '}
-                    Pagos sin partida de cuentas por pagar: <strong>{missingPayableEntries ?? 0}</strong>.
-                </p>
-                <button
-                    type="button"
-                    className="btn secondary"
-                    onClick={handleGenerateMissing}
-                    disabled={generating || totalMissing === 0}
-                >
-                    {generating ? 'Generando...' : `Generar partidas faltantes (${totalMissing})`}
-                </button>
-            </div>
+            {hasAccounting && (
+                <div className="card">
+                    <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15, fontWeight: 600 }}>
+                        Partidas contables faltantes
+                    </h2>
+                    <p style={{ margin: '0 0 12px', fontSize: 13, color: '#6b7280' }}>
+                        Facturas aprobadas sin partida de compra: <strong>{missingPurchaseEntries ?? 0}</strong>.{' '}
+                        Pagos sin partida de cuentas por pagar: <strong>{missingPayableEntries ?? 0}</strong>.
+                    </p>
+                    <button
+                        type="button"
+                        className="btn secondary"
+                        onClick={handleGenerateMissing}
+                        disabled={generating || totalMissing === 0}
+                    >
+                        {generating ? 'Generando...' : `Generar partidas faltantes (${totalMissing})`}
+                    </button>
+                </div>
+            )}
         </AppLayout>
     );
 }

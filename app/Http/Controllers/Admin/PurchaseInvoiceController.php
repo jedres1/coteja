@@ -90,6 +90,8 @@ class PurchaseInvoiceController extends Controller
 
     public function generateMissingEntries(AccountingEntryService $accounting, AccountingPeriodService $periods)
     {
+        abort_unless(request()->user()?->hasModuleAccess('accounting'), 403, 'Requiere acceso al módulo de Contabilidad.');
+
         $purchaseEntries = 0;
         $payableEntries = 0;
         $failures = 0;
