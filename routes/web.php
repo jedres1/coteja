@@ -155,6 +155,7 @@ Route::middleware(['auth', 'role:admin,consultant,customer,inquilino', 'module:i
     Route::delete('inventario/tipos-producto/{productType}', [InventoryController::class, 'destroyProductType'])->name('inventory.product-types.destroy');
     Route::get('inventario/bodegas', [InventoryController::class, 'warehouses'])->name('inventory.warehouses');
     Route::post('inventario/bodegas', [InventoryController::class, 'storeWarehouse'])->name('inventory.warehouses.store');
+    Route::delete('inventario/bodegas/{warehouse}', [InventoryController::class, 'destroyWarehouse'])->name('inventory.warehouses.destroy');
     Route::get('inventario/movimientos', [InventoryController::class, 'movements'])->name('inventory.movements');
     Route::post('inventario/movimientos', [InventoryController::class, 'storeMovement'])->name('inventory.movements.store');
 });

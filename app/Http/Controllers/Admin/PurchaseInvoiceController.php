@@ -439,7 +439,13 @@ class PurchaseInvoiceController extends Controller
 
     public function store(Request $request)
     {
-        PurchaseInvoice::create($this->validatedData($request));
+        $data     = $this->validatedData($request);
+        $tenantId = $this->activeTenantId($request);
+        if ($tenantId !== null && empty($data['customer_id'])) {
+            $data['customer_id'] = $tenantId;
+        }
+
+        PurchaseInvoice::create($data);
 
         return back()->with('status', 'Factura de compra registrada.');
     }

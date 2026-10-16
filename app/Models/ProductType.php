@@ -8,9 +8,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ProductType extends Model
 {
-    protected $fillable = ['customer_id', 'name', 'controls_inventory'];
+    protected $fillable = ['customer_id', 'name', 'code', 'controls_inventory', 'is_active'];
 
-    protected $casts = ['controls_inventory' => 'boolean'];
+    protected $casts = [
+        'controls_inventory' => 'boolean',
+        'is_active'          => 'boolean',
+    ];
 
     public function customer(): BelongsTo
     {

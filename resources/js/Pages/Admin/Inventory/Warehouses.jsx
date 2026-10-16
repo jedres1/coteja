@@ -128,7 +128,10 @@ export default function Warehouses({ warehouses }) {
         setEditingWarehouse(null);
     }
 
-    // No delete route exists for warehouses
+    function handleDelete(id) {
+        if (!confirm('¿Eliminar esta bodega?')) return;
+        router.delete(route('admin.inventory.warehouses.destroy', id));
+    }
 
     return (
         <AppLayout>
@@ -206,6 +209,13 @@ export default function Warehouses({ warehouses }) {
                                             onClick={() => handleEdit(w)}
                                         >
                                             Editar
+                                        </button>
+                                        <button
+                                            type="button"
+                                            style={{ fontSize: 12, padding: '3px 10px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 6, cursor: 'pointer' }}
+                                            onClick={() => handleDelete(w.id)}
+                                        >
+                                            Eliminar
                                         </button>
                                     </div>
                                 </td>

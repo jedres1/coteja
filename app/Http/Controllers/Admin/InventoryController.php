@@ -34,10 +34,19 @@ class InventoryController extends Controller
     public function storeProductType(Request $request)
     {
         $tenantId = $this->tenantId();
-        $data     = $request->validate([
+        $codeRule = Rule::unique('product_types', 'code')->whereNull('code')->ignore(0);
+        if ($request->filled('code')) {
+            $codeRule = Rule::unique('product_types', 'code');
+            if ($tenantId !== null) $codeRule->where('customer_id', $tenantId);
+            if ($request->filled('id')) $codeRule->ignore($request->input('id'));
+        }
+
+        $data = $request->validate([
             'id'                 => 'nullable|integer|exists:product_types,id',
             'name'               => 'required|string|max:100',
+            'code'               => ['nullable', 'string', 'max:20', $codeRule],
             'controls_inventory' => 'boolean',
+            'is_active'          => 'boolean',
         ]);
 
         if (!empty($data['id'])) {
@@ -45,13 +54,17 @@ class InventoryController extends Controller
             if ($tenantId) abort_unless($productType->customer_id === $tenantId, 403);
             $productType->update([
                 'name'               => $data['name'],
+                'code'               => $data['code'] ?? $productType->code,
                 'controls_inventory' => $data['controls_inventory'] ?? false,
+                'is_active'          => $data['is_active'] ?? true,
             ]);
         } else {
             ProductType::create([
                 'customer_id'        => $tenantId,
                 'name'               => $data['name'],
+                'code'               => $data['code'] ?? null,
                 'controls_inventory' => $data['controls_inventory'] ?? false,
+                'is_active'          => $data['is_active'] ?? true,
             ]);
         }
 
@@ -84,30 +97,51 @@ class InventoryController extends Controller
     {
         $tenantId = $this->tenantId();
         $data     = $request->validate([
-            'id'      => 'nullable|integer|exists:warehouses,id',
-            'name'    => 'required|string|max:100',
-            'address' => 'required|string|max:500',
-            'phone'   => 'nullable|string|max:30',
+            'id'           => 'nullable|integer|exists:warehouses,id',
+            'name'         => 'required|string|max:100',
+            'code'         => 'nullable|string|max:20',
+            'address'      => 'nullable|string|max:500',
+            'phone'        => 'nullable|string|max:30',
+            'contact_name' => 'nullable|string|max:100',
+            'is_active'    => 'boolean',
         ]);
 
         if (!empty($data['id'])) {
             $warehouse = Warehouse::findOrFail($data['id']);
             if ($tenantId) abort_unless($warehouse->customer_id === $tenantId, 403);
             $warehouse->update([
-                'name'    => $data['name'],
-                'address' => $data['address'],
-                'phone'   => $data['phone'] ?? null,
+                'name'         => $data['name'],
+                'code'         => $data['code'] ?? $warehouse->code,
+                'address'      => $data['address'] ?? null,
+                'phone'        => $data['phone'] ?? null,
+                'contact_name' => $data['contact_name'] ?? null,
+                'is_active'    => $data['is_active'] ?? true,
             ]);
         } else {
             Warehouse::create([
-                'customer_id' => $tenantId,
-                'name'        => $data['name'],
-                'address'     => $data['address'],
-                'phone'       => $data['phone'] ?? null,
+                'customer_id'  => $tenantId,
+                'name'         => $data['name'],
+                'code'         => $data['code'] ?? null,
+                'address'      => $data['address'] ?? null,
+                'phone'        => $data['phone'] ?? null,
+                'contact_name' => $data['contact_name'] ?? null,
+                'is_active'    => $data['is_active'] ?? true,
             ]);
         }
 
         return back()->with('status', 'Bodega guardada.');
+    }
+
+    public function destroyWarehouse(Warehouse $warehouse)
+    {
+        $tenantId = $this->tenantId();
+        if ($tenantId) abort_unless($warehouse->customer_id === $tenantId, 403);
+
+        if ($warehouse->movements()->exists()) {
+            return back()->withErrors('No se puede eliminar: hay movimientos registrados en esta bodega.');
+        }
+        $warehouse->delete();
+        return back()->with('status', 'Bodega eliminada.');
     }
 
     // ── Parámetros ──────────────────────────────────────────────────────────

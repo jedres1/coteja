@@ -8,7 +8,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Warehouse extends Model
 {
-    protected $fillable = ['customer_id', 'name', 'address', 'phone'];
+    protected $fillable = ['customer_id', 'name', 'code', 'address', 'phone', 'contact_name', 'is_active'];
+
+    protected $casts = ['is_active' => 'boolean'];
 
     public function customer(): BelongsTo
     {

@@ -75,25 +75,29 @@ class PayrollController extends Controller
 
     public function storeEmployee(Request $request)
     {
-        $tenantId  = $this->tenantId();
-        $codeRule  = Rule::unique('employees', 'code');
+        $tenantId = $this->tenantId();
+        $codeRule = Rule::unique('employees', 'code');
         if ($tenantId !== null) $codeRule->where('customer_id', $tenantId);
 
         $request->validate([
             'name'      => ['required', 'string', 'max:255'],
-            'code'      => ['required', 'string', 'max:20', $codeRule],
+            'code'      => ['nullable', 'string', 'max:20', $codeRule],
             'hire_date' => ['required', 'date'],
             'salary'    => ['required', 'numeric', 'min:0'],
         ]);
 
-        Employee::create(array_merge(
+        $employee = Employee::create(array_merge(
             $request->only([
-                'code', 'name', 'dui', 'isss_number', 'nup', 'afp',
+                'code', 'name', 'email', 'dui', 'isss_number', 'nup', 'afp',
                 'position', 'department', 'hire_date', 'salary',
                 'bank_name', 'bank_account', 'is_active',
             ]),
             ['customer_id' => $tenantId]
         ));
+
+        if (! $employee->code) {
+            $employee->update(['code' => 'EMP' . str_pad($employee->id, 5, '0', STR_PAD_LEFT)]);
+        }
 
         return back()->with('status', 'Empleado creado.');
     }
@@ -108,16 +112,20 @@ class PayrollController extends Controller
 
         $request->validate([
             'name'      => ['required', 'string', 'max:255'],
-            'code'      => ['required', 'string', 'max:20', $codeRule],
+            'code'      => ['nullable', 'string', 'max:20', $codeRule],
             'hire_date' => ['required', 'date'],
             'salary'    => ['required', 'numeric', 'min:0'],
         ]);
 
-        $employee->update($request->only([
-            'code', 'name', 'dui', 'isss_number', 'nup', 'afp',
+        $updates = $request->only([
+            'name', 'email', 'dui', 'isss_number', 'nup', 'afp',
             'position', 'department', 'hire_date', 'salary',
             'bank_name', 'bank_account', 'is_active',
-        ]));
+        ]);
+        if ($request->filled('code')) {
+            $updates['code'] = $request->input('code');
+        }
+        $employee->update($updates);
 
         return back()->with('status', 'Empleado actualizado.');
     }
