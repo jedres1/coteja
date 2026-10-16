@@ -33,9 +33,14 @@ class PayrollController extends Controller
             'periods'   => PayrollPeriod::when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))
                 ->withCount('lines')
                 ->withSum('lines', 'net_salary')
+                ->withSum('lines', 'gross_salary')
                 ->orderBy('period_start', 'desc')
                 ->limit(12)
-                ->get(),
+                ->get()
+                ->map(fn ($p) => array_merge($p->toArray(), [
+                    'total_gross' => $p->lines_sum_gross_salary,
+                    'total_net'   => $p->lines_sum_net_salary,
+                ])),
         ]);
     }
 

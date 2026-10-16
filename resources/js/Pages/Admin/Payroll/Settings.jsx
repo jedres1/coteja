@@ -13,13 +13,13 @@ export default function PayrollSettings({ settings, accounts }) {
     const [unlocked, setUnlocked]       = useState(false);
     const [showWarning, setShowWarning] = useState(false);
 
-    const bankAccounts = accounts ?? [];
     const { data, setData, post, processing, errors, recentlySuccessful } = useForm({
-        igss_employee_rate: settings?.igss_employee_rate ?? '',
-        igss_employer_rate: settings?.igss_employer_rate ?? '',
-        isr_rate: settings?.isr_rate ?? '',
-        minimum_wage: settings?.minimum_wage ?? '',
-        bank_account_id: settings?.bank_account_id ?? '',
+        account_salaries_payable_id: settings?.account_salaries_payable_id ?? '',
+        isss_salary_cap:             settings?.isss_salary_cap ?? '',
+        isss_employee_rate:          settings?.isss_employee_rate ?? '',
+        isss_employer_rate:          settings?.isss_employer_rate ?? '',
+        afp_employee_rate:           settings?.afp_employee_rate ?? '',
+        afp_employer_rate:           settings?.afp_employer_rate ?? '',
     });
 
     function handleSubmit(e) {
@@ -57,10 +57,10 @@ export default function PayrollSettings({ settings, accounts }) {
                         style={{ whiteSpace: 'nowrap' }}
                         onClick={() => unlocked ? setUnlocked(false) : setShowWarning(true)}
                     >
-                        {unlocked ? '🔓 Bloquear' : '🔒 Desbloquear'}
+                        {unlocked ? 'Bloquear' : 'Desbloquear'}
                     </button>
                 ) : (
-                    <span style={{ whiteSpace: 'nowrap', fontSize: 13, color: '#9ca3af' }}>🔒 Bloqueado</span>
+                    <span style={{ whiteSpace: 'nowrap', fontSize: 13, color: '#9ca3af' }}>Bloqueado</span>
                 )}
             </div>
 
@@ -69,11 +69,11 @@ export default function PayrollSettings({ settings, accounts }) {
                     <div style={{ background: '#fff', borderRadius: 10, padding: '28px 32px', maxWidth: 460, width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}>
                         <p style={{ margin: '0 0 8px', fontWeight: 700, fontSize: 16, color: '#dc2626' }}>Advertencia — edición de parámetros</p>
                         <p style={{ margin: '0 0 12px', fontSize: 13, color: '#374151' }}>
-                            Cambiar estos parámetros puede afectar el funcionamiento del sistema.
+                            Cambiar estos parámetros puede afectar el cálculo de nóminas futuras.
                         </p>
                         <ul style={{ margin: '0 0 20px', paddingLeft: 20, fontSize: 12, color: '#7f1d1d' }}>
                             <li>Verifica los valores antes de guardar.</li>
-                            <li>Los cambios tienen efecto inmediato.</li>
+                            <li>Los cambios tienen efecto inmediato en nuevos períodos.</li>
                         </ul>
                         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
                             <button type="button" className="btn secondary" onClick={() => setShowWarning(false)}>Cancelar</button>
@@ -83,114 +83,135 @@ export default function PayrollSettings({ settings, accounts }) {
                 </div>
             )}
 
-            <div className="card" style={{ maxWidth: 640 }}>
+            <div className="card" style={{ maxWidth: 680 }}>
                 <form onSubmit={handleSubmit} noValidate>
                     <h2 style={{ marginTop: 0, marginBottom: 20, fontSize: 15, fontWeight: 600 }}>
-                        Tasas y parámetros
+                        Tasas y parámetros legales
                     </h2>
 
                     <div style={{ position: 'relative' }}>
-                    <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                            <label style={{ margin: 0 }}>
-                                Tasa IGSS empleado (%)
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+
+                                {/* ISSS */}
+                                <label style={{ margin: 0 }}>
+                                    Tope salarial ISSS
                                     <input
                                         type="number"
-                                        value={data.igss_employee_rate}
-                                        onChange={(e) => setData('igss_employee_rate', e.target.value)}
+                                        value={data.isss_salary_cap}
+                                        onChange={(e) => setData('isss_salary_cap', e.target.value)}
                                         min="0"
-                                        max="100"
                                         step="0.01"
-                                        placeholder="0.00"
-                                        style={{ flex: 1 }}
+                                        placeholder="1000.00"
                                     />
-                                    <span style={{ color: '#6b7280', fontWeight: 600 }}>%</span>
-                                </div>
-                                {errors.igss_employee_rate && (
-                                    <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.igss_employee_rate}</span>
-                                )}
-                            </label>
+                                    {errors.isss_salary_cap && (
+                                        <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.isss_salary_cap}</span>
+                                    )}
+                                </label>
 
-                            <label style={{ margin: 0 }}>
-                                Tasa IGSS patronal (%)
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    <input
-                                        type="number"
-                                        value={data.igss_employer_rate}
-                                        onChange={(e) => setData('igss_employer_rate', e.target.value)}
-                                        min="0"
-                                        max="100"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        style={{ flex: 1 }}
-                                    />
-                                    <span style={{ color: '#6b7280', fontWeight: 600 }}>%</span>
-                                </div>
-                                {errors.igss_employer_rate && (
-                                    <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.igss_employer_rate}</span>
-                                )}
-                            </label>
+                                <div />
 
-                            <label style={{ margin: 0 }}>
-                                Tasa ISR (%)
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    <input
-                                        type="number"
-                                        value={data.isr_rate}
-                                        onChange={(e) => setData('isr_rate', e.target.value)}
-                                        min="0"
-                                        max="100"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        style={{ flex: 1 }}
-                                    />
-                                    <span style={{ color: '#6b7280', fontWeight: 600 }}>%</span>
-                                </div>
-                                {errors.isr_rate && (
-                                    <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.isr_rate}</span>
-                                )}
-                            </label>
+                                <label style={{ margin: 0 }}>
+                                    Tasa ISSS empleado (0–1)
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <input
+                                            type="number"
+                                            value={data.isss_employee_rate}
+                                            onChange={(e) => setData('isss_employee_rate', e.target.value)}
+                                            min="0"
+                                            max="1"
+                                            step="0.0001"
+                                            placeholder="0.0300"
+                                            style={{ flex: 1 }}
+                                        />
+                                    </div>
+                                    {errors.isss_employee_rate && (
+                                        <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.isss_employee_rate}</span>
+                                    )}
+                                </label>
 
-                            <label style={{ margin: 0 }}>
-                                Salario mínimo
-                                <input
-                                    type="number"
-                                    value={data.minimum_wage}
-                                    onChange={(e) => setData('minimum_wage', e.target.value)}
-                                    min="0"
-                                    step="0.01"
-                                    placeholder="0.00"
-                                />
-                                {errors.minimum_wage && (
-                                    <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.minimum_wage}</span>
-                                )}
-                            </label>
-                        </div>
+                                <label style={{ margin: 0 }}>
+                                    Tasa ISSS patronal (0–1)
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <input
+                                            type="number"
+                                            value={data.isss_employer_rate}
+                                            onChange={(e) => setData('isss_employer_rate', e.target.value)}
+                                            min="0"
+                                            max="1"
+                                            step="0.0001"
+                                            placeholder="0.0750"
+                                            style={{ flex: 1 }}
+                                        />
+                                    </div>
+                                    {errors.isss_employer_rate && (
+                                        <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.isss_employer_rate}</span>
+                                    )}
+                                </label>
 
-                        <div style={{ marginTop: 16 }}>
-                            <label style={{ margin: 0 }}>
-                                Cuenta bancaria de pago
-                                <select
-                                    value={data.bank_account_id}
-                                    onChange={(e) => setData('bank_account_id', e.target.value)}
-                                >
-                                    <option value="">— Sin cuenta vinculada —</option>
-                                    {bankAccounts.map((ba) => (
-                                        <option key={ba.id} value={ba.id}>
-                                            {ba.code} — {ba.name}
-                                        </option>
-                                    ))}
-                                </select>
-                                {errors.bank_account_id && (
-                                    <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.bank_account_id}</span>
-                                )}
-                            </label>
-                        </div>
-                    </fieldset>
-                    {(!hasPayroll || !unlocked) && (
-                        <div style={{ position: 'absolute', inset: 0, background: 'rgba(248,250,252,0.55)', zIndex: 1, pointerEvents: 'all', cursor: 'not-allowed', borderRadius: 4 }} />
-                    )}
+                                {/* AFP */}
+                                <label style={{ margin: 0 }}>
+                                    Tasa AFP empleado (0–1)
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <input
+                                            type="number"
+                                            value={data.afp_employee_rate}
+                                            onChange={(e) => setData('afp_employee_rate', e.target.value)}
+                                            min="0"
+                                            max="1"
+                                            step="0.0001"
+                                            placeholder="0.0725"
+                                            style={{ flex: 1 }}
+                                        />
+                                    </div>
+                                    {errors.afp_employee_rate && (
+                                        <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.afp_employee_rate}</span>
+                                    )}
+                                </label>
+
+                                <label style={{ margin: 0 }}>
+                                    Tasa AFP patronal (0–1)
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <input
+                                            type="number"
+                                            value={data.afp_employer_rate}
+                                            onChange={(e) => setData('afp_employer_rate', e.target.value)}
+                                            min="0"
+                                            max="1"
+                                            step="0.0001"
+                                            placeholder="0.0875"
+                                            style={{ flex: 1 }}
+                                        />
+                                    </div>
+                                    {errors.afp_employer_rate && (
+                                        <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.afp_employer_rate}</span>
+                                    )}
+                                </label>
+
+                                {/* Cuenta contable */}
+                                <label style={{ margin: 0, gridColumn: '1 / -1' }}>
+                                    Cuenta sueldos por pagar <span style={{ color: '#ef4444' }}>*</span>
+                                    <select
+                                        value={data.account_salaries_payable_id}
+                                        onChange={(e) => setData('account_salaries_payable_id', e.target.value)}
+                                    >
+                                        <option value="">— Seleccionar cuenta —</option>
+                                        {(accounts ?? []).map((a) => (
+                                            <option key={a.id} value={a.id}>
+                                                {a.code} — {a.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {errors.account_salaries_payable_id && (
+                                        <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.account_salaries_payable_id}</span>
+                                    )}
+                                </label>
+                            </div>
+                        </fieldset>
+
+                        {(!hasPayroll || !unlocked) && (
+                            <div style={{ position: 'absolute', inset: 0, background: 'rgba(248,250,252,0.55)', zIndex: 1, pointerEvents: 'all', cursor: 'not-allowed', borderRadius: 4 }} />
+                        )}
                     </div>
 
                     <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 24 }}>
