@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class PayrollSetting extends Model
 {
     protected $fillable = [
+        'customer_id',
         'accounting_package_id',
         'account_salaries_id',
         'account_isss_employer_id',
@@ -33,15 +34,30 @@ class PayrollSetting extends Model
         'afp_employer_rate'  => 'decimal:4',
     ];
 
-    public static function current(): static
+    private static array $defaults = [
+        'isss_salary_cap'    => 1000,
+        'isss_employee_rate' => 0.0300,
+        'isss_employer_rate' => 0.0750,
+        'afp_employee_rate'  => 0.0725,
+        'afp_employer_rate'  => 0.0875,
+    ];
+
+    public static function current(?int $customerId = null): static
     {
-        return static::firstOrCreate([], [
-            'isss_salary_cap' => 1000,
-            'isss_employee_rate' => 0.0300,
-            'isss_employer_rate' => 0.0750,
-            'afp_employee_rate' => 0.0725,
-            'afp_employer_rate' => 0.0875,
-        ]);
+        if ($customerId !== null) {
+            return static::firstOrCreate(['customer_id' => $customerId], static::$defaults);
+        }
+
+        $setting = static::whereNull('customer_id')->first();
+        if (! $setting) {
+            $setting = static::create(array_merge(['customer_id' => null], static::$defaults));
+        }
+        return $setting;
+    }
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class);
     }
 
     public function accountingPackage(): BelongsTo

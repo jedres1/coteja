@@ -24,9 +24,14 @@ class PayrollEntryService
             return null;
         }
 
-        $settings = PayrollSetting::current();
+        $settings = PayrollSetting::current($customerId);
+
         $legalConcepts = PayrollConcept::whereNotNull('system_key')
             ->where('is_active', true)
+            ->when($customerId !== null,
+                fn ($q) => $q->where('customer_id', $customerId),
+                fn ($q) => $q->whereNull('customer_id')
+            )
             ->get()
             ->keyBy('system_key');
 
@@ -39,12 +44,12 @@ class PayrollEntryService
             $missing[] = 'paquete contable NOM';
         }
         foreach ([
-            'salario' => 'cuenta de gasto para Salario base',
-            'isss_laboral' => 'cuenta por pagar para ISSS laboral',
+            'salario'       => 'cuenta de gasto para Salario base',
+            'isss_laboral'  => 'cuenta por pagar para ISSS laboral',
             'isss_patronal' => 'cuenta de gasto para ISSS patronal',
-            'afp_laboral' => 'cuenta por pagar para AFP laboral',
-            'afp_patronal' => 'cuenta de gasto para AFP patronal',
-            'isr' => 'cuenta por pagar para ISR',
+            'afp_laboral'   => 'cuenta por pagar para AFP laboral',
+            'afp_patronal'  => 'cuenta de gasto para AFP patronal',
+            'isr'           => 'cuenta por pagar para ISR',
         ] as $key => $label) {
             if (! $legalConcepts->get($key)?->account_id) {
                 $missing[] = $label . ' en Gestión de conceptos';
@@ -66,17 +71,16 @@ class PayrollEntryService
             );
         }
 
-        // Totals
-        $totalGross         = round($lines->sum(fn ($l) => (float) $l->gross_salary), 2);
-        $totalIsssEmployer  = round($lines->sum(fn ($l) => (float) $l->isss_employer), 2);
-        $totalAfpEmployer   = round($lines->sum(fn ($l) => (float) $l->afp_employer), 2);
-        $totalIsssEmployee  = round($lines->sum(fn ($l) => (float) $l->isss_employee), 2);
-        $totalAfpEmployee   = round($lines->sum(fn ($l) => (float) $l->afp_employee), 2);
-        $totalIsr           = round($lines->sum(fn ($l) => (float) $l->isr), 2);
-        $totalNet           = round($lines->sum(fn ($l) => (float) $l->net_salary), 2);
-        $benefitConcepts = $this->sumConcepts($lines, 'beneficio');
+        $totalGross        = round($lines->sum(fn ($l) => (float) $l->gross_salary), 2);
+        $totalIsssEmployer = round($lines->sum(fn ($l) => (float) $l->isss_employer), 2);
+        $totalAfpEmployer  = round($lines->sum(fn ($l) => (float) $l->afp_employer), 2);
+        $totalIsssEmployee = round($lines->sum(fn ($l) => (float) $l->isss_employee), 2);
+        $totalAfpEmployee  = round($lines->sum(fn ($l) => (float) $l->afp_employee), 2);
+        $totalIsr          = round($lines->sum(fn ($l) => (float) $l->isr), 2);
+        $totalNet          = round($lines->sum(fn ($l) => (float) $l->net_salary), 2);
+        $benefitConcepts   = $this->sumConcepts($lines, 'beneficio');
         $deductionConcepts = $this->sumConcepts($lines, 'deduccion');
-        $totalBenefits = round(array_sum($benefitConcepts), 2);
+        $totalBenefits     = round(array_sum($benefitConcepts), 2);
 
         foreach (array_merge(array_keys($benefitConcepts), array_keys($deductionConcepts)) as $accountId) {
             if (! $accountId) {
@@ -110,7 +114,6 @@ class PayrollEntryService
 
             $sort = 0;
             $entryLines = [
-                // DEBE
                 [
                     'journal_entry_id' => $entry->id,
                     'account_id'       => $legalConcepts->get('salario')->account_id,
@@ -135,7 +138,6 @@ class PayrollEntryService
                     'credit'           => 0,
                     'sort_order'       => $sort++,
                 ],
-                // HABER
                 [
                     'journal_entry_id' => $entry->id,
                     'account_id'       => $legalConcepts->get('isss_laboral')->account_id,
@@ -190,11 +192,11 @@ class PayrollEntryService
                 if ($amount > 0) {
                     $entryLines[] = [
                         'journal_entry_id' => $entry->id,
-                        'account_id' => $accountId,
-                        'description' => 'Beneficios de nómina — ' . $period->name,
-                        'debit' => $amount,
-                        'credit' => 0,
-                        'sort_order' => $sort++,
+                        'account_id'       => $accountId,
+                        'description'      => 'Beneficios de nómina — ' . $period->name,
+                        'debit'            => $amount,
+                        'credit'           => 0,
+                        'sort_order'       => $sort++,
                     ];
                 }
             }
@@ -203,11 +205,11 @@ class PayrollEntryService
                 if ($amount > 0) {
                     $entryLines[] = [
                         'journal_entry_id' => $entry->id,
-                        'account_id' => $accountId,
-                        'description' => 'Deducciones de nómina — ' . $period->name,
-                        'debit' => 0,
-                        'credit' => $amount,
-                        'sort_order' => $sort++,
+                        'account_id'       => $accountId,
+                        'description'      => 'Deducciones de nómina — ' . $period->name,
+                        'debit'            => 0,
+                        'credit'           => $amount,
+                        'sort_order'       => $sort++,
                     ];
                 }
             }

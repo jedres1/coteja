@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class PayrollPeriod extends Model
 {
     protected $fillable = [
-        'name', 'period_start', 'period_end', 'status', 'notes',
+        'customer_id', 'name', 'period_start', 'period_end', 'status', 'notes',
         'journal_entry_id', 'applied_at', 'applied_by',
     ];
 
@@ -19,6 +20,11 @@ class PayrollPeriod extends Model
         'applied_at'   => 'datetime',
         'status'       => 'string',
     ];
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class);
+    }
 
     public function lines(): HasMany
     {
@@ -38,5 +44,10 @@ class PayrollPeriod extends Model
     public function isApplied(): bool
     {
         return $this->status === 'aplicado';
+    }
+
+    public function scopeForCustomer(Builder $query, int $customerId): Builder
+    {
+        return $query->where('customer_id', $customerId);
     }
 }
