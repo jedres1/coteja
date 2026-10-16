@@ -330,14 +330,24 @@ export default function Productos({ products, productTypes, hasInventory }) {
                                     <td style={{ fontSize: 12 }}>{p.productTypeName ?? <span className="muted">—</span>}</td>
                                 )}
                                 <td>
-                                    <button
-                                        type="button"
-                                        className="btn secondary"
-                                        style={{ fontSize: 12, padding: '3px 10px' }}
-                                        onClick={() => openEdit(p)}
-                                    >
-                                        Editar
-                                    </button>
+                                    <div style={{ display: 'flex', gap: 4 }}>
+                                        <button
+                                            type="button"
+                                            className="btn secondary"
+                                            style={{ fontSize: 12, padding: '3px 10px' }}
+                                            onClick={() => openEdit(p)}
+                                        >
+                                            Editar
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn danger"
+                                            style={{ fontSize: 12, padding: '3px 10px' }}
+                                            onClick={() => handleDelete(p)}
+                                        >
+                                            Eliminar
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         ))}

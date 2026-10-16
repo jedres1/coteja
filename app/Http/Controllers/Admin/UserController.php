@@ -104,7 +104,7 @@ class UserController extends Controller
             'customer_id' => ['nullable', 'exists:customers,id'],
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user?->id)],
-            'role' => ['required', 'in:admin,customer,consultant'],
+            'role' => ['required', 'in:admin,customer,consultant,inquilino'],
             'is_active' => ['nullable', 'boolean'],
             'password' => [$isUpdate ? 'nullable' : 'required', 'string', 'min:8'],
             'module_accesses' => ['nullable', 'array'],

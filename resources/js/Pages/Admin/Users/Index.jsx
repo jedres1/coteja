@@ -5,8 +5,8 @@ import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
 import Modal from '@/Components/Modal';
 
-const roles = { admin: 'Administrador', customer: 'Cliente', consultant: 'Consultor' };
-const roleBadges = { admin: 'role-admin', customer: 'role-customer', consultant: 'role-consultant' };
+const roles = { admin: 'Administrador', customer: 'Cliente', consultant: 'Consultor', inquilino: 'Inquilino' };
+const roleBadges = { admin: 'role-admin', customer: 'role-customer', consultant: 'role-consultant', inquilino: 'role-inquilino' };
 
 // ─── UserForm ────────────────────────────────────────────────────────────────
 
@@ -28,6 +28,7 @@ function UserForm({ user, modules, customers, companies, onSuccess, onCancel }) 
 
     // Derived: show customer fields only when role === 'customer'
     const showCustomerFields = data.role === 'customer';
+    const showModuleNote = data.role === 'inquilino';
 
     // When role changes away from customer, clear customer-specific fields
     useEffect(() => {
@@ -138,11 +139,18 @@ function UserForm({ user, modules, customers, companies, onSuccess, onCancel }) 
                     {errors.is_active && <p className="field-error">{errors.is_active}</p>}
                 </label>
 
+                {/* Nota inquilino */}
+                {showModuleNote && (
+                    <p className="muted full-width" style={{ margin: 0, fontSize: 13 }}>
+                        El rol Inquilino tiene acceso a todos los módulos automáticamente, pero no puede acceder a páginas de parámetros ni configuración de módulos.
+                    </p>
+                )}
+
                 {/* Customer fields – visible only when role === 'customer' */}
                 {showCustomerFields && (
                     <>
                         <label className="full-width">
-                            Cliente vinculado
+                            Inquilino vinculado
                             <select
                                 value={data.customer_id}
                                 onChange={(e) => setData('customer_id', e.target.value)}
@@ -252,9 +260,10 @@ export default function UsersIndex({ users, search, role, modules, customers, co
             <Head title="Usuarios y acceso" />
 
             <style>{`
-                .role-admin    { background: #dbeafe; color: #1e40af; }
-                .role-customer { background: #dcfce7; color: #166534; }
+                .role-admin      { background: #dbeafe; color: #1e40af; }
+                .role-customer   { background: #dcfce7; color: #166534; }
                 .role-consultant { background: #fef3c7; color: #92400e; }
+                .role-inquilino  { background: #f3e8ff; color: #6b21a8; }
             `}</style>
 
             <div className="top">
@@ -307,7 +316,7 @@ export default function UsersIndex({ users, search, role, modules, customers, co
                         <tr>
                             <th>Usuario</th>
                             <th>Rol</th>
-                            <th>Cliente vinculado</th>
+                            <th>Inquilino vinculado</th>
                             <th>Empresas</th>
                             <th>Módulos</th>
                             <th>Estado</th>
@@ -337,7 +346,7 @@ export default function UsersIndex({ users, search, role, modules, customers, co
                                     </span>
                                 </td>
 
-                                {/* Cliente vinculado */}
+                                {/* Inquilino vinculado */}
                                 <td>
                                     {user.customer
                                         ? <span>{user.customer.name}<br /><span className="muted">{user.customer.email}</span></span>
@@ -347,7 +356,7 @@ export default function UsersIndex({ users, search, role, modules, customers, co
 
                                 {/* Empresas */}
                                 <td>
-                                    {(user.role === 'admin' || user.role === 'consultant')
+                                    {(user.role === 'admin' || user.role === 'consultant' || user.role === 'inquilino')
                                         ? <span style={{ fontSize: 12, color: '#6b7280', fontStyle: 'italic' }}>Todas las empresas</span>
                                         : user.accessibleCompanies?.length > 0
                                             ? user.accessibleCompanies.map((c) => (

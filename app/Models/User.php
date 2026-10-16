@@ -78,9 +78,14 @@ class User extends Authenticatable
         return $this->role === 'consultant';
     }
 
+    public function isInquilino(): bool
+    {
+        return $this->role === 'inquilino';
+    }
+
     public function canAccessAdmin(): bool
     {
-        return in_array($this->role, ['admin', 'consultant'], true);
+        return in_array($this->role, ['admin', 'consultant', 'inquilino'], true);
     }
 
     public function hasModuleAccess(string $module): bool

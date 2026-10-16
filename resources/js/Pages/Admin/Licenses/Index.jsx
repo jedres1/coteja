@@ -11,10 +11,17 @@ const licenseStatuses = {
     suspended: 'Suspendida',
 };
 
+const licenseTypes = {
+    propietario: 'Propietario',
+    mensual: 'Mensual',
+    anual: 'Anual',
+};
+
 function CreateLicenseForm({ companies, plans, onSuccess }) {
     const form = useForm({
         company_id: '',
         plan_id: '',
+        license_type: 'mensual',
         status: 'active',
         starts_at: '',
         expires_at: '',
@@ -22,6 +29,8 @@ function CreateLicenseForm({ companies, plans, onSuccess }) {
         max_devices: 1,
         grace_days: 0,
     });
+
+    const isPropietario = form.data.license_type === 'propietario';
 
     function handleSubmit(e) {
         e.preventDefault();
@@ -59,6 +68,23 @@ function CreateLicenseForm({ companies, plans, onSuccess }) {
                 {form.errors.plan_id && <p className="field-error">{form.errors.plan_id}</p>}
             </div>
             <div className="field">
+                <label>Tipo de licencia</label>
+                <select
+                    value={form.data.license_type}
+                    onChange={(e) => form.setData('license_type', e.target.value)}
+                >
+                    {Object.entries(licenseTypes).map(([k, v]) => (
+                        <option key={k} value={k}>{v}</option>
+                    ))}
+                </select>
+                {isPropietario && (
+                    <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0' }}>
+                        Licencia de propietario: no requiere fecha de vencimiento.
+                    </p>
+                )}
+                {form.errors.license_type && <p className="field-error">{form.errors.license_type}</p>}
+            </div>
+            <div className="field">
                 <label>Estado</label>
                 <select
                     value={form.data.status}
@@ -79,15 +105,17 @@ function CreateLicenseForm({ companies, plans, onSuccess }) {
                 />
                 {form.errors.starts_at && <p className="field-error">{form.errors.starts_at}</p>}
             </div>
-            <div className="field">
-                <label>Fecha vencimiento</label>
-                <input
-                    type="date"
-                    value={form.data.expires_at}
-                    onChange={(e) => form.setData('expires_at', e.target.value)}
-                />
-                {form.errors.expires_at && <p className="field-error">{form.errors.expires_at}</p>}
-            </div>
+            {!isPropietario && (
+                <div className="field">
+                    <label>Fecha vencimiento</label>
+                    <input
+                        type="date"
+                        value={form.data.expires_at}
+                        onChange={(e) => form.setData('expires_at', e.target.value)}
+                    />
+                    {form.errors.expires_at && <p className="field-error">{form.errors.expires_at}</p>}
+                </div>
+            )}
             <div className="field">
                 <label>Máx. usuarios</label>
                 <input
@@ -129,12 +157,15 @@ function CreateLicenseForm({ companies, plans, onSuccess }) {
 
 function EditLicenseForm({ license, onSuccess }) {
     const form = useForm({
+        license_type: license?.license_type ?? 'mensual',
         status: license?.status ?? 'active',
         expires_at: license?.expires_at ? license.expires_at.substring(0, 10) : '',
         max_users: license?.max_users ?? 1,
         max_devices: license?.max_devices ?? 1,
         grace_days: license?.grace_days ?? 0,
     });
+
+    const isPropietario = form.data.license_type === 'propietario';
 
     function handleSubmit(e) {
         e.preventDefault();
@@ -143,6 +174,18 @@ function EditLicenseForm({ license, onSuccess }) {
 
     return (
         <form onSubmit={handleSubmit}>
+            <div className="field">
+                <label>Tipo de licencia</label>
+                <select
+                    value={form.data.license_type}
+                    onChange={(e) => form.setData('license_type', e.target.value)}
+                >
+                    {Object.entries(licenseTypes).map(([k, v]) => (
+                        <option key={k} value={k}>{v}</option>
+                    ))}
+                </select>
+                {form.errors.license_type && <p className="field-error">{form.errors.license_type}</p>}
+            </div>
             <div className="field">
                 <label>Estado</label>
                 <select
@@ -155,15 +198,17 @@ function EditLicenseForm({ license, onSuccess }) {
                 </select>
                 {form.errors.status && <p className="field-error">{form.errors.status}</p>}
             </div>
-            <div className="field">
-                <label>Fecha vencimiento</label>
-                <input
-                    type="date"
-                    value={form.data.expires_at}
-                    onChange={(e) => form.setData('expires_at', e.target.value)}
-                />
-                {form.errors.expires_at && <p className="field-error">{form.errors.expires_at}</p>}
-            </div>
+            {!isPropietario && (
+                <div className="field">
+                    <label>Fecha vencimiento</label>
+                    <input
+                        type="date"
+                        value={form.data.expires_at}
+                        onChange={(e) => form.setData('expires_at', e.target.value)}
+                    />
+                    {form.errors.expires_at && <p className="field-error">{form.errors.expires_at}</p>}
+                </div>
+            )}
             <div className="field">
                 <label>Máx. usuarios</label>
                 <input
@@ -222,9 +267,10 @@ export default function LicensesIndex({ licenses, companies, plans }) {
                     <thead>
                         <tr>
                             <th>Código</th>
-                            <th>Cliente</th>
+                            <th>Inquilino</th>
                             <th>Empresa</th>
                             <th>Plan</th>
+                            <th>Tipo</th>
                             <th>Estado</th>
                             <th>Vence</th>
                             <th>Límites</th>
@@ -234,7 +280,7 @@ export default function LicensesIndex({ licenses, companies, plans }) {
                     <tbody>
                         {licenses.data.length === 0 && (
                             <tr>
-                                <td colSpan={8} style={{ textAlign: 'center' }} className="muted">
+                                <td colSpan={9} style={{ textAlign: 'center' }} className="muted">
                                     Sin registros
                                 </td>
                             </tr>
@@ -248,12 +294,21 @@ export default function LicensesIndex({ licenses, companies, plans }) {
                                 <td>{license.company?.business_name ?? '—'}</td>
                                 <td>{license.plan?.name ?? '—'}</td>
                                 <td>
+                                    <span style={{ fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 10,
+                                        background: license.license_type === 'propietario' ? '#dbeafe' : '#f3f4f6',
+                                        color: license.license_type === 'propietario' ? '#1e40af' : '#374151' }}>
+                                        {licenseTypes[license.license_type] ?? license.license_type}
+                                    </span>
+                                </td>
+                                <td>
                                     <span className={`badge ${license.status}`}>
                                         {licenseStatuses[license.status] ?? license.status}
                                     </span>
                                 </td>
                                 <td>
-                                    {license.expires_at ? license.expires_at.substring(0, 10) : '—'}
+                                    {license.license_type === 'propietario'
+                                        ? <span className="muted" style={{ fontSize: 12 }}>Sin vencimiento</span>
+                                        : license.expires_at ? license.expires_at.substring(0, 10) : '—'}
                                 </td>
                                 <td className="muted" style={{ fontSize: '0.85em' }}>
                                     {license.max_users} usuarios / {license.max_devices} dispositivos / {license.grace_days} días

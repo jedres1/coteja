@@ -18,11 +18,16 @@ function CustomerForm({ customer, geography, documentTypes, dteTypes, statuses, 
         document_number:      customer?.document_number ?? '',
         nrc:                  customer?.nrc ?? '',
         trade_name:           customer?.trade_name ?? '',
-        dte_type:             customer?.dte_type ?? '',
+        preferred_dte_type:   customer?.preferred_dte_type ?? '',
         business_activity:    customer?.business_activity ?? '',
+        activity_description: customer?.activity_description ?? '',
         address_department:   customer?.address_department ?? '',
         address_municipality: customer?.address_municipality ?? '',
         address_district:     customer?.address_district ?? '',
+        address:              customer?.address ?? '',
+        billing_email:        customer?.billing_email ?? '',
+        billing_phone:        customer?.billing_phone ?? '',
+        password:             '',
     });
 
     const [activities, setActivities] = useState([]);
@@ -150,14 +155,14 @@ function CustomerForm({ customer, geography, documentTypes, dteTypes, statuses, 
 
                 {/* DTE type */}
                 <label>
-                    Tipo de DTE
-                    <select value={data.dte_type} onChange={(e) => setData('dte_type', e.target.value)}>
+                    Tipo de DTE preferido
+                    <select value={data.preferred_dte_type} onChange={(e) => setData('preferred_dte_type', e.target.value)}>
                         <option value="">— Seleccionar —</option>
                         {Object.entries(dteTypes).map(([k, v]) => (
                             <option key={k} value={k}>{v}</option>
                         ))}
                     </select>
-                    {errors.dte_type && <p className="field-error">{errors.dte_type}</p>}
+                    {errors.preferred_dte_type && <p className="field-error">{errors.preferred_dte_type}</p>}
                 </label>
 
                 {/* Business activity */}
@@ -176,6 +181,17 @@ function CustomerForm({ customer, geography, documentTypes, dteTypes, statuses, 
                         ))}
                     </datalist>
                     {errors.business_activity && <p className="field-error">{errors.business_activity}</p>}
+                </label>
+
+                {/* Activity description */}
+                <label>
+                    Descripción de actividad
+                    <input
+                        type="text"
+                        value={data.activity_description}
+                        onChange={(e) => setData('activity_description', e.target.value)}
+                    />
+                    {errors.activity_description && <p className="field-error">{errors.activity_description}</p>}
                 </label>
 
                 {/* Department */}
@@ -221,6 +237,57 @@ function CustomerForm({ customer, geography, documentTypes, dteTypes, statuses, 
                     </select>
                     {errors.address_district && <p className="field-error">{errors.address_district}</p>}
                 </label>
+
+                {/* Address */}
+                <label style={{ gridColumn: '1 / -1' }}>
+                    Dirección <span style={{ color: '#ef4444' }}>*</span>
+                    <input
+                        type="text"
+                        value={data.address}
+                        onChange={(e) => setData('address', e.target.value)}
+                        required
+                    />
+                    {errors.address && <p className="field-error">{errors.address}</p>}
+                </label>
+
+                {/* Billing email */}
+                <label>
+                    Correo de facturación
+                    <input
+                        type="email"
+                        value={data.billing_email}
+                        onChange={(e) => setData('billing_email', e.target.value)}
+                        placeholder="Si difiere del correo principal"
+                    />
+                    {errors.billing_email && <p className="field-error">{errors.billing_email}</p>}
+                </label>
+
+                {/* Billing phone */}
+                <label>
+                    Teléfono de facturación
+                    <input
+                        type="text"
+                        value={data.billing_phone}
+                        onChange={(e) => setData('billing_phone', e.target.value)}
+                        placeholder="Si difiere del teléfono principal"
+                    />
+                    {errors.billing_phone && <p className="field-error">{errors.billing_phone}</p>}
+                </label>
+
+                {/* Password – solo en creación */}
+                {!isEdit && (
+                    <label style={{ gridColumn: '1 / -1' }}>
+                        Contraseña de acceso <span style={{ color: '#ef4444' }}>*</span>
+                        <input
+                            type="password"
+                            value={data.password}
+                            onChange={(e) => setData('password', e.target.value)}
+                            autoComplete="new-password"
+                            required
+                        />
+                        {errors.password && <p className="field-error">{errors.password}</p>}
+                    </label>
+                )}
             </div>
 
             <div className="form-actions" style={{ marginTop: 20 }}>
@@ -228,7 +295,7 @@ function CustomerForm({ customer, geography, documentTypes, dteTypes, statuses, 
                     Cancelar
                 </button>
                 <button type="submit" className="btn" disabled={processing}>
-                    {processing ? 'Guardando…' : isEdit ? 'Actualizar' : 'Crear cliente'}
+                    {processing ? 'Guardando…' : isEdit ? 'Actualizar' : 'Crear inquilino'}
                 </button>
             </div>
         </form>
@@ -248,7 +315,7 @@ export default function CustomersIndex({ customers, search, geography, documentT
     }
 
     function handleDelete(customer) {
-        if (!confirm(`¿Eliminar al cliente "${customer.name}"? Esta acción no se puede deshacer.`)) return;
+        if (!confirm(`¿Eliminar al inquilino "${customer.name}"? Esta acción no se puede deshacer.`)) return;
         router.delete(route('admin.customers.destroy', customer.id), {
             onSuccess: () => {},
         });
@@ -256,16 +323,16 @@ export default function CustomersIndex({ customers, search, geography, documentT
 
     return (
         <AppLayout>
-            <Head title="Clientes" />
+            <Head title="Inquilinos" />
 
             <div className="top">
-                <h1>Clientes</h1>
+                <h1>Inquilinos</h1>
                 <div style={{ display: 'flex', gap: 8 }}>
                     <a href={route('admin.customers.export')} className="btn secondary">
                         Exportar
                     </a>
                     <button className="btn" type="button" onClick={() => setShowCreate(true)}>
-                        + Nuevo cliente
+                        + Nuevo inquilino
                     </button>
                 </div>
             </div>
@@ -299,7 +366,7 @@ export default function CustomersIndex({ customers, search, geography, documentT
                 <table>
                     <thead>
                         <tr>
-                            <th>Cliente</th>
+                            <th>Inquilino</th>
                             <th>Documento</th>
                             <th>DTE</th>
                             <th>Actividad</th>
@@ -317,7 +384,7 @@ export default function CustomersIndex({ customers, search, geography, documentT
                         )}
                         {customers.data.map((customer) => (
                             <tr key={customer.id}>
-                                {/* Cliente */}
+                                {/* Inquilino */}
                                 <td>
                                     <span style={{ fontWeight: 600 }}>{customer.name}</span>
                                     {customer.trade_name && (
@@ -351,8 +418,8 @@ export default function CustomersIndex({ customers, search, geography, documentT
 
                                 {/* DTE */}
                                 <td>
-                                    {customer.dte_type
-                                        ? (dteTypes[customer.dte_type] ?? customer.dte_type)
+                                    {customer.preferred_dte_type
+                                        ? (dteTypes[customer.preferred_dte_type] ?? customer.preferred_dte_type)
                                         : <span className="muted">—</span>
                                     }
                                 </td>
@@ -409,7 +476,7 @@ export default function CustomersIndex({ customers, search, geography, documentT
 
             {/* Create modal */}
             {showCreate && (
-                <Modal title="Nuevo cliente" onClose={() => setShowCreate(false)}>
+                <Modal title="Nuevo inquilino" onClose={() => setShowCreate(false)}>
                     <CustomerForm
                         geography={geography}
                         documentTypes={documentTypes}
@@ -423,7 +490,7 @@ export default function CustomersIndex({ customers, search, geography, documentT
 
             {/* Edit modal */}
             {editItem && (
-                <Modal title={`Editar cliente — ${editItem.name}`} onClose={() => setEditItem(null)}>
+                <Modal title={`Editar inquilino — ${editItem.name}`} onClose={() => setEditItem(null)}>
                     <CustomerForm
                         customer={editItem}
                         geography={geography}

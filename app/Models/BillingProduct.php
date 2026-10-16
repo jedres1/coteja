@@ -17,6 +17,7 @@ class BillingProduct extends Model
         'notes',
         'stock_quantity',
         'min_stock',
+        'product_type_id',
     ];
 
     protected $casts = [

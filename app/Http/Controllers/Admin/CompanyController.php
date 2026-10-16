@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\Customer;
+use App\Models\License;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -21,8 +22,18 @@ class CompanyController extends Controller
 
     public function store(Request $request)
     {
-        $company = Company::create($this->validated($request));
+        $validated = $this->validated($request);
 
+        $hasActiveLicense = License::where('customer_id', $validated['customer_id'])
+            ->where('status', 'active')
+            ->get()
+            ->contains(fn($l) => $l->isActive());
+
+        if (!$hasActiveLicense) {
+            return back()->withErrors(['customer_id' => 'El inquilino no tiene una licencia activa. Active una licencia antes de registrar empresas.']);
+        }
+
+        $company = Company::create($validated);
         $this->syncCustomerUsers($company);
 
         return back()->with('status', 'Empresa creada.');

@@ -271,10 +271,11 @@ class FacturaElectronicaSVController extends Controller
     public function guardarProducto(Request $request)
     {
         $hasInventory = $request->user()?->hasModuleAccess('inventory') ?? false;
+        $productId    = $request->input('id');
 
         $data = $request->validate([
             'id'             => 'nullable|integer|exists:billing_products,id',
-            'code'           => 'required|string|max:100',
+            'code'           => ['required', 'string', 'max:100', \Illuminate\Validation\Rule::unique('billing_products', 'code')->ignore($productId)],
             'description'    => 'required|string|max:255',
             'type'           => ['required', 'string', $hasInventory ? 'in:1,2,3,4' : 'in:1,2'],
             'price'          => 'required|numeric|min:0',
@@ -293,21 +294,26 @@ class FacturaElectronicaSVController extends Controller
             $productTypeId = $defaultType->id;
         }
 
-        $product = BillingProduct::updateOrCreate(
-            ['id' => $data['id'] ?? null],
-            [
-                'code'            => $data['code'],
-                'description'     => $data['description'],
-                'type'            => $data['type'],
-                'price'           => $data['price'],
-                'unit'            => $data['unit'],
-                'is_exempt'       => $data['isExempt'] ?? false,
-                'notes'           => $data['notes'] ?? null,
-                'stock_quantity'  => isset($data['stockQuantity']) ? (int) $data['stockQuantity'] : null,
-                'min_stock'       => isset($data['minStock']) ? (int) $data['minStock'] : null,
-                'product_type_id' => $productTypeId,
-            ],
-        );
+        $existingId = $data['id'] ?? null;
+        $attributes = [
+            'code'            => $data['code'],
+            'description'     => $data['description'],
+            'type'            => $data['type'],
+            'price'           => $data['price'],
+            'unit'            => $data['unit'],
+            'is_exempt'       => $data['isExempt'] ?? false,
+            'notes'           => $data['notes'] ?? null,
+            'stock_quantity'  => isset($data['stockQuantity']) ? (int) $data['stockQuantity'] : null,
+            'min_stock'       => isset($data['minStock']) ? (int) $data['minStock'] : null,
+            'product_type_id' => $productTypeId,
+        ];
+
+        if ($existingId) {
+            $product = BillingProduct::findOrFail($existingId);
+            $product->update($attributes);
+        } else {
+            $product = BillingProduct::create($attributes);
+        }
 
         $product->load('productType');
 
@@ -320,6 +326,13 @@ class FacturaElectronicaSVController extends Controller
             'success' => true,
             'product' => $this->formatProduct($product),
         ]);
+    }
+
+    public function destroyProducto(BillingProduct $product)
+    {
+        $product->delete();
+
+        return back()->with('status', 'Producto eliminado.');
     }
 
     // ── Dashboard Facturación ──────────────────────────────────────────────────

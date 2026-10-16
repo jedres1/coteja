@@ -34,7 +34,7 @@ function CompanyForm({ company, customers, onSuccess }) {
     return (
         <form onSubmit={handleSubmit}>
             <div className="field">
-                <label>Cliente</label>
+                <label>Inquilino</label>
                 <select
                     value={form.data.customer_id}
                     onChange={(e) => form.setData('customer_id', e.target.value)}
@@ -141,7 +141,7 @@ export default function CompaniesIndex({ companies, customers }) {
                     <thead>
                         <tr>
                             <th>Empresa</th>
-                            <th>Cliente</th>
+                            <th>Inquilino</th>
                             <th>NIT/DUI</th>
                             <th>NRC</th>
                             <th>Contacto</th>

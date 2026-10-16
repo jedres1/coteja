@@ -29,6 +29,7 @@ class HandleInertiaRequests extends Middleware
                     'role'             => $user->role,
                     'can_access_admin' => $user->canAccessAdmin(),
                     'is_admin'         => $user->isAdmin(),
+                    'is_inquilino'     => $user->isInquilino(),
                     'modules'          => [
                         'purchases'  => $user->hasModuleAccess('purchases'),
                         'banking'    => $user->hasModuleAccess('banking'),

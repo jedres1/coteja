@@ -16,6 +16,7 @@ class License extends Model
         'company_id',
         'plan_id',
         'license_key',
+        'license_type',
         'status',
         'starts_at',
         'expires_at',
@@ -68,6 +69,8 @@ class License extends Model
 
     public function isActive(): bool
     {
-        return $this->status === 'active' && (!$this->expires_at || $this->expires_at->isToday() || $this->expires_at->isFuture());
+        if ($this->status !== 'active') return false;
+        if ($this->license_type === 'propietario') return true;
+        return !$this->expires_at || $this->expires_at->isToday() || $this->expires_at->isFuture();
     }
 }
