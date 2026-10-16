@@ -453,6 +453,8 @@ class PurchaseInvoiceController extends Controller
         if ($tenantId !== null && empty($data['customer_id'])) {
             $data['customer_id'] = $tenantId;
         }
+        $data['created_by'] = $request->user()?->id;
+        $data['updated_by'] = $request->user()?->id;
 
         PurchaseInvoice::create($data);
 
@@ -513,7 +515,10 @@ class PurchaseInvoiceController extends Controller
 
     public function update(Request $request, PurchaseInvoice $purchaseInvoice)
     {
-        $purchaseInvoice->update($this->validatedData($request, $purchaseInvoice));
+        $purchaseInvoice->update(array_merge(
+            $this->validatedData($request, $purchaseInvoice),
+            ['updated_by' => $request->user()?->id],
+        ));
 
         return back()->with('status', 'Factura de compra actualizada.');
     }

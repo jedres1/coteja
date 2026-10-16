@@ -7,13 +7,16 @@ import Modal from '@/Components/Modal';
 
 // ─── PayForm ──────────────────────────────────────────────────────────────────
 
-function PayForm({ invoice, onSuccess, onCancel }) {
+function PayForm({ invoice, bankAccounts, onSuccess, onCancel }) {
     const { data, setData, post, processing, errors } = useForm({
-        amount:  '',
-        paid_at: '',
-        method:  '',
-        notes:   '',
+        payment_status:   'paid',
+        payment_method:   '',
+        transaction_date: new Date().toISOString().split('T')[0],
+        bank_account_id:  '',
+        reference:        '',
     });
+
+    const isPaid = data.payment_status === 'paid';
 
     function handleSubmit(e) {
         e.preventDefault();
@@ -24,49 +27,69 @@ function PayForm({ invoice, onSuccess, onCancel }) {
         <form onSubmit={handleSubmit}>
             <div className="form-grid">
                 <label>
-                    Monto pagado
-                    <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={data.amount}
-                        onChange={(e) => setData('amount', e.target.value)}
-                        required
-                        autoFocus
-                    />
-                    {errors.amount && <p className="field-error">{errors.amount}</p>}
-                </label>
-
-                <label>
-                    Fecha de pago
-                    <input
-                        type="date"
-                        value={data.paid_at}
-                        onChange={(e) => setData('paid_at', e.target.value)}
-                        required
-                    />
-                    {errors.paid_at && <p className="field-error">{errors.paid_at}</p>}
+                    Estado de pago <span style={{ color: '#ef4444' }}>*</span>
+                    <select value={data.payment_status} onChange={(e) => setData('payment_status', e.target.value)}>
+                        <option value="paid">Pagado</option>
+                        <option value="partial">Pago parcial</option>
+                        <option value="pending">Pendiente</option>
+                    </select>
+                    {errors.payment_status && <p className="field-error">{errors.payment_status}</p>}
                 </label>
 
                 <label>
                     Método de pago
                     <input
                         type="text"
-                        value={data.method}
-                        onChange={(e) => setData('method', e.target.value)}
+                        value={data.payment_method}
+                        onChange={(e) => setData('payment_method', e.target.value)}
                         placeholder="Transferencia, cheque, efectivo…"
+                        maxLength={100}
                     />
-                    {errors.method && <p className="field-error">{errors.method}</p>}
+                    {errors.payment_method && <p className="field-error">{errors.payment_method}</p>}
                 </label>
 
+                {isPaid && (
+                    <>
+                        <label>
+                            Fecha de transacción <span style={{ color: '#ef4444' }}>*</span>
+                            <input
+                                type="date"
+                                value={data.transaction_date}
+                                onChange={(e) => setData('transaction_date', e.target.value)}
+                                required={isPaid}
+                            />
+                            {errors.transaction_date && <p className="field-error">{errors.transaction_date}</p>}
+                        </label>
+
+                        <label>
+                            Cuenta bancaria <span style={{ color: '#ef4444' }}>*</span>
+                            <select
+                                value={data.bank_account_id}
+                                onChange={(e) => setData('bank_account_id', e.target.value)}
+                                required={isPaid}
+                            >
+                                <option value="">— Seleccionar cuenta —</option>
+                                {(bankAccounts ?? []).map((ba) => (
+                                    <option key={ba.id} value={ba.id}>
+                                        {ba.bank_name} / {ba.name}{ba.account_number ? ` (${ba.account_number})` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                            {errors.bank_account_id && <p className="field-error">{errors.bank_account_id}</p>}
+                        </label>
+                    </>
+                )}
+
                 <label>
-                    Notas
+                    Referencia
                     <input
                         type="text"
-                        value={data.notes}
-                        onChange={(e) => setData('notes', e.target.value)}
+                        value={data.reference}
+                        onChange={(e) => setData('reference', e.target.value)}
+                        placeholder="Nro. de referencia, cheque…"
+                        maxLength={200}
                     />
-                    {errors.notes && <p className="field-error">{errors.notes}</p>}
+                    {errors.reference && <p className="field-error">{errors.reference}</p>}
                 </label>
             </div>
 
@@ -82,7 +105,7 @@ function PayForm({ invoice, onSuccess, onCancel }) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function AccountsPayable({ invoices, search: searchProp = '', from: fromProp = '', to: toProp = '' }) {
+export default function AccountsPayable({ invoices, totals, bankAccounts, search: searchProp = '', from: fromProp = '', to: toProp = '' }) {
     const today        = new Date().toISOString().split('T')[0];
     const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
 
@@ -124,6 +147,23 @@ export default function AccountsPayable({ invoices, search: searchProp = '', fro
             <div className="top">
                 <h1>Cuentas por pagar</h1>
             </div>
+
+            {totals && (
+                <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+                    {[
+                        { label: 'Facturas pendientes', value: totals.invoices, money: false },
+                        { label: 'Proveedores', value: totals.suppliers, money: false },
+                        { label: 'Total por pagar', value: totals.total, money: true },
+                    ].map(({ label, value, money }) => (
+                        <div key={label} className="card" style={{ flex: '0 1 auto', padding: '8px 16px', textAlign: 'center' }}>
+                            <div style={{ fontSize: 11, color: '#6b7280' }}>{label}</div>
+                            <div style={{ fontWeight: 700, fontSize: 18 }}>
+                                {money ? fmt(value) : value}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
 
             <div className="card" style={{ marginBottom: 16 }}>
                 <form onSubmit={applyFilters} style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
@@ -213,6 +253,7 @@ export default function AccountsPayable({ invoices, search: searchProp = '', fro
                 >
                     <PayForm
                         invoice={payItem}
+                        bankAccounts={bankAccounts}
                         onSuccess={() => setPayItem(null)}
                         onCancel={() => setPayItem(null)}
                     />

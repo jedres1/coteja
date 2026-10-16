@@ -47,7 +47,11 @@ class SupplierController extends Controller
 
     public function store(SaveSupplierRequest $request)
     {
-        Supplier::create(array_merge($request->validated(), ['customer_id' => $this->tenantId()]));
+        Supplier::create(array_merge($request->validated(), [
+            'customer_id' => $this->tenantId(),
+            'created_by'  => $request->user()?->id,
+            'updated_by'  => $request->user()?->id,
+        ]));
 
         return back()->with('status', 'Proveedor creado.');
     }
@@ -57,7 +61,9 @@ class SupplierController extends Controller
         $tenantId = $this->tenantId();
         if ($tenantId) abort_unless($supplier->customer_id === $tenantId, 403);
 
-        $supplier->update($request->validated());
+        $supplier->update(array_merge($request->validated(), [
+            'updated_by' => $request->user()?->id,
+        ]));
 
         return back()->with('status', 'Proveedor actualizado.');
     }
