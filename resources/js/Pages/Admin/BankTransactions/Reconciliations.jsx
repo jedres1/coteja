@@ -5,10 +5,10 @@ import AppLayout from '@/Layouts/AppLayout';
 
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-const STATUS_LABEL = { open: 'Abierta', completed: 'Completada' };
+const STATUS_LABEL = { borrador: 'Abierta', completado: 'Completada' };
 const STATUS_COLOR = {
-    open:      { background: '#fef3c7', color: '#92400e' },
-    completed: { background: '#f0fdf4', color: '#15803d' },
+    borrador:   { background: '#fef3c7', color: '#92400e' },
+    completado: { background: '#f0fdf4', color: '#15803d' },
 };
 
 function periodLabel(year, month) {

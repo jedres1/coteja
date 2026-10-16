@@ -17,6 +17,7 @@ function AccountForm({ account, onSuccess, onCancel }) {
         currency:        account?.currency ?? 'USD',
         opening_balance: account?.opening_balance ?? '',
         is_active:       account?.is_active !== undefined ? String(Number(account.is_active)) : '1',
+        notes:           account?.notes ?? '',
     });
 
     function handleSubmit(e) {
@@ -101,6 +102,17 @@ function AccountForm({ account, onSuccess, onCancel }) {
                         <option value="0">Inactiva</option>
                     </select>
                     {errors.is_active && <p className="field-error">{errors.is_active}</p>}
+                </label>
+
+                <label style={{ gridColumn: '1 / -1' }}>
+                    Notas
+                    <input
+                        type="text"
+                        value={data.notes}
+                        onChange={(e) => setData('notes', e.target.value)}
+                        maxLength={1000}
+                    />
+                    {errors.notes && <p className="field-error">{errors.notes}</p>}
                 </label>
             </div>
 

@@ -97,7 +97,7 @@ function TransactionForm({ bankAccounts, onCancel }) {
                         type="text"
                         value={data.notes}
                         onChange={(e) => setData('notes', e.target.value)}
-                        maxLength={500}
+                        maxLength={2000}
                     />
                     {errors.notes && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.notes}</span>}
                 </label>
@@ -157,9 +157,17 @@ export default function Transactions({ transactions, bankAccounts, from, to, ban
             <div className="top">
                 <h1>Transacciones</h1>
                 <div style={{ display: 'flex', gap: 8 }}>
-                    <a href={route('admin.bank-transactions.transactions.export')} className="btn secondary">
+                    <button
+                        type="button"
+                        className="btn secondary"
+                        onClick={() => {
+                            const params = new URLSearchParams({ from: fromVal, to: toVal });
+                            if (accountVal) params.set('bank_account_id', accountVal);
+                            window.location.href = route('admin.bank-transactions.transactions.export') + '?' + params.toString();
+                        }}
+                    >
                         Exportar
-                    </a>
+                    </button>
                     <button type="button" className="btn" onClick={() => setShowCreate((v) => !v)}>
                         {showCreate ? 'Cancelar' : '+ Nueva transacción'}
                     </button>

@@ -5,8 +5,8 @@ import AppLayout from '@/Layouts/AppLayout';
 
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-const STATUS_LABEL = { open: 'Abierta', completado: 'Completada' };
-const STATUS_BADGE = { open: 'suspended', completado: 'active' };
+const STATUS_LABEL = { borrador: 'Abierta', completado: 'Completada' };
+const STATUS_BADGE = { borrador: 'suspended', completado: 'active' };
 const TYPE_LABEL   = { credit: 'Crédito', debit: 'Débito', deposito: 'Depósito', pago: 'Pago', transferencia: 'Transferencia', cheque: 'Cheque', otro: 'Otro' };
 
 const fmt = (n) =>
@@ -17,7 +17,7 @@ const fmt = (n) =>
 export default function ReconciliationDetail({ reconciliation, transactions }) {
     const [uploading, setUploading] = useState(false);
 
-    const isOpen    = reconciliation.status === 'open';
+    const isOpen    = reconciliation.status === 'borrador';
     const periodStr = MONTHS[(reconciliation.period_month ?? 1) - 1] + ' ' + reconciliation.period_year;
 
     function handleToggle(rawId, source, currentlyReconciled) {
