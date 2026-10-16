@@ -53,11 +53,6 @@ class FacturaElectronicaSVController extends Controller
         $query    = $this->buildReceivableQuery($request, $tenantId);
         $all      = $this->buildReceivableBaseQuery($request, $tenantId);
 
-        $availableCustomers = $request->user()?->isAdmin()
-            ? Customer::where('status', 'active')->orderBy('name')->get(['id', 'name'])
-                ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])->values()
-            : collect();
-
         return Inertia::render('Admin/Billing/CuentasPorCobrar', [
             'stats'              => $this->buildReceivableStats($all),
             'invoices'           => $query->paginate(15)->through(fn (BillingInvoice $invoice) => $this->formatReceivableItem($invoice)),
@@ -67,7 +62,7 @@ class FacturaElectronicaSVController extends Controller
                 'to'             => $request->query('to'),
                 'payment_status' => $request->query('payment_status', ''),
             ],
-            'availableCustomers' => $availableCustomers,
+            'availableCustomers' => $this->availableCustomersForUser($request),
         ]);
     }
 
@@ -103,11 +98,6 @@ class FacturaElectronicaSVController extends Controller
 
         $invoices = $this->buildFacturasQuery($request, $tenantId)->paginate(15);
 
-        $availableCustomers = $request->user()?->isAdmin()
-            ? Customer::where('status', 'active')->orderBy('name')->get(['id', 'name'])
-                ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])->values()
-            : collect();
-
         return Inertia::render('Admin/Billing/Facturas', [
             'stats' => [
                 'todayCount'     => BillingInvoice::whereDate('issued_at', $today)->tap($scope)->count(),
@@ -138,7 +128,7 @@ class FacturaElectronicaSVController extends Controller
                     'customerName'   => $inv->customer_name,
                     'date'           => optional($inv->issued_at)->format('Y-m-d'),
                 ])->values(),
-            'availableCustomers'   => $availableCustomers,
+            'availableCustomers'   => $this->availableCustomersForUser($request),
         ]);
     }
 
@@ -356,11 +346,6 @@ class FacturaElectronicaSVController extends Controller
         $today    = now()->toDateString();
         $scope    = fn ($q) => $q->when($tenantId !== null, fn ($q) => $q->where('tenant_customer_id', $tenantId));
 
-        $availableCustomers = $request->user()?->isAdmin()
-            ? Customer::where('status', 'active')->orderBy('name')->get(['id', 'name'])
-                ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])->values()
-            : collect();
-
         return Inertia::render('Admin/Billing/Dashboard', [
             'stats'              => [
                 'todayCount'     => BillingInvoice::whereDate('issued_at', $today)->tap($scope)->count(),
@@ -374,7 +359,7 @@ class FacturaElectronicaSVController extends Controller
                 ->when($tenantId !== null, fn ($q) => $q->where('tenant_customer_id', $tenantId))
                 ->latest('issued_at')->latest('id')->take(15)->get()
                 ->map(fn (BillingInvoice $invoice) => $this->formatFacturaItem($invoice)),
-            'availableCustomers' => $availableCustomers,
+            'availableCustomers' => $this->availableCustomersForUser($request),
         ]);
     }
 
@@ -394,7 +379,12 @@ class FacturaElectronicaSVController extends Controller
                 ->withErrors(['_error' => 'Solo se pueden corregir facturas en estado RECHAZADO.']);
         }
 
-        $tenantId = $invoice->tenant_customer_id ?? $this->activeTenantId($request);
+        $tenantId = $this->activeTenantId($request);
+        if ($tenantId !== null && $invoice->tenant_customer_id !== $tenantId) {
+            abort(403);
+        }
+
+        $tenantId = $invoice->tenant_customer_id ?? $tenantId;
 
         return Inertia::render('Admin/Billing/NuevaFactura', [
             ...$this->buildInvoiceFormData($request, $tenantId),
@@ -415,11 +405,6 @@ class FacturaElectronicaSVController extends Controller
         $tenantId = $this->activeTenantId($request);
         $settings = BillingSetting::allAsArray($tenantId);
 
-        $availableCustomers = $request->user()?->isAdmin()
-            ? Customer::where('status', 'active')->orderBy('name')->get(['id', 'name'])
-                ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])->values()
-            : collect();
-
         return Inertia::render('Admin/Billing/Configuracion', [
             'settings'           => [
                 'emisor'    => $settings['emisor']    ?? [],
@@ -431,7 +416,7 @@ class FacturaElectronicaSVController extends Controller
             ],
             'correlativos'       => $this->buildCorrelativos($tenantId),
             'currentYear'        => now()->year,
-            'availableCustomers' => $availableCustomers,
+            'availableCustomers' => $this->availableCustomersForUser($request),
         ]);
     }
 
@@ -991,11 +976,31 @@ class FacturaElectronicaSVController extends Controller
         if (! $user) {
             return null;
         }
-        if ($user->isAdmin()) {
+        if ($user->isAdmin() || $user->isConsultant()) {
             $id = $request->session()->get('billing_tenant_id');
             return $id ? (int) $id : null;
         }
         return $user->customer_id ? (int) $user->customer_id : null;
+    }
+
+    private function availableCustomersForUser(Request $request): array
+    {
+        $user = $request->user();
+        if (! $user) return [];
+        if ($user->isAdmin()) {
+            return Customer::where('status', 'active')->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])
+                ->values()->all();
+        }
+        if ($user->isConsultant()) {
+            $ids = $user->accessibleCompanies()->pluck('customer_id')->unique()->filter()->values();
+            return Customer::whereIn('id', $ids)->where('status', 'active')->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])
+                ->values()->all();
+        }
+        return [];
     }
 
     private function buildReceivableBaseQuery(Request $request, ?int $tenantId): Builder
@@ -1095,11 +1100,6 @@ class FacturaElectronicaSVController extends Controller
                 'notes'       => $p->notes,
             ]);
 
-        $availableCustomers = $request->user()?->isAdmin()
-            ? Customer::where('status', 'active')->orderBy('name')->get(['id', 'name'])
-                ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])->values()
-            : collect();
-
         return [
             'customers'          => $customers,
             'products'           => $products,
@@ -1114,7 +1114,7 @@ class FacturaElectronicaSVController extends Controller
             'clientesVariosId'   => Customer::where('email', 'clientes.varios@coteja.internal')->value('id'),
             'hasInventory'       => $request->user()?->hasModuleAccess('inventory') ?? false,
             'currentYear'        => now()->year,
-            'availableCustomers' => $availableCustomers,
+            'availableCustomers' => $this->availableCustomersForUser($request),
         ];
     }
 

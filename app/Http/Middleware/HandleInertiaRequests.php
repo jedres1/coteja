@@ -29,6 +29,7 @@ class HandleInertiaRequests extends Middleware
                     'role'             => $user->role,
                     'can_access_admin' => $user->canAccessAdmin(),
                     'is_admin'         => $user->isAdmin(),
+                    'is_consultant'    => $user->isConsultant(),
                     'is_inquilino'     => $user->isInquilino(),
                     'modules'          => [
                         'purchases'  => $user->hasModuleAccess('purchases'),
@@ -64,12 +65,23 @@ class HandleInertiaRequests extends Middleware
                     ->toArray();
                 return ['id' => $customer->id, 'name' => $customer->name, 'modules' => $modules];
             },
-            'availableCustomers' => $user && $user->isAdmin()
-                ? Customer::where('status', 'active')->orderBy('name')
-                    ->get(['id', 'name'])
-                    ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])
-                    ->toArray()
-                : [],
+            'availableCustomers' => function () use ($user) {
+                if (! $user) return [];
+                if ($user->isAdmin()) {
+                    return Customer::where('status', 'active')->orderBy('name')
+                        ->get(['id', 'name'])
+                        ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])
+                        ->toArray();
+                }
+                if ($user->isConsultant()) {
+                    $ids = $user->accessibleCompanies()->pluck('customer_id')->unique()->filter()->values();
+                    return Customer::whereIn('id', $ids)->where('status', 'active')->orderBy('name')
+                        ->get(['id', 'name'])
+                        ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])
+                        ->toArray();
+                }
+                return [];
+            },
         ]);
     }
 }

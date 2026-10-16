@@ -65,6 +65,7 @@ export default function AppLayout({ title, children }) {
     };
 
     const isAdmin = user?.is_admin;
+    const isConsultant = user?.is_consultant;
     const isInquilino = user?.is_inquilino;
     const canAccessAdmin = user?.can_access_admin;
     // Cuando hay empresa activa, los módulos visibles son los de esa empresa; si no, los del usuario
@@ -220,7 +221,7 @@ export default function AppLayout({ title, children }) {
                         <span className="topbar-name">{user?.name}</span>
                         <span className="topbar-email">{user?.email}</span>
                     </div>
-                    {isAdmin && (
+                    {(isAdmin || isConsultant) && availableCustomers.length > 0 && (
                         <TenantSelector
                             billingTenant={billingTenant}
                             availableCustomers={availableCustomers}
