@@ -103,15 +103,17 @@ class PurchaseInvoiceController extends Controller
         return back()->with('status', 'Parámetros contables de compras y cuentas por pagar guardados.');
     }
 
-    public function generateMissingEntries(AccountingEntryService $accounting, AccountingPeriodService $periods)
+    public function generateMissingEntries(Request $request, AccountingEntryService $accounting, AccountingPeriodService $periods)
     {
-        abort_unless(request()->user()?->hasModuleAccess('accounting'), 403, 'Requiere acceso al módulo de Contabilidad.');
+        abort_unless($request->user()?->hasModuleAccess('accounting'), 403, 'Requiere acceso al módulo de Contabilidad.');
 
+        $tenantId        = $this->activeTenantId($request);
         $purchaseEntries = 0;
-        $payableEntries = 0;
-        $failures = 0;
+        $payableEntries  = 0;
+        $failures        = 0;
 
         $invoices = PurchaseInvoice::with('supplier')
+            ->when($tenantId !== null, fn ($q) => $q->where('customer_id', $tenantId))
             ->where('status', 'approved')
             ->whereDoesntHave('journalEntry')
             ->get();
@@ -119,7 +121,7 @@ class PurchaseInvoiceController extends Controller
         foreach ($invoices as $invoice) {
             try {
                 $periods->validateDateOrFail($invoice->purchase_date ?? now());
-                if ($accounting->createFromPurchase($invoice, request()->user()?->id)) {
+                if ($accounting->createFromPurchase($invoice, $request->user()?->id)) {
                     $purchaseEntries++;
                 }
             } catch (\Throwable) {
@@ -128,6 +130,7 @@ class PurchaseInvoiceController extends Controller
         }
 
         $paidInvoices = PurchaseInvoice::with(['supplier', 'bankTransactions'])
+            ->when($tenantId !== null, fn ($q) => $q->where('customer_id', $tenantId))
             ->where('payment_status', 'paid')
             ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('journal_entries')
                 ->whereColumn('journal_entries.source_id', 'purchase_invoices.id')
@@ -139,7 +142,7 @@ class PurchaseInvoiceController extends Controller
                 $paymentTransaction = $invoice->bankTransactions->sortByDesc('transaction_date')->first();
                 $accounting->createFromPurchasePayment(
                     $invoice,
-                    request()->user()?->id,
+                    $request->user()?->id,
                     $paymentTransaction?->transaction_date?->toDateString() ?? $invoice->purchase_date?->toDateString(),
                     $paymentTransaction?->reference,
                 );
@@ -193,8 +196,8 @@ class PurchaseInvoiceController extends Controller
         $baseQuery = fn () => PurchaseInvoice::whereIn('payment_status', ['pending', 'partial'])
             ->whereNotIn('status', ['extracted', 'rejected'])
             ->when($customerIds !== null, fn ($q) => $q->whereIn('customer_id', $customerIds))
-            ->when($from !== '', fn ($q) => $q->whereDate('date', '>=', $from))
-            ->when($to   !== '', fn ($q) => $q->whereDate('date', '<=', $to))
+            ->when($from !== '', fn ($q) => $q->whereDate('purchase_date', '>=', $from))
+            ->when($to   !== '', fn ($q) => $q->whereDate('purchase_date', '<=', $to))
             ->when($search !== '', function ($q) use ($search) {
                 $q->where(function ($q) use ($search) {
                     $q->where('total', 'like', "%{$search}%")
@@ -213,10 +216,16 @@ class PurchaseInvoiceController extends Controller
         ];
 
         $invoices = $baseQuery()
-            ->with('supplier')
+            ->with(['supplier', 'bankTransactions'])
             ->latest()
             ->paginate(25)
             ->withQueryString();
+
+        $invoices->getCollection()->transform(function ($invoice) {
+            $invoice->paid_amount = $invoice->bankTransactions
+                ->sum(fn ($bt) => $bt->pivot->amount_applied ?? 0);
+            return $invoice;
+        });
 
         $tenantId     = $this->activeTenantId($request);
         $bankAccounts = BankAccount::when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))

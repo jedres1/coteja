@@ -171,7 +171,7 @@ export default function AccountsPayable({ invoices, search: searchProp = '', fro
                                     <td style={{ fontWeight: 600 }}>{invoice.supplier?.name}</td>
                                     <td className="muted">{invoice.invoice_number}</td>
                                     <td>
-                                        <span>{invoice.date}</span>
+                                        <span>{invoice.purchase_date}</span>
                                         {invoice.due_date && (
                                             <><br /><span className="muted" style={{ fontSize: 12 }}>Vence: {invoice.due_date}</span></>
                                         )}

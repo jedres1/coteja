@@ -27,6 +27,7 @@ function SupplierForm({ supplier, geography, onSuccess, onCancel }) {
 
     const { data, setData, post, put, processing, errors } = useForm({
         name:                 supplier?.name ?? '',
+        trade_name:           supplier?.trade_name ?? '',
         email:                supplier?.email ?? '',
         phone:                supplier?.phone ?? '',
         status:               supplier?.status ?? 'active',
@@ -34,9 +35,14 @@ function SupplierForm({ supplier, geography, onSuccess, onCancel }) {
         document_number:      supplier?.document_number ?? '',
         nrc:                  supplier?.nrc ?? '',
         business_activity:    supplier?.business_activity ?? '',
+        activity_description: supplier?.activity_description ?? '',
         address_department:   supplier?.address_department ?? '',
         address_municipality: supplier?.address_municipality ?? '',
         address_district:     supplier?.address_district ?? '',
+        address:              supplier?.address ?? '',
+        billing_email:        supplier?.billing_email ?? '',
+        billing_phone:        supplier?.billing_phone ?? '',
+        notes:                supplier?.notes ?? '',
     });
 
     const [activities, setActivities] = useState([]);
@@ -82,6 +88,17 @@ function SupplierForm({ supplier, geography, onSuccess, onCancel }) {
                         autoFocus
                     />
                     {errors.name && <p className="field-error">{errors.name}</p>}
+                </label>
+
+                {/* Trade name */}
+                <label>
+                    Nombre comercial
+                    <input
+                        type="text"
+                        value={data.trade_name}
+                        onChange={(e) => setData('trade_name', e.target.value)}
+                    />
+                    {errors.trade_name && <p className="field-error">{errors.trade_name}</p>}
                 </label>
 
                 {/* Email */}
@@ -169,6 +186,18 @@ function SupplierForm({ supplier, geography, onSuccess, onCancel }) {
                     {errors.business_activity && <p className="field-error">{errors.business_activity}</p>}
                 </label>
 
+                {/* Activity description */}
+                <label>
+                    Descripción de actividad
+                    <input
+                        type="text"
+                        value={data.activity_description}
+                        onChange={(e) => setData('activity_description', e.target.value)}
+                        maxLength={255}
+                    />
+                    {errors.activity_description && <p className="field-error">{errors.activity_description}</p>}
+                </label>
+
                 {/* Department */}
                 <label>
                     Departamento
@@ -211,6 +240,55 @@ function SupplierForm({ supplier, geography, onSuccess, onCancel }) {
                         ))}
                     </select>
                     {errors.address_district && <p className="field-error">{errors.address_district}</p>}
+                </label>
+
+                {/* Address */}
+                <label style={{ gridColumn: '1 / -1' }}>
+                    Dirección <span style={{ color: '#ef4444' }}>*</span>
+                    <input
+                        type="text"
+                        value={data.address}
+                        onChange={(e) => setData('address', e.target.value)}
+                        maxLength={500}
+                        required
+                    />
+                    {errors.address && <p className="field-error">{errors.address}</p>}
+                </label>
+
+                {/* Billing email */}
+                <label>
+                    Correo de facturación
+                    <input
+                        type="email"
+                        value={data.billing_email}
+                        onChange={(e) => setData('billing_email', e.target.value)}
+                        maxLength={255}
+                    />
+                    {errors.billing_email && <p className="field-error">{errors.billing_email}</p>}
+                </label>
+
+                {/* Billing phone */}
+                <label>
+                    Teléfono de facturación
+                    <input
+                        type="text"
+                        value={data.billing_phone}
+                        onChange={(e) => setData('billing_phone', e.target.value)}
+                        maxLength={50}
+                    />
+                    {errors.billing_phone && <p className="field-error">{errors.billing_phone}</p>}
+                </label>
+
+                {/* Notes */}
+                <label style={{ gridColumn: '1 / -1' }}>
+                    Notas
+                    <input
+                        type="text"
+                        value={data.notes}
+                        onChange={(e) => setData('notes', e.target.value)}
+                        maxLength={2000}
+                    />
+                    {errors.notes && <p className="field-error">{errors.notes}</p>}
                 </label>
             </div>
 

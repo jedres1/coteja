@@ -215,8 +215,8 @@ function ExtractForm() {
     const today        = new Date().toISOString().split('T')[0];
     const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
     const { data, setData, post, processing, errors } = useForm({
-        from_date: firstOfMonth,
-        to_date:   today,
+        from: firstOfMonth,
+        to:   today,
     });
 
     function handleSubmit(e) {
@@ -230,21 +230,21 @@ function ExtractForm() {
                 Desde
                 <input
                     type="date"
-                    value={data.from_date}
-                    onChange={(e) => setData('from_date', e.target.value)}
+                    value={data.from}
+                    onChange={(e) => setData('from', e.target.value)}
                     required
                 />
-                {errors.from_date && <p className="field-error">{errors.from_date}</p>}
+                {errors.from && <p className="field-error">{errors.from}</p>}
             </label>
             <label style={{ flex: '1 1 160px', margin: 0 }}>
                 Hasta
                 <input
                     type="date"
-                    value={data.to_date}
-                    onChange={(e) => setData('to_date', e.target.value)}
+                    value={data.to}
+                    onChange={(e) => setData('to', e.target.value)}
                     required
                 />
-                {errors.to_date && <p className="field-error">{errors.to_date}</p>}
+                {errors.to && <p className="field-error">{errors.to}</p>}
             </label>
             <button type="submit" className="btn" disabled={processing}>
                 {processing ? 'Extrayendo…' : 'Extraer facturas'}
@@ -418,7 +418,7 @@ export default function PendingApproval({ invoices, total, showAll }) {
                                         style={{ width: 'auto' }}
                                     />
                                 </td>
-                                <td className="muted">{invoice.date}</td>
+                                <td className="muted">{invoice.purchase_date}</td>
                                 <td style={{ fontWeight: 600 }}>{invoice.supplier?.name}</td>
                                 <td>
                                     {invoice.receptor_name

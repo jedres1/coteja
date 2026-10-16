@@ -29,6 +29,7 @@ class Supplier extends Model
         'activity_description',
         'address_department',
         'address_municipality',
+        'address_district',
         'address',
         'billing_email',
         'billing_phone',
