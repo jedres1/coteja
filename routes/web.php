@@ -242,9 +242,11 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:payroll'])-
 });
 
 Route::middleware(['auth', 'role:customer'])->prefix('cliente')->name('client.')->group(function () {
-    Route::get('/', [PortalController::class, 'dashboard'])->name('dashboard');
+    Route::get('/',          [PortalController::class, 'dashboard'])->name('dashboard');
+    Route::get('/perfil',    [PortalController::class, 'profile'])->name('profile');
+    Route::put('/perfil/password', [PortalController::class, 'updatePassword'])->name('profile.password');
     Route::get('/facturacion', [PortalController::class, 'billing'])->middleware('module:billing')->name('billing');
-    Route::get('/compras', [PortalController::class, 'purchases'])->middleware('module:purchases')->name('purchases');
+    Route::get('/compras',     [PortalController::class, 'purchases'])->middleware('module:purchases')->name('purchases');
     Route::post('/empresa-activa', [PortalController::class, 'switchCompany'])->name('companies.switch');
     Route::get('/backups/{backup}/download', [PortalController::class, 'backup'])->name('backups.download');
 });
