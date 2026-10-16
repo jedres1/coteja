@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 
 class PayrollEntryService
 {
-    public function createFromPayroll(PayrollPeriod $period, ?int $userId = null): ?JournalEntry
+    public function createFromPayroll(PayrollPeriod $period, ?int $userId = null, ?int $customerId = null): ?JournalEntry
     {
         if ($period->status === 'aplicado') {
             return null;
@@ -30,7 +30,9 @@ class PayrollEntryService
             ->get()
             ->keyBy('system_key');
 
-        $package = AccountingPackage::where('code', 'NOM')->where('is_active', true)->first();
+        $package = $customerId
+            ? AccountingPackage::where('customer_id', $customerId)->where('code', 'NOM')->where('is_active', true)->first()
+            : AccountingPackage::whereNull('customer_id')->where('code', 'NOM')->where('is_active', true)->first();
 
         $missing = [];
         if (! $package) {
@@ -83,7 +85,7 @@ class PayrollEntryService
         }
 
         return DB::transaction(function () use (
-            $period, $package, $settings, $legalConcepts, $userId,
+            $period, $package, $settings, $legalConcepts, $userId, $customerId,
             $totalGross, $totalIsssEmployer, $totalAfpEmployer,
             $totalIsssEmployee, $totalAfpEmployee, $totalIsr, $totalNet,
             $benefitConcepts, $deductionConcepts, $totalBenefits
@@ -91,6 +93,7 @@ class PayrollEntryService
             $number = $package->reserveNextNumber();
 
             $entry = JournalEntry::create([
+                'customer_id'           => $customerId,
                 'entry_number'          => $number,
                 'entry_date'            => $period->period_end->toDateString(),
                 'description'           => 'Nómina: ' . $period->name,

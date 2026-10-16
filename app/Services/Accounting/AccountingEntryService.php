@@ -13,23 +13,35 @@ use RuntimeException;
 
 class AccountingEntryService
 {
+    private function packageFor(?int $customerId, string $code): ?AccountingPackage
+    {
+        if ($customerId) {
+            return AccountingPackage::forCustomer($customerId)->where('code', $code)->where('is_active', true)->first();
+        }
+        return AccountingPackage::whereNull('customer_id')->where('code', $code)->where('is_active', true)->first();
+    }
+
     public function createFromBilling(BillingInvoice $invoice, ?int $userId = null): ?JournalEntry
     {
-        $package = AccountingPackage::where('code', 'FA')->where('is_active', true)->first();
+        $customerId = $invoice->tenant_customer_id ?? null;
+        $package    = $this->packageFor($customerId, 'FA');
 
         if (! $package || ! $package->debit_account_id || ! $package->credit_account_id) {
             return null;
         }
 
-        if (JournalEntry::where('source_type', 'billing')->where('source_id', $invoice->id)->exists()) {
+        if (JournalEntry::where('source_type', 'billing')->where('source_id', $invoice->id)
+            ->when($customerId, fn ($q) => $q->where('customer_id', $customerId))
+            ->exists()) {
             return null;
         }
 
-        return DB::transaction(function () use ($invoice, $package, $userId) {
+        return DB::transaction(function () use ($invoice, $package, $userId, $customerId) {
             $number = $package->reserveNextNumber();
             $total  = round((float) $invoice->total, 2);
 
             $entry = JournalEntry::create([
+                'customer_id'           => $customerId,
                 'entry_number'          => $number,
                 'entry_date'            => $invoice->issued_at ?? now()->toDateString(),
                 'description'           => 'Venta: ' . ($invoice->customer_name ?? 'Cliente') . ' — ' . $invoice->number_control,
@@ -66,7 +78,6 @@ class AccountingEntryService
                 ],
             ];
 
-            // COGS + Inventory lines si se configuraron cuentas secundarias
             if ($package->secondary_debit_account_id && $package->secondary_credit_account_id) {
                 $costValue = $this->billingInventoryValue($invoice);
                 if ($costValue > 0) {
@@ -99,22 +110,26 @@ class AccountingEntryService
 
     public function createFromPurchase(PurchaseInvoice $invoice, ?int $userId = null): ?JournalEntry
     {
-        $package = AccountingPackage::where('code', 'CP')->where('is_active', true)->first();
+        $customerId = $invoice->customer_id ?? null;
+        $package    = $this->packageFor($customerId, 'CP');
 
         if (! $package || ! $package->debit_account_id || ! $package->credit_account_id) {
             throw new RuntimeException('Configure las cuentas de débito y crédito del paquete CP en Compras antes de aprobar facturas.');
         }
 
-        if (JournalEntry::where('source_type', 'purchase')->where('source_id', $invoice->id)->exists()) {
+        if (JournalEntry::where('source_type', 'purchase')->where('source_id', $invoice->id)
+            ->when($customerId, fn ($q) => $q->where('customer_id', $customerId))
+            ->exists()) {
             return null;
         }
 
-        return DB::transaction(function () use ($invoice, $package, $userId) {
+        return DB::transaction(function () use ($invoice, $package, $userId, $customerId) {
             $number       = $package->reserveNextNumber();
             $total        = round((float) $invoice->total, 2);
             $supplierName = $invoice->supplier?->name ?? 'Proveedor';
 
             $entry = JournalEntry::create([
+                'customer_id'           => $customerId,
                 'entry_number'          => $number,
                 'entry_date'            => $invoice->purchase_date ?? now()->toDateString(),
                 'description'           => 'Compra: ' . $supplierName . ' — ' . $invoice->invoice_number,
@@ -151,7 +166,6 @@ class AccountingEntryService
                 ],
             ];
 
-            // Líneas secundarias de inventario si están configuradas
             if ($package->secondary_debit_account_id && $package->secondary_credit_account_id) {
                 $inventoryValue = $this->purchaseInventoryValue($invoice);
                 if ($inventoryValue > 0) {
@@ -188,53 +202,58 @@ class AccountingEntryService
         ?string $paymentDate = null,
         ?string $reference = null,
     ): ?JournalEntry {
-        $package = AccountingPackage::where('code', 'CXP')->where('is_active', true)->first();
+        $customerId = $invoice->customer_id ?? null;
+        $package    = $this->packageFor($customerId, 'CXP');
 
         if (! $package || ! $package->debit_account_id || ! $package->credit_account_id) {
             throw new RuntimeException('Configure las cuentas de débito y crédito del paquete CXP en Compras antes de registrar pagos.');
         }
 
-        if (JournalEntry::where('source_type', 'purchase_payment')->where('source_id', $invoice->id)->exists()) {
+        if (JournalEntry::where('source_type', 'purchase_payment')->where('source_id', $invoice->id)
+            ->when($customerId, fn ($q) => $q->where('customer_id', $customerId))
+            ->exists()) {
             return null;
         }
 
-        return DB::transaction(function () use ($invoice, $package, $userId, $paymentDate, $reference) {
+        return DB::transaction(function () use ($invoice, $package, $userId, $paymentDate, $reference, $customerId) {
             $supplierName = $invoice->supplier?->name ?? 'Proveedor';
-            $entryNumber = $package->reserveNextNumber();
+            $entryNumber  = $package->reserveNextNumber();
+
             $entry = JournalEntry::create([
-                'entry_number' => $entryNumber,
-                'entry_date' => $paymentDate ?? now()->toDateString(),
-                'description' => 'Pago de compra: '.$supplierName.' — '.$invoice->invoice_number,
-                'reference' => $reference ?: $invoice->invoice_number,
-                'status' => 'aprobado',
-                'created_by' => $userId,
-                'approved_by' => $userId,
-                'approved_at' => now(),
+                'customer_id'           => $customerId,
+                'entry_number'          => $entryNumber,
+                'entry_date'            => $paymentDate ?? now()->toDateString(),
+                'description'           => 'Pago de compra: ' . $supplierName . ' — ' . $invoice->invoice_number,
+                'reference'             => $reference ?: $invoice->invoice_number,
+                'status'                => 'aprobado',
+                'created_by'            => $userId,
+                'approved_by'           => $userId,
+                'approved_at'           => now(),
                 'accounting_package_id' => $package->id,
-                'source_type' => 'purchase_payment',
-                'source_id' => $invoice->id,
-                'source_document' => $invoice->invoice_number,
+                'source_type'           => 'purchase_payment',
+                'source_id'             => $invoice->id,
+                'source_document'       => $invoice->invoice_number,
             ]);
 
             $amount = round((float) $invoice->total, 2);
             JournalEntryLine::insert([
                 [
                     'journal_entry_id' => $entry->id,
-                    'account_id' => $package->debit_account_id,
-                    'cost_center_id' => $package->cost_center_id,
-                    'description' => 'Disminución de cuentas por pagar — '.$invoice->invoice_number,
-                    'debit' => $amount,
-                    'credit' => 0,
-                    'sort_order' => 0,
+                    'account_id'       => $package->debit_account_id,
+                    'cost_center_id'   => $package->cost_center_id,
+                    'description'      => 'Disminución de cuentas por pagar — ' . $invoice->invoice_number,
+                    'debit'            => $amount,
+                    'credit'           => 0,
+                    'sort_order'       => 0,
                 ],
                 [
                     'journal_entry_id' => $entry->id,
-                    'account_id' => $package->credit_account_id,
-                    'cost_center_id' => $package->cost_center_id,
-                    'description' => 'Pago al proveedor: '.$supplierName,
-                    'debit' => 0,
-                    'credit' => $amount,
-                    'sort_order' => 1,
+                    'account_id'       => $package->credit_account_id,
+                    'cost_center_id'   => $package->cost_center_id,
+                    'description'      => 'Pago al proveedor: ' . $supplierName,
+                    'debit'            => 0,
+                    'credit'           => $amount,
+                    'sort_order'       => 1,
                 ],
             ]);
 
@@ -242,20 +261,22 @@ class AccountingEntryService
         });
     }
 
-    public function createFromInventory(InventoryMovement $movement, ?int $userId = null): ?JournalEntry
+    public function createFromInventory(InventoryMovement $movement, ?int $userId = null, ?int $customerId = null): ?JournalEntry
     {
         // Movimientos originados desde facturación o compras ya tienen su partida en FA/CP
         if ($movement->billing_invoice_id || $movement->purchase_invoice_id) {
             return null;
         }
 
-        $package = AccountingPackage::where('code', 'IN')->where('is_active', true)->first();
+        $package = $this->packageFor($customerId, 'IN');
 
         if (! $package || ! $package->debit_account_id || ! $package->credit_account_id) {
             return null;
         }
 
-        if (JournalEntry::where('source_type', 'inventory')->where('source_id', $movement->id)->exists()) {
+        if (JournalEntry::where('source_type', 'inventory')->where('source_id', $movement->id)
+            ->when($customerId, fn ($q) => $q->where('customer_id', $customerId))
+            ->exists()) {
             return null;
         }
 
@@ -266,13 +287,14 @@ class AccountingEntryService
             return null;
         }
 
-        return DB::transaction(function () use ($movement, $package, $userId, $amount, $product) {
+        return DB::transaction(function () use ($movement, $package, $userId, $amount, $product, $customerId) {
             $number      = $package->reserveNextNumber();
             $productName = $product?->description ?? 'Producto';
             $typeLabel   = $movement->type === 'entry' ? 'Entrada' : 'Salida';
             $docRef      = $movement->document_number ?? ('MOV-' . $movement->id);
 
             $entry = JournalEntry::create([
+                'customer_id'           => $customerId,
                 'entry_number'          => $number,
                 'entry_date'            => $movement->created_at->toDateString(),
                 'description'           => $typeLabel . ' inventario: ' . $productName . ($movement->document_number ? ' — ' . $movement->document_number : ''),
@@ -288,8 +310,6 @@ class AccountingEntryService
                 'source_document'       => $docRef,
             ]);
 
-            // Entrada: Debe=Inventario  Haber=Costo/Proveedor
-            // Salida:  Debe=Costo  Haber=Inventario
             if ($movement->type === 'entry') {
                 $debitDesc  = 'Entrada inventario: ' . $productName;
                 $creditDesc = 'Costo entrada: ' . $productName;

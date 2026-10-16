@@ -3,12 +3,36 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class SaveJournalEntryRequest extends FormRequest
 {
+    private function resolveCustomerId(): ?int
+    {
+        $user = $this->user();
+        if (!$user) return null;
+
+        if ($user->isAdmin() || $user->isConsultant()) {
+            $id = session('billing_tenant_id');
+            return $id ? (int) $id : null;
+        }
+
+        return $user->customer_id ? (int) $user->customer_id : null;
+    }
+
     public function rules(): array
     {
+        $customerId = $this->resolveCustomerId();
+
+        $accountRule = $customerId
+            ? Rule::exists('accounting_accounts', 'id')->where('customer_id', $customerId)
+            : 'exists:accounting_accounts,id';
+
+        $costCenterRule = $customerId
+            ? Rule::exists('cost_centers', 'id')->where('customer_id', $customerId)
+            : 'exists:cost_centers,id';
+
         return [
             'entry_date'             => ['required', 'date'],
             'description'            => ['required', 'string', 'max:300'],
@@ -16,8 +40,8 @@ class SaveJournalEntryRequest extends FormRequest
             'notes'                  => ['nullable', 'string', 'max:2000'],
             'action'                 => ['required', 'in:borrador,aprobado'],
             'lines'                  => ['required', 'array', 'min:2'],
-            'lines.*.account_id'     => ['required', 'exists:accounting_accounts,id'],
-            'lines.*.cost_center_id' => ['nullable', 'exists:cost_centers,id'],
+            'lines.*.account_id'     => ['required', $accountRule],
+            'lines.*.cost_center_id' => ['nullable', $costCenterRule],
             'lines.*.description'    => ['nullable', 'string', 'max:255'],
             'lines.*.debit'          => ['required', 'numeric', 'min:0'],
             'lines.*.credit'         => ['required', 'numeric', 'min:0'],

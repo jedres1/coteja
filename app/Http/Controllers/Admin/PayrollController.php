@@ -220,8 +220,9 @@ class PayrollController extends Controller
         }
 
         try {
-            $service = new PayrollEntryService();
-            $entry   = $service->createFromPayroll($period, auth()->id());
+            $service    = new PayrollEntryService();
+            $tenantId   = (int) session('billing_tenant_id') ?: null;
+            $entry      = $service->createFromPayroll($period, auth()->id(), $tenantId);
 
             if (! $entry) {
                 return back()->withErrors('No se pudo aplicar la nómina. Verifique que el período tenga líneas y no esté ya aplicado.');

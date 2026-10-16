@@ -9,51 +9,17 @@ use App\Models\AccountingPeriod;
 use App\Models\AccountingYearPeriod;
 use App\Models\CostCenter;
 use App\Services\Accounting\AccountingPeriodService;
+use App\Traits\HasAccountingTenant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class AccountingController extends Controller
 {
+    use HasAccountingTenant;
+
     public function __construct(private readonly AccountingPeriodService $periods) {}
-
-    // ── Tenant helper ───────────────────────────────────────────────────────
-
-    /**
-     * Devuelve el customer_id activo según el rol:
-     *  - Admin / Consultor: usa la sesión billing_tenant_id (empresa seleccionada)
-     *  - Inquilino / Customer: usa su propio customer_id
-     */
-    private function tenantCustomerId(): ?int
-    {
-        $user = auth()->user();
-        if (!$user) return null;
-
-        if ($user->isAdmin() || $user->isConsultant()) {
-            $id = session('billing_tenant_id');
-            return $id ? (int) $id : null;
-        }
-
-        return $user->customer_id ? (int) $user->customer_id : null;
-    }
-
-    private function requireTenant(): int
-    {
-        $id = $this->tenantCustomerId();
-
-        abort_if(
-            $id === null,
-            422,
-            'Seleccione un inquilino activo para acceder al módulo contable.'
-        );
-
-        // Primera vez: copiar catálogo plantilla
-        if (!AccountingAccount::customerHasCatalog($id)) {
-            AccountingAccount::copyDefaultsFor($id);
-        }
-
-        return $id;
-    }
 
     // ── Catálogo de cuentas ─────────────────────────────────────────────────
 
@@ -169,7 +135,7 @@ class AccountingController extends Controller
     {
         $customerId = $this->requireTenant();
 
-        $packages = AccountingPackage::with([
+        $packages = AccountingPackage::forCustomer($customerId)->with([
             'debitAccount', 'creditAccount',
             'secondaryDebitAccount', 'secondaryCreditAccount', 'costCenter',
         ])->orderBy('code')->get();
@@ -181,27 +147,31 @@ class AccountingController extends Controller
             ->map(fn($a) => ['id' => $a->id, 'label' => $a->code . ' — ' . $a->name, 'type' => $a->type])
             ->values();
 
-        $costCenters = CostCenter::orderBy('code')->get();
+        $costCenters = CostCenter::forCustomer($customerId)->orderBy('code')->get();
 
         return Inertia::render('Admin/Accounting/Configuracion', compact('packages', 'accounts', 'costCenters'));
     }
 
     public function storePackage(Request $request)
     {
+        $customerId = $this->requireTenant();
+
         $data = $request->validate([
-            'code'                        => 'required|string|max:10|unique:accounting_packages,code',
+            'code'                        => ['required', 'string', 'max:10',
+                Rule::unique('accounting_packages', 'code')->where('customer_id', $customerId)],
             'name'                        => 'required|string|max:100',
             'description'                 => 'nullable|string|max:500',
             'type'                        => 'required|in:automatico,manual',
-            'debit_account_id'            => 'nullable|exists:accounting_accounts,id',
-            'credit_account_id'           => 'nullable|exists:accounting_accounts,id',
-            'secondary_debit_account_id'  => 'nullable|exists:accounting_accounts,id',
-            'secondary_credit_account_id' => 'nullable|exists:accounting_accounts,id',
-            'cost_center_id'              => 'nullable|exists:cost_centers,id',
+            'debit_account_id'            => ['nullable', Rule::exists('accounting_accounts', 'id')->where('customer_id', $customerId)],
+            'credit_account_id'           => ['nullable', Rule::exists('accounting_accounts', 'id')->where('customer_id', $customerId)],
+            'secondary_debit_account_id'  => ['nullable', Rule::exists('accounting_accounts', 'id')->where('customer_id', $customerId)],
+            'secondary_credit_account_id' => ['nullable', Rule::exists('accounting_accounts', 'id')->where('customer_id', $customerId)],
+            'cost_center_id'              => ['nullable', Rule::exists('cost_centers', 'id')->where('customer_id', $customerId)],
             'is_active'                   => 'boolean',
         ]);
 
-        $data['code'] = strtoupper($data['code']);
+        $data['code']        = strtoupper($data['code']);
+        $data['customer_id'] = $customerId;
         $package = AccountingPackage::create($data);
 
         return response()->json(['success' => true, 'message' => 'Paquete creado.', 'package' => $package]);
@@ -209,15 +179,18 @@ class AccountingController extends Controller
 
     public function updatePackage(Request $request, AccountingPackage $package)
     {
+        $customerId = $this->requireTenant();
+        abort_unless($package->customer_id === $customerId, 403);
+
         $data = $request->validate([
             'name'                        => 'required|string|max:100',
             'description'                 => 'nullable|string|max:500',
             'type'                        => 'required|in:automatico,manual',
-            'debit_account_id'            => 'nullable|exists:accounting_accounts,id',
-            'credit_account_id'           => 'nullable|exists:accounting_accounts,id',
-            'secondary_debit_account_id'  => 'nullable|exists:accounting_accounts,id',
-            'secondary_credit_account_id' => 'nullable|exists:accounting_accounts,id',
-            'cost_center_id'              => 'nullable|exists:cost_centers,id',
+            'debit_account_id'            => ['nullable', Rule::exists('accounting_accounts', 'id')->where('customer_id', $customerId)],
+            'credit_account_id'           => ['nullable', Rule::exists('accounting_accounts', 'id')->where('customer_id', $customerId)],
+            'secondary_debit_account_id'  => ['nullable', Rule::exists('accounting_accounts', 'id')->where('customer_id', $customerId)],
+            'secondary_credit_account_id' => ['nullable', Rule::exists('accounting_accounts', 'id')->where('customer_id', $customerId)],
+            'cost_center_id'              => ['nullable', Rule::exists('cost_centers', 'id')->where('customer_id', $customerId)],
             'is_active'                   => 'boolean',
         ]);
 
@@ -228,6 +201,9 @@ class AccountingController extends Controller
 
     public function destroyPackage(AccountingPackage $package)
     {
+        $customerId = $this->requireTenant();
+        abort_unless($package->customer_id === $customerId, 403);
+
         if ($package->journalEntries()->exists()) {
             return response()->json(['success' => false, 'message' => 'No se puede eliminar un paquete que tiene asientos contables registrados.'], 422);
         }
@@ -241,14 +217,18 @@ class AccountingController extends Controller
 
     public function storeCostCenter(Request $request)
     {
+        $customerId = $this->requireTenant();
+
         $data = $request->validate([
-            'code'        => 'required|string|max:20|unique:cost_centers,code',
+            'code'        => ['required', 'string', 'max:20',
+                Rule::unique('cost_centers', 'code')->where('customer_id', $customerId)],
             'name'        => 'required|string|max:120',
             'description' => 'nullable|string|max:500',
             'is_active'   => 'boolean',
         ]);
 
-        $data['code'] = strtoupper($data['code']);
+        $data['code']        = strtoupper($data['code']);
+        $data['customer_id'] = $customerId;
         $center = CostCenter::create($data);
 
         return response()->json(['success' => true, 'message' => 'Centro de costo creado.', 'cost_center' => $center]);
@@ -256,8 +236,12 @@ class AccountingController extends Controller
 
     public function updateCostCenter(Request $request, CostCenter $costCenter)
     {
+        $customerId = $this->requireTenant();
+        abort_unless($costCenter->customer_id === $customerId, 403);
+
         $data = $request->validate([
-            'code'        => 'required|string|max:20|unique:cost_centers,code,'.$costCenter->id,
+            'code'        => ['required', 'string', 'max:20',
+                Rule::unique('cost_centers', 'code')->where('customer_id', $customerId)->ignore($costCenter->id)],
             'name'        => 'required|string|max:120',
             'description' => 'nullable|string|max:500',
             'is_active'   => 'boolean',
@@ -271,6 +255,9 @@ class AccountingController extends Controller
 
     public function destroyCostCenter(CostCenter $costCenter)
     {
+        $customerId = $this->requireTenant();
+        abort_unless($costCenter->customer_id === $customerId, 403);
+
         if ($costCenter->accountingPackages()->exists() || $costCenter->journalEntryLines()->exists()) {
             return response()->json(['success' => false, 'message' => 'No se puede eliminar un centro de costo en uso. Puede desactivarlo.'], 422);
         }

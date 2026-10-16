@@ -190,7 +190,8 @@ class InventoryController extends Controller
 
         // Partida contable de inventario (solo movimientos manuales)
         try {
-            app(AccountingEntryService::class)->createFromInventory($movement->load('product'), $request->user()?->id);
+            $tenantId = (int) session('billing_tenant_id') ?: null;
+            app(AccountingEntryService::class)->createFromInventory($movement->load('product'), $request->user()?->id, $tenantId);
         } catch (\Throwable) {
             // No interrumpir el registro si falla la contabilidad
         }

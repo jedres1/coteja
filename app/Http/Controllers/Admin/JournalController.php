@@ -6,6 +6,7 @@ use App\Exceptions\AccountingPeriodException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SaveJournalEntryRequest;
 use App\Traits\ExportsCsv;
+use App\Traits\HasAccountingTenant;
 use App\Models\AccountingAccount;
 use App\Models\AccountingPackage;
 use App\Models\CostCenter;
@@ -18,18 +19,21 @@ use Inertia\Inertia;
 
 class JournalController extends Controller
 {
-    use ExportsCsv;
+    use ExportsCsv, HasAccountingTenant;
 
     public function __construct(private readonly AccountingPeriodService $periods) {}
 
     public function index(Request $request)
     {
+        $customerId = $this->requireTenant();
+
         $search = trim((string) $request->query('search', ''));
         $status = $request->query('status', '');
         $from   = $request->query('from', now()->startOfMonth()->toDateString());
         $to     = $request->query('to', now()->toDateString());
 
-        $query = JournalEntry::with(['lines', 'accountingPackage'])
+        $query = JournalEntry::forCustomer($customerId)
+            ->with(['lines', 'accountingPackage'])
             ->when($from,   fn ($q) => $q->whereDate('entry_date', '>=', $from))
             ->when($to,     fn ($q) => $q->whereDate('entry_date', '<=', $to))
             ->when($status, fn ($q) => $q->where('status', $status))
@@ -45,10 +49,10 @@ class JournalController extends Controller
         $entries = $query->paginate(20)->withQueryString();
 
         $stats = [
-            'borrador' => JournalEntry::where('status', 'borrador')->count(),
-            'aprobado' => JournalEntry::where('status', 'aprobado')->count(),
-            'anulado'  => JournalEntry::where('status', 'anulado')->count(),
-            'total'    => JournalEntry::count(),
+            'borrador' => JournalEntry::forCustomer($customerId)->where('status', 'borrador')->count(),
+            'aprobado' => JournalEntry::forCustomer($customerId)->where('status', 'aprobado')->count(),
+            'anulado'  => JournalEntry::forCustomer($customerId)->where('status', 'anulado')->count(),
+            'total'    => JournalEntry::forCustomer($customerId)->count(),
         ];
 
         return Inertia::render('Admin/Accounting/Diario', compact('entries', 'stats', 'search', 'status', 'from', 'to'));
@@ -56,24 +60,29 @@ class JournalController extends Controller
 
     public function create()
     {
-        $accounts = AccountingAccount::where('is_active', true)
+        $customerId = $this->requireTenant();
+
+        $accounts = AccountingAccount::forCustomer($customerId)
+            ->where('is_active', true)
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'type', 'nature']);
 
-        $cgPackage = AccountingPackage::where('code', 'CG')->first();
-        $costCenters = CostCenter::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
+        $cgPackage   = AccountingPackage::forCustomer($customerId)->where('code', 'CG')->first();
+        $costCenters = CostCenter::forCustomer($customerId)->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
 
         return Inertia::render('Admin/Accounting/DiarioNuevo', [
-            'accounts'  => $accounts,
+            'accounts'    => $accounts,
             'costCenters' => $costCenters,
-            'entry'     => null,
-            'today'     => now()->toDateString(),
-            'cgPackage' => $cgPackage,
+            'entry'       => null,
+            'today'       => now()->toDateString(),
+            'cgPackage'   => $cgPackage,
         ]);
     }
 
     public function store(SaveJournalEntryRequest $request)
     {
+        $customerId = $this->requireTenant();
+
         $data = $request->validated();
 
         try {
@@ -82,12 +91,13 @@ class JournalController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
 
-        $cgPackage = AccountingPackage::where('code', 'CG')->where('is_active', true)->first();
+        $cgPackage = AccountingPackage::forCustomer($customerId)->where('code', 'CG')->where('is_active', true)->first();
 
-        $entry = DB::transaction(function () use ($data, $request, $cgPackage) {
-            $number = JournalEntry::nextNumber($cgPackage);
+        $entry = DB::transaction(function () use ($data, $request, $cgPackage, $customerId) {
+            $number = JournalEntry::nextNumber($cgPackage, $customerId);
 
             $entry = JournalEntry::create([
+                'customer_id'           => $customerId,
                 'entry_number'          => $number,
                 'entry_date'            => $data['entry_date'],
                 'description'           => $data['description'],
@@ -127,33 +137,42 @@ class JournalController extends Controller
 
     public function show(JournalEntry $entry)
     {
+        $customerId = $this->requireTenant();
+        abort_unless($entry->customer_id === $customerId, 403);
+
         $entry->load(['lines.account', 'lines.costCenter', 'creator', 'approver', 'accountingPackage.costCenter']);
         return Inertia::render('Admin/Accounting/DiarioVer', compact('entry'));
     }
 
     public function edit(JournalEntry $entry)
     {
+        $customerId = $this->requireTenant();
+        abort_unless($entry->customer_id === $customerId, 403);
+
         if (! $entry->isEditable()) {
             return redirect()->route('admin.accounting.diario.show', $entry)
                 ->with('error', 'Solo se pueden editar asientos en borrador.');
         }
 
-        $accounts  = AccountingAccount::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name', 'type', 'nature']);
-        $cgPackage = AccountingPackage::where('code', 'CG')->first();
-        $costCenters = CostCenter::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
+        $accounts    = AccountingAccount::forCustomer($customerId)->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name', 'type', 'nature']);
+        $cgPackage   = AccountingPackage::forCustomer($customerId)->where('code', 'CG')->first();
+        $costCenters = CostCenter::forCustomer($customerId)->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
         $entry->load('lines');
 
         return Inertia::render('Admin/Accounting/DiarioNuevo', [
-            'accounts'  => $accounts,
+            'accounts'    => $accounts,
             'costCenters' => $costCenters,
-            'entry'     => $entry,
-            'today'     => $entry->entry_date->toDateString(),
-            'cgPackage' => $cgPackage,
+            'entry'       => $entry,
+            'today'       => $entry->entry_date->toDateString(),
+            'cgPackage'   => $cgPackage,
         ]);
     }
 
     public function update(SaveJournalEntryRequest $request, JournalEntry $entry)
     {
+        $customerId = $this->requireTenant();
+        abort_unless($entry->customer_id === $customerId, 403);
+
         $this->authorize('update', $entry);
 
         if (! $entry->isEditable()) {
@@ -170,14 +189,14 @@ class JournalController extends Controller
 
         DB::transaction(function () use ($data, $entry, $request) {
             $entry->update([
-                'entry_date'     => $data['entry_date'],
-                'description'    => $data['description'],
-                'reference'      => $data['reference'] ?? null,
-                'notes'          => $data['notes'] ?? null,
-                'status'         => $data['action'],
+                'entry_date'      => $data['entry_date'],
+                'description'     => $data['description'],
+                'reference'       => $data['reference'] ?? null,
+                'notes'           => $data['notes'] ?? null,
+                'status'          => $data['action'],
                 'source_document' => $data['reference'] ?? $entry->source_document,
-                'approved_by'    => $data['action'] === 'aprobado' ? $request->user()?->id : null,
-                'approved_at'    => $data['action'] === 'aprobado' ? now() : null,
+                'approved_by'     => $data['action'] === 'aprobado' ? $request->user()?->id : null,
+                'approved_at'     => $data['action'] === 'aprobado' ? now() : null,
             ]);
 
             $entry->lines()->delete();
@@ -204,6 +223,9 @@ class JournalController extends Controller
 
     public function approve(Request $request, JournalEntry $entry)
     {
+        $customerId = $this->requireTenant();
+        abort_unless($entry->customer_id === $customerId, 403);
+
         $this->authorize('approve', $entry);
 
         if ($entry->status !== 'borrador') {
@@ -221,6 +243,9 @@ class JournalController extends Controller
 
     public function annul(Request $request, JournalEntry $entry)
     {
+        $customerId = $this->requireTenant();
+        abort_unless($entry->customer_id === $customerId, 403);
+
         $this->authorize('annul', $entry);
 
         if ($entry->status !== 'aprobado') {
@@ -231,17 +256,18 @@ class JournalController extends Controller
             'motivo' => 'required|string|min:5|max:300',
         ]);
 
-        DB::transaction(function () use ($entry, $data, $request) {
+        DB::transaction(function () use ($entry, $data, $request, $customerId) {
             $entry->update([
                 'status' => 'anulado',
                 'notes'  => ($entry->notes ? $entry->notes . "\n" : '') . 'Anulado: ' . $data['motivo'],
             ]);
 
-            // Usa el mismo paquete que el asiento original para el número de reversión
-            $package = $entry->accountingPackage ?? AccountingPackage::where('code', 'CG')->first();
+            $package = $entry->accountingPackage
+                ?? AccountingPackage::forCustomer($customerId)->where('code', 'CG')->first();
 
             $reversal = JournalEntry::create([
-                'entry_number'          => JournalEntry::nextNumber($package),
+                'customer_id'           => $customerId,
+                'entry_number'          => JournalEntry::nextNumber($package, $customerId),
                 'entry_date'            => now()->toDateString(),
                 'description'           => 'REVERSIÓN: ' . $entry->description,
                 'reference'             => $entry->entry_number,
@@ -274,6 +300,9 @@ class JournalController extends Controller
 
     public function destroy(JournalEntry $entry)
     {
+        $customerId = $this->requireTenant();
+        abort_unless($entry->customer_id === $customerId, 403);
+
         $this->authorize('delete', $entry);
 
         if (! $entry->isEditable()) {
@@ -287,12 +316,15 @@ class JournalController extends Controller
 
     public function export(Request $request)
     {
+        $customerId = $this->requireTenant();
+
         $search = trim((string) $request->query('search', ''));
         $status = $request->query('status', '');
         $from   = $request->query('from', now()->startOfMonth()->toDateString());
         $to     = $request->query('to', now()->toDateString());
 
-        $rows = JournalEntry::with(['lines', 'creator'])
+        $rows = JournalEntry::forCustomer($customerId)
+            ->with(['lines', 'creator'])
             ->when($from,   fn ($q) => $q->whereDate('entry_date', '>=', $from))
             ->when($to,     fn ($q) => $q->whereDate('entry_date', '<=', $to))
             ->when($status, fn ($q) => $q->where('status', $status))
@@ -320,5 +352,4 @@ class JournalController extends Controller
             $rows
         );
     }
-
 }
