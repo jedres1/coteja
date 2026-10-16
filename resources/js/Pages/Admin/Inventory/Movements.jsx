@@ -12,19 +12,19 @@ const TYPE_CONFIG = {
 };
 
 const emptyMovement = {
-    product_id: '',
-    warehouse_id: '',
-    date: new Date().toISOString().slice(0, 10),
-    type: 'entry',
-    quantity: '',
-    unit_cost: '',
-    document_type: '',
-    document_number: '',
-    notes: '',
+    product_id:          '',
+    warehouse_id:        '',
+    type:                'entry',
+    quantity:            '',
+    document_type:       'manual',
+    purchase_invoice_id: '',
+    document_number:     '',
+    notes:               '',
 };
 
-function MovementForm({ products, warehouses, onCancel }) {
+function MovementForm({ products, warehouses, approvedPurchases, onCancel }) {
     const { data, setData, processing, errors, reset } = useForm({ ...emptyMovement });
+    const isPurchaseEntry = data.type === 'entry' && data.document_type === 'purchase';
 
     function handleSubmit(e) {
         e.preventDefault();
@@ -57,18 +57,14 @@ function MovementForm({ products, warehouses, onCancel }) {
                     {errors.warehouse_id && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.warehouse_id}</span>}
                 </label>
                 <label style={{ margin: 0 }}>
-                    Fecha <span style={{ color: '#ef4444' }}>*</span>
-                    <input
-                        type="date"
-                        value={data.date}
-                        onChange={(e) => setData('date', e.target.value)}
-                        required
-                    />
-                    {errors.date && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.date}</span>}
-                </label>
-                <label style={{ margin: 0 }}>
                     Tipo <span style={{ color: '#ef4444' }}>*</span>
-                    <select value={data.type} onChange={(e) => setData('type', e.target.value)}>
+                    <select
+                        value={data.type}
+                        onChange={(e) => {
+                            const t = e.target.value;
+                            setData({ ...data, type: t, document_type: t === 'exit' ? 'manual' : data.document_type, purchase_invoice_id: '' });
+                        }}
+                    >
                         <option value="entry">Entrada</option>
                         <option value="exit">Salida</option>
                     </select>
@@ -87,40 +83,48 @@ function MovementForm({ products, warehouses, onCancel }) {
                     />
                     {errors.quantity && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.quantity}</span>}
                 </label>
-                <label style={{ margin: 0 }}>
-                    Costo unitario
-                    <input
-                        type="number"
-                        value={data.unit_cost}
-                        onChange={(e) => setData('unit_cost', e.target.value)}
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                    />
-                    {errors.unit_cost && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.unit_cost}</span>}
-                </label>
-                <label style={{ margin: 0 }}>
-                    Tipo de documento
-                    <input
-                        type="text"
-                        value={data.document_type}
-                        onChange={(e) => setData('document_type', e.target.value)}
-                        maxLength={50}
-                        placeholder="Factura, O/C, etc."
-                    />
-                    {errors.document_type && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.document_type}</span>}
-                </label>
-                <label style={{ margin: 0 }}>
-                    Número de documento
-                    <input
-                        type="text"
-                        value={data.document_number}
-                        onChange={(e) => setData('document_number', e.target.value)}
-                        maxLength={100}
-                        placeholder="Número"
-                    />
-                    {errors.document_number && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.document_number}</span>}
-                </label>
+
+                {data.type === 'entry' && (
+                    <label style={{ margin: 0 }}>
+                        Origen <span style={{ color: '#ef4444' }}>*</span>
+                        <select
+                            value={data.document_type}
+                            onChange={(e) => setData({ ...data, document_type: e.target.value, purchase_invoice_id: '' })}
+                        >
+                            <option value="manual">Manual</option>
+                            <option value="purchase">Factura de compra</option>
+                        </select>
+                        {errors.document_type && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.document_type}</span>}
+                    </label>
+                )}
+
+                {isPurchaseEntry ? (
+                    <label style={{ margin: 0, gridColumn: 'span 3' }}>
+                        Factura de compra <span style={{ color: '#ef4444' }}>*</span>
+                        <select value={data.purchase_invoice_id} onChange={(e) => setData('purchase_invoice_id', e.target.value)} required>
+                            <option value="">— Seleccionar factura —</option>
+                            {(approvedPurchases ?? []).map((p) => (
+                                <option key={p.id} value={p.id}>
+                                    {p.invoice_number} — {p.supplier?.name ?? '—'}
+                                </option>
+                            ))}
+                        </select>
+                        {errors.purchase_invoice_id && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.purchase_invoice_id}</span>}
+                    </label>
+                ) : (
+                    <label style={{ margin: 0, gridColumn: data.type === 'entry' ? 'span 3' : '1 / -1' }}>
+                        Número de documento
+                        <input
+                            type="text"
+                            value={data.document_number}
+                            onChange={(e) => setData('document_number', e.target.value)}
+                            maxLength={100}
+                            placeholder="Número"
+                        />
+                        {errors.document_number && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.document_number}</span>}
+                    </label>
+                )}
+
                 <label style={{ margin: 0, gridColumn: '1 / -1' }}>
                     Notas
                     <input
@@ -143,7 +147,7 @@ function MovementForm({ products, warehouses, onCancel }) {
     );
 }
 
-export default function Movements({ movements, inventoryProducts, warehouses }) {
+export default function Movements({ movements, inventoryProducts, warehouses, approvedPurchases }) {
     const products = inventoryProducts ?? [];
     const [showForm, setShowForm] = useState(false);
 
@@ -161,6 +165,7 @@ export default function Movements({ movements, inventoryProducts, warehouses }) 
                     <MovementForm
                         products={products}
                         warehouses={warehouses}
+                        approvedPurchases={approvedPurchases ?? []}
                         onCancel={() => setShowForm(false)}
                     />
                 </div>

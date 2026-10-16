@@ -395,7 +395,7 @@ export default function PayrollIndex({ employees, periods, activeTab }) {
                                     </tr>
                                 )}
                                 {payrollPeriods.map((period) => {
-                                    const statusStyle = STATUS_COLORS[period.status] || STATUS_COLORS.draft;
+                                    const statusStyle = STATUS_COLORS[period.status] ?? STATUS_COLORS.borrador;
                                     return (
                                         <tr key={period.id}>
                                             <td style={{ fontWeight: 500 }}>{period.name}</td>

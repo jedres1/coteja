@@ -29,8 +29,16 @@ function StatCard({ label, value, mono = false }) {
     );
 }
 
-function PaymentForm({ invoice, onClose }) {
-    const form = useForm({ amount: '', method: '', reference: '', notes: '' });
+function PaymentForm({ invoice, bankAccounts, onClose }) {
+    const today = new Date().toISOString().split('T')[0];
+    const form = useForm({
+        amount:          '',
+        method:          '',
+        reference:       '',
+        notes:           '',
+        bank_account_id: '',
+        transaction_date: today,
+    });
 
     function handleSubmit(e) {
         e.preventDefault();
@@ -61,6 +69,17 @@ function PaymentForm({ invoice, onClose }) {
                 </div>
 
                 <div className="field" style={{ margin: 0 }}>
+                    <label>Fecha de cobro <span style={{ color: '#ef4444' }}>*</span></label>
+                    <input
+                        type="date"
+                        value={form.data.transaction_date}
+                        onChange={(e) => form.setData('transaction_date', e.target.value)}
+                        required
+                    />
+                    {form.errors.transaction_date && <p className="field-error">{form.errors.transaction_date}</p>}
+                </div>
+
+                <div className="field" style={{ margin: 0 }}>
                     <label>Método de pago</label>
                     <select value={form.data.method} onChange={(e) => form.setData('method', e.target.value)}>
                         <option value="">Seleccionar…</option>
@@ -68,6 +87,19 @@ function PaymentForm({ invoice, onClose }) {
                     </select>
                     {form.errors.method && <p className="field-error">{form.errors.method}</p>}
                 </div>
+
+                {(bankAccounts ?? []).length > 0 && (
+                    <div className="field" style={{ margin: 0 }}>
+                        <label>Cuenta bancaria</label>
+                        <select value={form.data.bank_account_id} onChange={(e) => form.setData('bank_account_id', e.target.value)}>
+                            <option value="">— Sin cuenta —</option>
+                            {bankAccounts.map((a) => (
+                                <option key={a.id} value={a.id}>{a.name} — {a.bank_name}</option>
+                            ))}
+                        </select>
+                        {form.errors.bank_account_id && <p className="field-error">{form.errors.bank_account_id}</p>}
+                    </div>
+                )}
 
                 <div className="field" style={{ margin: 0, gridColumn: '1 / -1' }}>
                     <label>Referencia / No. comprobante</label>
@@ -102,7 +134,7 @@ function PaymentForm({ invoice, onClose }) {
     );
 }
 
-export default function CuentasPorCobrar({ stats, invoices, filters }) {
+export default function CuentasPorCobrar({ stats, invoices, filters, bankAccounts }) {
     const { auth } = usePage().props;
     const [search, setSearch]         = useState(filters?.search ?? '');
     const today         = new Date().toISOString().split('T')[0];
@@ -257,7 +289,7 @@ export default function CuentasPorCobrar({ stats, invoices, filters }) {
                     onClose={() => setPayModal(null)}
                     maxWidth={480}
                 >
-                    <PaymentForm invoice={payModal} onClose={() => setPayModal(null)} />
+                    <PaymentForm invoice={payModal} bankAccounts={bankAccounts ?? []} onClose={() => setPayModal(null)} />
                 </Modal>
             )}
         </AppLayout>

@@ -22,6 +22,7 @@ use App\Services\Billing\InvoiceEOEService;
 use App\Services\Billing\InvoiceReturnService;
 use App\Services\Billing\InvoiceVoidService;
 use App\Services\DteEngine;
+use App\Models\BankAccount;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -63,6 +64,8 @@ class FacturaElectronicaSVController extends Controller
                 'payment_status' => $request->query('payment_status', ''),
             ],
             'availableCustomers' => $this->availableCustomersForUser($request),
+            'bankAccounts'       => BankAccount::when($tenantId, fn ($q) => $q->forCustomer($tenantId))
+                ->where('is_active', true)->orderBy('name')->get(['id', 'name', 'bank_name']),
         ]);
     }
 
@@ -194,10 +197,12 @@ class FacturaElectronicaSVController extends Controller
         }
 
         $data = $request->validate([
-            'amount'    => 'required|numeric|min:0.01',
-            'method'    => 'nullable|string|max:100',
-            'reference' => 'nullable|string|max:200',
-            'notes'     => 'nullable|string|max:500',
+            'amount'           => 'required|numeric|min:0.01',
+            'method'           => 'nullable|string|max:100',
+            'reference'        => 'nullable|string|max:200',
+            'notes'            => 'nullable|string|max:500',
+            'bank_account_id'  => 'nullable|exists:bank_accounts,id',
+            'transaction_date' => 'nullable|date',
         ]);
 
         $maxAllowed = $invoice->balance;
@@ -209,10 +214,12 @@ class FacturaElectronicaSVController extends Controller
 
         BillingInvoicePayment::create([
             'billing_invoice_id' => $invoice->id,
+            'bank_account_id'    => $data['bank_account_id'] ?? null,
             'amount'             => $data['amount'],
             'method'             => $data['method'] ?? null,
             'reference'          => $data['reference'] ?? null,
             'notes'              => $data['notes'] ?? null,
+            'registered_at'      => $data['transaction_date'] ?? now(),
         ]);
 
         $newAmountPaid = round((float) $invoice->amount_paid + (float) $data['amount'], 2);
