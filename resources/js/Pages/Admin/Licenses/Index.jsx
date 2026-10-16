@@ -17,11 +17,12 @@ const licenseTypes = {
     anual: 'Anual',
 };
 
-function CreateLicenseForm({ companies, plans, onSuccess }) {
+function CreateLicenseForm({ customers, plans, onSuccess }) {
     const form = useForm({
-        company_id: '',
+        customer_id: '',
         plan_id: '',
         license_type: 'mensual',
+        environment: 'production',
         status: 'active',
         starts_at: '',
         expires_at: '',
@@ -40,19 +41,31 @@ function CreateLicenseForm({ companies, plans, onSuccess }) {
     return (
         <form onSubmit={handleSubmit}>
             <div className="field">
-                <label>Empresa</label>
+                <label>Inquilino</label>
                 <select
-                    value={form.data.company_id}
-                    onChange={(e) => form.setData('company_id', e.target.value)}
+                    value={form.data.customer_id}
+                    onChange={(e) => form.setData('customer_id', e.target.value)}
                 >
                     <option value="">— Seleccionar —</option>
-                    {companies.map((c) => (
-                        <option key={c.id} value={c.id}>
-                            {c.customer?.name} — {c.business_name}
-                        </option>
+                    {customers.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                 </select>
-                {form.errors.company_id && <p className="field-error">{form.errors.company_id}</p>}
+                {form.errors.customer_id && <p className="field-error">{form.errors.customer_id}</p>}
+            </div>
+            <div className="field">
+                <label>Ambiente</label>
+                <select
+                    value={form.data.environment}
+                    onChange={(e) => form.setData('environment', e.target.value)}
+                >
+                    <option value="production">Producción</option>
+                    <option value="testing">Pruebas</option>
+                </select>
+                <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0' }}>
+                    Si el inquilino no tiene empresa registrada, se creará automáticamente.
+                </p>
+                {form.errors.environment && <p className="field-error">{form.errors.environment}</p>}
             </div>
             <div className="field">
                 <label>Plan</label>
@@ -248,7 +261,7 @@ function EditLicenseForm({ license, onSuccess }) {
     );
 }
 
-export default function LicensesIndex({ licenses, companies, plans }) {
+export default function LicensesIndex({ licenses, customers, plans }) {
     const [showCreate, setShowCreate] = useState(false);
     const [editItem, setEditItem] = useState(null);
 
@@ -331,7 +344,7 @@ export default function LicensesIndex({ licenses, companies, plans }) {
             {showCreate && (
                 <Modal title="Nueva licencia" onClose={() => setShowCreate(false)}>
                     <CreateLicenseForm
-                        companies={companies}
+                        customers={customers}
                         plans={plans}
                         onSuccess={() => setShowCreate(false)}
                     />

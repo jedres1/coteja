@@ -30,7 +30,7 @@ class CompanyController extends Controller
             ->contains(fn($l) => $l->isActive());
 
         if (!$hasActiveLicense) {
-            return back()->withErrors(['customer_id' => 'El inquilino no tiene una licencia activa. Active una licencia antes de registrar empresas.']);
+            return back()->withErrors(['customer_id' => 'El inquilino no tiene una licencia activa. Asigne una licencia para poder registrar empresas adicionales.']);
         }
 
         $company = Company::create($validated);
