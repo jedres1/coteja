@@ -429,6 +429,7 @@ class AccountingController extends Controller
 
         $movsSub = DB::table('journal_entry_lines as jel')
             ->join('journal_entries as je', 'je.id', '=', 'jel.journal_entry_id')
+            ->where('je.customer_id', $customerId)
             ->where('je.status', 'aprobado')
             ->whereYear('je.entry_date', $year)
             ->when($acumulado,
@@ -533,6 +534,7 @@ class AccountingController extends Controller
         $saldosIniciales = DB::table('journal_entry_lines as jel')
             ->join('journal_entries as je', 'je.id', '=', 'jel.journal_entry_id')
             ->whereIn('jel.account_id', $accountIds)
+            ->where('je.customer_id', $customerId)
             ->where('je.status', 'aprobado')
             ->where('je.entry_date', '<', $startDate)
             ->groupBy('jel.account_id')
@@ -548,6 +550,7 @@ class AccountingController extends Controller
             ->join('journal_entries as je',      'je.id', '=', 'jel.journal_entry_id')
             ->leftJoin('accounting_packages as ap', 'ap.id', '=', 'je.accounting_package_id')
             ->whereIn('jel.account_id', $accountIds)
+            ->where('je.customer_id', $customerId)
             ->where('je.status', 'aprobado')
             ->whereBetween('je.entry_date', [$startDate, $endDate])
             ->orderBy('jel.account_id')

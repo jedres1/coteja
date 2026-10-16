@@ -15,6 +15,7 @@ function AccountForm({ account, parents, onCancel }) {
         type:      account?.type ?? '',
         nature:    account?.nature ?? '',
         parent_id: account?.parent_id ? String(account.parent_id) : '',
+        notes:     account?.notes ?? '',
         is_active: account?.is_active !== undefined ? String(Number(account.is_active)) : '1',
     });
 
@@ -75,6 +76,17 @@ function AccountForm({ account, parents, onCancel }) {
                         </select>
                     </label>
                 )}
+                <label style={{ margin: 0, gridColumn: '1 / -1' }}>
+                    Notas
+                    <input
+                        type="text"
+                        value={data.notes}
+                        onChange={(e) => setData('notes', e.target.value)}
+                        maxLength={1000}
+                        placeholder="Notas opcionales"
+                    />
+                    {errors.notes && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.notes}</span>}
+                </label>
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
                 <button type="button" className="btn secondary" onClick={onCancel}>Cancelar</button>

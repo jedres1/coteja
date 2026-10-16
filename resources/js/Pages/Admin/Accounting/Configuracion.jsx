@@ -144,9 +144,10 @@ function PackageForm({ pkg, accounts, costCenters, onCancel }) {
 function CostCenterForm({ cc, onCancel }) {
     const isEdit = !!cc;
     const { data, setData, post, put, processing, errors } = useForm({
-        name:      cc?.name ?? '',
-        code:      cc?.code ?? '',
-        is_active: cc?.is_active !== undefined ? String(Number(cc.is_active)) : '1',
+        name:        cc?.name ?? '',
+        code:        cc?.code ?? '',
+        description: cc?.description ?? '',
+        is_active:   cc?.is_active !== undefined ? String(Number(cc.is_active)) : '1',
     });
 
     function handleSubmit(e) {
@@ -177,6 +178,17 @@ function CostCenterForm({ cc, onCancel }) {
                         <option value="1">Activo</option>
                         <option value="0">Inactivo</option>
                     </select>
+                </label>
+                <label style={{ margin: 0, gridColumn: '1 / -1' }}>
+                    Descripción
+                    <input
+                        type="text"
+                        value={data.description}
+                        onChange={(e) => setData('description', e.target.value)}
+                        maxLength={500}
+                        placeholder="Descripción opcional"
+                    />
+                    {errors.description && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.description}</span>}
                 </label>
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>

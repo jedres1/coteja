@@ -170,7 +170,7 @@ export default function DiarioNuevo({ entry, accounts, costCenters, today, cgPac
                                 value={headerData.description}
                                 onChange={(e) => updateHeader('description', e.target.value)}
                                 placeholder="Descripción del asiento"
-                                maxLength={255}
+                                maxLength={300}
                             />
                         </label>
                     </div>
@@ -180,7 +180,7 @@ export default function DiarioNuevo({ entry, accounts, costCenters, today, cgPac
                             type="text"
                             value={headerData.notes}
                             onChange={(e) => updateHeader('notes', e.target.value)}
-                            maxLength={500}
+                            maxLength={2000}
                         />
                     </label>
                 </div>
