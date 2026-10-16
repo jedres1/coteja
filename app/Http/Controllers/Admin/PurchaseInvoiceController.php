@@ -27,10 +27,11 @@ class PurchaseInvoiceController extends Controller
 {
     use ExportsCsv;
 
-    public function settingsIndex()
+    public function settingsIndex(Request $request)
     {
+        $tenantId = $this->activeTenantId($request);
         $settings = BillingSetting::allAsArray();
-        $env = config('services.purchase_invoice_mailbox');
+        $env      = config('services.purchase_invoice_mailbox');
 
         return Inertia::render('Admin/PurchaseInvoices/Settings', [
             'host'       => $settings['mailbox_host']        ?? $env['host'],
@@ -40,12 +41,18 @@ class PurchaseInvoiceController extends Controller
             'mailbox'    => $settings['mailbox_mailbox']     ?? $env['mailbox'],
             'onlyUnseen' => $settings['mailbox_only_unseen'] ?? $env['only_unseen'],
             'limit'      => $settings['mailbox_limit']       ?? $env['limit'],
-            'accountingAccounts' => AccountingAccount::where('is_active', true)->orderBy('code')->get(),
-            'costCenters' => CostCenter::where('is_active', true)->orderBy('code')->get(),
-            'purchasePackage' => AccountingPackage::where('code', 'CP')->first(),
-            'payablePackage' => AccountingPackage::where('code', 'CXP')->first(),
-            'missingPurchaseEntries' => PurchaseInvoice::where('status', 'approved')->whereDoesntHave('journalEntry')->count(),
-            'missingPayableEntries' => PurchaseInvoice::where('payment_status', 'paid')
+            'accountingAccounts' => AccountingAccount::when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))
+                ->where('is_active', true)->orderBy('code')->get(),
+            'costCenters' => CostCenter::when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))
+                ->where('is_active', true)->orderBy('code')->get(),
+            'purchasePackage' => AccountingPackage::when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))
+                ->where('code', 'CP')->first(),
+            'payablePackage' => AccountingPackage::when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))
+                ->where('code', 'CXP')->first(),
+            'missingPurchaseEntries' => PurchaseInvoice::when($tenantId !== null, fn ($q) => $q->where('customer_id', $tenantId))
+                ->where('status', 'approved')->whereDoesntHave('journalEntry')->count(),
+            'missingPayableEntries' => PurchaseInvoice::when($tenantId !== null, fn ($q) => $q->where('customer_id', $tenantId))
+                ->where('payment_status', 'paid')
                 ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('journal_entries')
                     ->whereColumn('journal_entries.source_id', 'purchase_invoices.id')
                     ->where('journal_entries.source_type', 'purchase_payment'))
@@ -57,32 +64,40 @@ class PurchaseInvoiceController extends Controller
     {
         abort_unless($request->user()?->hasModuleAccess('accounting'), 403, 'Requiere acceso al módulo de Contabilidad.');
 
-        $activeAccount = Rule::exists('accounting_accounts', 'id')->where('is_active', true);
+        $tenantId         = $this->activeTenantId($request);
+        $activeAccount    = Rule::exists('accounting_accounts', 'id')->where('is_active', true);
         $activeCostCenter = Rule::exists('cost_centers', 'id')->where('is_active', true);
+        if ($tenantId !== null) {
+            $activeAccount->where('customer_id', $tenantId);
+            $activeCostCenter->where('customer_id', $tenantId);
+        }
+
         $data = $request->validate([
-            'purchase_debit_account_id' => ['required', 'integer', $activeAccount],
+            'purchase_debit_account_id'  => ['required', 'integer', $activeAccount],
             'purchase_credit_account_id' => ['required', 'integer', $activeAccount],
-            'purchase_cost_center_id' => ['nullable', 'integer', $activeCostCenter],
-            'payable_debit_account_id' => ['required', 'integer', $activeAccount],
-            'payable_credit_account_id' => ['required', 'integer', $activeAccount],
-            'payable_cost_center_id' => ['nullable', 'integer', $activeCostCenter],
+            'purchase_cost_center_id'    => ['nullable', 'integer', $activeCostCenter],
+            'payable_debit_account_id'   => ['required', 'integer', $activeAccount],
+            'payable_credit_account_id'  => ['required', 'integer', $activeAccount],
+            'payable_cost_center_id'     => ['nullable', 'integer', $activeCostCenter],
         ]);
 
-        DB::transaction(function () use ($data) {
-            AccountingPackage::where('code', 'CP')->update([
-                'debit_account_id' => $data['purchase_debit_account_id'],
-                'credit_account_id' => $data['purchase_credit_account_id'],
-                'cost_center_id' => $data['purchase_cost_center_id'] ?? null,
-                'is_active' => true,
-                'type' => 'automatico',
-            ]);
-            AccountingPackage::where('code', 'CXP')->update([
-                'debit_account_id' => $data['payable_debit_account_id'],
-                'credit_account_id' => $data['payable_credit_account_id'],
-                'cost_center_id' => $data['payable_cost_center_id'] ?? null,
-                'is_active' => true,
-                'type' => 'automatico',
-            ]);
+        DB::transaction(function () use ($data, $tenantId) {
+            AccountingPackage::when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))
+                ->where('code', 'CP')->update([
+                    'debit_account_id'  => $data['purchase_debit_account_id'],
+                    'credit_account_id' => $data['purchase_credit_account_id'],
+                    'cost_center_id'    => $data['purchase_cost_center_id'] ?? null,
+                    'is_active'         => true,
+                    'type'              => 'automatico',
+                ]);
+            AccountingPackage::when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))
+                ->where('code', 'CXP')->update([
+                    'debit_account_id'  => $data['payable_debit_account_id'],
+                    'credit_account_id' => $data['payable_credit_account_id'],
+                    'cost_center_id'    => $data['payable_cost_center_id'] ?? null,
+                    'is_active'         => true,
+                    'type'              => 'automatico',
+                ]);
         });
 
         return back()->with('status', 'Parámetros contables de compras y cuentas por pagar guardados.');
@@ -203,23 +218,24 @@ class PurchaseInvoiceController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        $bankAccounts = BankAccount::where('is_active', true)->orderBy('bank_name')->orderBy('name')->get();
+        $tenantId     = $this->activeTenantId($request);
+        $bankAccounts = BankAccount::when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))
+            ->where('is_active', true)->orderBy('bank_name')->orderBy('name')->get();
 
         return Inertia::render('Admin/PurchaseInvoices/AccountsPayable', compact('invoices', 'totals', 'search', 'from', 'to', 'bankAccounts'));
     }
 
     public function markPaid(Request $request, PurchaseInvoice $purchaseInvoice, AccountingEntryService $accounting)
     {
+        $tenantId        = $this->activeTenantId($request);
+        $bankAccountRule = Rule::exists('bank_accounts', 'id')->where('is_active', true);
+        if ($tenantId !== null) $bankAccountRule->where('customer_id', $tenantId);
+
         $data = $request->validate([
             'payment_status'   => ['required', 'in:paid,partial,pending'],
             'payment_method'   => ['nullable', 'string', 'max:100'],
             'transaction_date' => ['required_if:payment_status,paid', 'nullable', 'date'],
-            'bank_account_id'  => [
-                'required_if:payment_status,paid',
-                'nullable',
-                'integer',
-                Rule::exists('bank_accounts', 'id')->where('is_active', true),
-            ],
+            'bank_account_id'  => ['required_if:payment_status,paid', 'nullable', 'integer', $bankAccountRule],
             'reference'        => ['nullable', 'string', 'max:200'],
         ]);
 
@@ -412,7 +428,7 @@ class PurchaseInvoiceController extends Controller
                 ->latest()
                 ->paginate(15)
                 ->withQueryString(),
-            'suppliers'   => Supplier::orderBy('name')->get(),
+            'suppliers'   => Supplier::when($customerIds !== null, fn ($q) => $q->whereIn('customer_id', $customerIds))->orderBy('name')->get(),
             'customers'   => Customer::with('companies')->orderBy('name')->get(),
             'search'      => $search,
             'supplierId'  => $supplierId,
@@ -555,13 +571,17 @@ class PurchaseInvoiceController extends Controller
         return $request->session()->get('billing_tenant_id');
     }
 
-    /** Devuelve los customer_ids accesibles para el usuario. Null significa sin restricción (admin). */
+    /** Devuelve los customer_ids accesibles para el usuario. Null significa sin restricción (admin sin tenant activo). */
     private function accessibleCustomerIds(Request $request): ?array
     {
         $user = $request->user();
-        if (! $user || $user->isAdmin()) {
-            return null;
+        if (! $user) return null;
+
+        if ($user->isAdmin() || $user->isConsultant()) {
+            $tenantId = $request->session()->get('billing_tenant_id');
+            return $tenantId ? [(int) $tenantId] : null;
         }
+
         return $user->accessibleCompanies()->pluck('customer_id')->unique()->values()->all();
     }
 

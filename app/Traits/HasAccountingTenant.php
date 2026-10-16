@@ -8,22 +8,16 @@ use App\Models\CostCenter;
 
 trait HasAccountingTenant
 {
+    use HasTenantScope;
+
     private function tenantCustomerId(): ?int
     {
-        $user = auth()->user();
-        if (!$user) return null;
-
-        if ($user->isAdmin() || $user->isConsultant()) {
-            $id = session('billing_tenant_id');
-            return $id ? (int) $id : null;
-        }
-
-        return $user->customer_id ? (int) $user->customer_id : null;
+        return $this->tenantId();
     }
 
     private function requireTenant(): int
     {
-        $id = $this->tenantCustomerId();
+        $id = $this->tenantId();
 
         abort_if(
             $id === null,

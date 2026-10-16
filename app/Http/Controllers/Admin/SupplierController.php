@@ -6,20 +6,23 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\SaveSupplierRequest;
 use App\Models\Supplier;
 use App\Traits\ExportsCsv;
+use App\Traits\HasTenantScope;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class SupplierController extends Controller
 {
-    use ExportsCsv;
+    use ExportsCsv, HasTenantScope;
 
     public function index(Request $request)
     {
-        $search = trim((string) $request->query('search', ''));
+        $tenantId = $this->tenantId();
+        $search   = trim((string) $request->query('search', ''));
         $geography = json_decode(file_get_contents(public_path('catalogs/division-geografica.json')), true) ?: [];
 
         return Inertia::render('Admin/Suppliers/Index', [
             'suppliers' => Supplier::withCount('purchaseInvoices')
+                ->when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))
                 ->when($search !== '', function ($query) use ($search) {
                     $query->where(function ($query) use ($search) {
                         $query->where('name', 'like', "%{$search}%")
@@ -37,20 +40,23 @@ class SupplierController extends Controller
                 ->latest()
                 ->paginate(15)
                 ->withQueryString(),
-            'search' => $search,
+            'search'    => $search,
             'geography' => $geography,
         ]);
     }
 
     public function store(SaveSupplierRequest $request)
     {
-        Supplier::create($request->validated());
+        Supplier::create(array_merge($request->validated(), ['customer_id' => $this->tenantId()]));
 
         return back()->with('status', 'Proveedor creado.');
     }
 
     public function update(SaveSupplierRequest $request, Supplier $supplier)
     {
+        $tenantId = $this->tenantId();
+        if ($tenantId) abort_unless($supplier->customer_id === $tenantId, 403);
+
         $supplier->update($request->validated());
 
         return back()->with('status', 'Proveedor actualizado.');
@@ -58,6 +64,9 @@ class SupplierController extends Controller
 
     public function destroy(Supplier $supplier)
     {
+        $tenantId = $this->tenantId();
+        if ($tenantId) abort_unless($supplier->customer_id === $tenantId, 403);
+
         if ($supplier->purchaseInvoices()->exists()) {
             return back()->withErrors('No se puede eliminar un proveedor con facturas de compra registradas.');
         }
@@ -69,9 +78,11 @@ class SupplierController extends Controller
 
     public function export(Request $request)
     {
-        $search = trim((string) $request->query('search', ''));
+        $tenantId = $this->tenantId();
+        $search   = trim((string) $request->query('search', ''));
 
         $rows = Supplier::withCount('purchaseInvoices')
+            ->when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
                     $query->where('name', 'like', "%{$search}%")

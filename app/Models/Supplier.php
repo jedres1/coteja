@@ -3,8 +3,10 @@
 namespace App\Models;
 
 use Database\Factories\SupplierFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Supplier extends Model
@@ -13,6 +15,7 @@ class Supplier extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
+        'customer_id',
         'created_by',
         'updated_by',
         'name',
@@ -33,8 +36,18 @@ class Supplier extends Model
         'notes',
     ];
 
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class);
+    }
+
     public function purchaseInvoices()
     {
         return $this->hasMany(PurchaseInvoice::class);
+    }
+
+    public function scopeForCustomer(Builder $query, int $customerId): Builder
+    {
+        return $query->where('customer_id', $customerId);
     }
 }

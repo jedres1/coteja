@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class BillingProduct extends Model
 {
     protected $fillable = [
+        'customer_id',
         'code',
         'description',
         'type',
@@ -28,6 +31,11 @@ class BillingProduct extends Model
         'min_stock'      => 'integer',
     ];
 
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class);
+    }
+
     public function productType()
     {
         return $this->belongsTo(ProductType::class);
@@ -43,6 +51,11 @@ class BillingProduct extends Model
     public function movements()
     {
         return $this->hasMany(InventoryMovement::class, 'product_id');
+    }
+
+    public function scopeForCustomer(Builder $query, int $customerId): Builder
+    {
+        return $query->where('customer_id', $customerId);
     }
 
     public function toInvoiceItem(): array

@@ -270,12 +270,18 @@ class FacturaElectronicaSVController extends Controller
 
     public function guardarProducto(Request $request)
     {
+        $tenantId     = $this->activeTenantId($request);
         $hasInventory = $request->user()?->hasModuleAccess('inventory') ?? false;
         $productId    = $request->input('id');
 
+        $codeRule = \Illuminate\Validation\Rule::unique('billing_products', 'code')->ignore($productId);
+        if ($tenantId !== null) {
+            $codeRule->where('customer_id', $tenantId);
+        }
+
         $data = $request->validate([
             'id'             => 'nullable|integer|exists:billing_products,id',
-            'code'           => ['required', 'string', 'max:100', \Illuminate\Validation\Rule::unique('billing_products', 'code')->ignore($productId)],
+            'code'           => ['required', 'string', 'max:100', $codeRule],
             'description'    => 'required|string|max:255',
             'type'           => ['required', 'string', $hasInventory ? 'in:1,2,3,4' : 'in:1,2'],
             'price'          => 'required|numeric|min:0',
@@ -290,7 +296,10 @@ class FacturaElectronicaSVController extends Controller
         $productTypeId = $data['productTypeId'] ?? null;
         if (! $hasInventory && ! $productTypeId) {
             $defaultName   = $data['type'] === '2' ? 'Servicio' : 'Bien Terminado';
-            $defaultType   = ProductType::firstOrCreate(['name' => $defaultName], ['controls_inventory' => $data['type'] !== '2']);
+            $defaultType   = ProductType::firstOrCreate(
+                ['name' => $defaultName, 'customer_id' => $tenantId],
+                ['controls_inventory' => $data['type'] !== '2']
+            );
             $productTypeId = $defaultType->id;
         }
 
@@ -310,9 +319,10 @@ class FacturaElectronicaSVController extends Controller
 
         if ($existingId) {
             $product = BillingProduct::findOrFail($existingId);
+            if ($tenantId) abort_unless($product->customer_id === $tenantId, 403);
             $product->update($attributes);
         } else {
-            $product = BillingProduct::create($attributes);
+            $product = BillingProduct::create(array_merge($attributes, ['customer_id' => $tenantId]));
         }
 
         $product->load('productType');
@@ -328,8 +338,11 @@ class FacturaElectronicaSVController extends Controller
         ]);
     }
 
-    public function destroyProducto(BillingProduct $product)
+    public function destroyProducto(Request $request, BillingProduct $product)
     {
+        $tenantId = $this->activeTenantId($request);
+        if ($tenantId) abort_unless($product->customer_id === $tenantId, 403);
+
         $product->delete();
 
         return back()->with('status', 'Producto eliminado.');
@@ -1068,7 +1081,9 @@ class FacturaElectronicaSVController extends Controller
                 'isClientesVarios' => $c->email === 'clientes.varios@coteja.internal',
             ]);
 
-        $products = BillingProduct::with('productType')->orderBy('description')->get()
+        $products = BillingProduct::with('productType')
+            ->when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))
+            ->orderBy('description')->get()
             ->map(fn ($p) => [
                 'id'          => $p->id,
                 'code'        => $p->code,
@@ -1105,11 +1120,15 @@ class FacturaElectronicaSVController extends Controller
 
     private function buildProductosData(Request $request): array
     {
+        $tenantId = $this->activeTenantId($request);
         return [
             'hasInventory' => $request->user()?->hasModuleAccess('inventory') ?? false,
-            'productTypes' => ProductType::orderBy('name')->get()
+            'productTypes' => ProductType::when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))
+                ->orderBy('name')->get()
                 ->map(fn (ProductType $t) => ['id' => $t->id, 'name' => $t->name, 'controlsInventory' => $t->controls_inventory]),
-            'products'     => BillingProduct::with('productType')->orderBy('description')->get()
+            'products'     => BillingProduct::with('productType')
+                ->when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))
+                ->orderBy('description')->get()
                 ->map(fn (BillingProduct $p) => [
                     ...$this->formatProduct($p),
                     'invoiceItem' => $p->toInvoiceItem(),
@@ -1228,7 +1247,8 @@ class FacturaElectronicaSVController extends Controller
             return;
         }
 
-        $warehouseId = (int) BillingSetting::get('inventory_sales_warehouse_id');
+        $tenantId    = $invoice->tenant_customer_id;
+        $warehouseId = (int) BillingSetting::get('inventory_sales_warehouse_id', null, $tenantId);
         if (! $warehouseId) {
             return;
         }
@@ -1239,7 +1259,10 @@ class FacturaElectronicaSVController extends Controller
             ->groupBy('codigo');
 
         foreach ($itemsByCode as $code => $codeItems) {
-            $product = BillingProduct::with('productType')->where('code', $code)->first();
+            $product = BillingProduct::with('productType')
+                ->where('code', $code)
+                ->when($tenantId !== null, fn ($q) => $q->where('customer_id', $tenantId))
+                ->first();
 
             if (! $product || ! ($product->productType?->controls_inventory ?? false)) {
                 continue;
@@ -1248,6 +1271,7 @@ class FacturaElectronicaSVController extends Controller
             $qty = collect($codeItems)->sum('cantidad');
 
             InventoryMovement::create([
+                'customer_id'        => $tenantId,
                 'product_id'         => $product->id,
                 'warehouse_id'       => $warehouseId,
                 'type'               => 'exit',

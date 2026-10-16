@@ -12,37 +12,57 @@ use App\Models\PurchaseInvoice;
 use App\Models\Warehouse;
 use App\Services\Accounting\AccountingEntryService;
 use App\Services\Accounting\AccountingPeriodService;
+use App\Traits\HasTenantScope;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class InventoryController extends Controller
 {
+    use HasTenantScope;
+
     // ── Tipos de producto ───────────────────────────────────────────────────
 
     public function productTypes()
     {
-        $productTypes = ProductType::withCount('products')->orderBy('name')->get();
+        $tenantId     = $this->tenantId();
+        $productTypes = ProductType::when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))
+            ->withCount('products')->orderBy('name')->get();
         return Inertia::render('Admin/Inventory/ProductTypes', compact('productTypes'));
     }
 
     public function storeProductType(Request $request)
     {
-        $data = $request->validate([
+        $tenantId = $this->tenantId();
+        $data     = $request->validate([
             'id'                 => 'nullable|integer|exists:product_types,id',
             'name'               => 'required|string|max:100',
             'controls_inventory' => 'boolean',
         ]);
 
-        ProductType::updateOrCreate(
-            ['id' => $data['id'] ?? null],
-            ['name' => $data['name'], 'controls_inventory' => $data['controls_inventory'] ?? false],
-        );
+        if (!empty($data['id'])) {
+            $productType = ProductType::findOrFail($data['id']);
+            if ($tenantId) abort_unless($productType->customer_id === $tenantId, 403);
+            $productType->update([
+                'name'               => $data['name'],
+                'controls_inventory' => $data['controls_inventory'] ?? false,
+            ]);
+        } else {
+            ProductType::create([
+                'customer_id'        => $tenantId,
+                'name'               => $data['name'],
+                'controls_inventory' => $data['controls_inventory'] ?? false,
+            ]);
+        }
 
         return back()->with('status', 'Tipo de producto guardado.');
     }
 
     public function destroyProductType(ProductType $productType)
     {
+        $tenantId = $this->tenantId();
+        if ($tenantId) abort_unless($productType->customer_id === $tenantId, 403);
+
         if ($productType->products()->exists()) {
             return back()->withErrors('No se puede eliminar: hay productos asignados a este tipo.');
         }
@@ -54,23 +74,38 @@ class InventoryController extends Controller
 
     public function warehouses()
     {
-        $warehouses = Warehouse::withCount('movements')->orderBy('name')->get();
+        $tenantId   = $this->tenantId();
+        $warehouses = Warehouse::when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))
+            ->withCount('movements')->orderBy('name')->get();
         return Inertia::render('Admin/Inventory/Warehouses', compact('warehouses'));
     }
 
     public function storeWarehouse(Request $request)
     {
-        $data = $request->validate([
+        $tenantId = $this->tenantId();
+        $data     = $request->validate([
             'id'      => 'nullable|integer|exists:warehouses,id',
             'name'    => 'required|string|max:100',
             'address' => 'required|string|max:500',
             'phone'   => 'nullable|string|max:30',
         ]);
 
-        Warehouse::updateOrCreate(
-            ['id' => $data['id'] ?? null],
-            ['name' => $data['name'], 'address' => $data['address'], 'phone' => $data['phone'] ?? null],
-        );
+        if (!empty($data['id'])) {
+            $warehouse = Warehouse::findOrFail($data['id']);
+            if ($tenantId) abort_unless($warehouse->customer_id === $tenantId, 403);
+            $warehouse->update([
+                'name'    => $data['name'],
+                'address' => $data['address'],
+                'phone'   => $data['phone'] ?? null,
+            ]);
+        } else {
+            Warehouse::create([
+                'customer_id' => $tenantId,
+                'name'        => $data['name'],
+                'address'     => $data['address'],
+                'phone'       => $data['phone'] ?? null,
+            ]);
+        }
 
         return back()->with('status', 'Bodega guardada.');
     }
@@ -79,19 +114,24 @@ class InventoryController extends Controller
 
     public function parameters()
     {
-        $warehouses = Warehouse::orderBy('name')->get();
-        $productTypes = ProductType::orderBy('name')->get();
-        $salesWarehouseId = (int) BillingSetting::get('inventory_sales_warehouse_id');
+        $tenantId         = $this->tenantId();
+        $warehouses       = Warehouse::when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))->orderBy('name')->get();
+        $productTypes     = ProductType::when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))->orderBy('name')->get();
+        $salesWarehouseId = (int) BillingSetting::get('inventory_sales_warehouse_id', null, $tenantId);
         return Inertia::render('Admin/Inventory/Parameters', compact('warehouses', 'productTypes', 'salesWarehouseId'));
     }
 
     public function saveParameters(Request $request)
     {
+        $tenantId      = $this->tenantId();
+        $warehouseRule = Rule::exists('warehouses', 'id');
+        if ($tenantId !== null) $warehouseRule->where('customer_id', $tenantId);
+
         $data = $request->validate([
-            'sales_warehouse_id' => 'required|exists:warehouses,id',
+            'sales_warehouse_id' => ['required', $warehouseRule],
         ]);
 
-        BillingSetting::put('inventory_sales_warehouse_id', $data['sales_warehouse_id']);
+        BillingSetting::put('inventory_sales_warehouse_id', $data['sales_warehouse_id'], $tenantId);
 
         return back()->with('status', 'Bodega de ventas actualizada.');
     }
@@ -100,11 +140,13 @@ class InventoryController extends Controller
 
     public function movements(Request $request)
     {
+        $tenantId    = $this->tenantId();
         $search      = trim((string) $request->query('search', ''));
         $type        = $request->query('type', '');
         $warehouseId = $request->query('warehouse_id', '');
 
         $movements = InventoryMovement::with(['product.productType', 'warehouse', 'billingInvoice', 'purchaseInvoice.supplier'])
+            ->when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))
             ->when($type !== '', fn ($q) => $q->where('type', $type))
             ->when($warehouseId !== '', fn ($q) => $q->where('warehouse_id', $warehouseId))
             ->when($search !== '', fn ($q) => $q->whereHas('product', fn ($q) => $q
@@ -115,15 +157,18 @@ class InventoryController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        $warehouses = Warehouse::orderBy('name')->get();
+        $warehouses = Warehouse::when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))
+            ->orderBy('name')->get();
 
         $approvedPurchases = PurchaseInvoice::with('supplier')
+            ->when($tenantId !== null, fn ($q) => $q->where('customer_id', $tenantId))
             ->where('status', 'approved')
             ->latest('purchase_date')
             ->limit(200)
             ->get();
 
         $inventoryProducts = BillingProduct::with('productType')
+            ->when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))
             ->whereHas('productType', fn ($q) => $q->where('controls_inventory', true))
             ->orderBy('description')
             ->get();
@@ -136,14 +181,25 @@ class InventoryController extends Controller
 
     public function storeMovement(Request $request)
     {
+        $tenantId = $this->tenantId();
+
+        $productRule  = Rule::exists('billing_products', 'id');
+        $warehouseRule = Rule::exists('warehouses', 'id');
+        $purchaseRule  = Rule::exists('purchase_invoices', 'id');
+        if ($tenantId !== null) {
+            $productRule->where('customer_id', $tenantId);
+            $warehouseRule->where('customer_id', $tenantId);
+            $purchaseRule->where('customer_id', $tenantId);
+        }
+
         $data = $request->validate([
-            'product_id'          => 'required|exists:billing_products,id',
-            'warehouse_id'        => 'required|exists:warehouses,id',
+            'product_id'          => ['required', $productRule],
+            'warehouse_id'        => ['required', $warehouseRule],
             'type'                => 'required|in:entry,exit',
             'quantity'            => 'required|numeric|min:0.01',
             'document_type'       => 'required|in:manual,purchase',
             'document_number'     => 'nullable|string|max:255',
-            'purchase_invoice_id' => 'nullable|exists:purchase_invoices,id',
+            'purchase_invoice_id' => ['nullable', $purchaseRule],
             'notes'               => 'nullable|string|max:1000',
         ]);
 
@@ -160,7 +216,7 @@ class InventoryController extends Controller
         }
 
         $purchaseInvoiceId = null;
-        $docNumber = $data['document_number'] ?? null;
+        $docNumber         = $data['document_number'] ?? null;
 
         if ($data['type'] === 'entry' && $data['document_type'] === 'purchase') {
             if (empty($data['purchase_invoice_id'])) {
@@ -171,10 +227,11 @@ class InventoryController extends Controller
                 return back()->withErrors('Solo se pueden registrar entradas de facturas aprobadas.');
             }
             $purchaseInvoiceId = $purchase->id;
-            $docNumber = $purchase->invoice_number;
+            $docNumber         = $purchase->invoice_number;
         }
 
         $movement = InventoryMovement::create([
+            'customer_id'         => $tenantId,
             'product_id'          => $data['product_id'],
             'warehouse_id'        => $data['warehouse_id'],
             'type'                => $data['type'],
@@ -188,9 +245,7 @@ class InventoryController extends Controller
 
         $this->syncWarehouseStock($product, (int) $data['warehouse_id'], $data['quantity'], $data['type']);
 
-        // Partida contable de inventario (solo movimientos manuales)
         try {
-            $tenantId = (int) session('billing_tenant_id') ?: null;
             app(AccountingEntryService::class)->createFromInventory($movement->load('product'), $request->user()?->id, $tenantId);
         } catch (\Throwable) {
             // No interrumpir el registro si falla la contabilidad
@@ -214,8 +269,6 @@ class InventoryController extends Controller
             $product->warehouses()->attach($warehouseId, ['stock_quantity' => $initial]);
         }
 
-        // Sync global stock_quantity
-        $product->warehouses()->flushCache ?? null;
         $total = \DB::table('billing_product_warehouse')
             ->where('billing_product_id', $product->id)
             ->sum('stock_quantity');

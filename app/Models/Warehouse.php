@@ -2,11 +2,18 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Warehouse extends Model
 {
-    protected $fillable = ['name', 'address', 'phone'];
+    protected $fillable = ['customer_id', 'name', 'address', 'phone'];
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class);
+    }
 
     public function products()
     {
@@ -18,5 +25,10 @@ class Warehouse extends Model
     public function movements()
     {
         return $this->hasMany(InventoryMovement::class);
+    }
+
+    public function scopeForCustomer(Builder $query, int $customerId): Builder
+    {
+        return $query->where('customer_id', $customerId);
     }
 }

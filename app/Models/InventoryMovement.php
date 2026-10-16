@@ -2,17 +2,24 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class InventoryMovement extends Model
 {
     protected $fillable = [
-        'product_id', 'warehouse_id', 'type', 'quantity',
+        'customer_id', 'product_id', 'warehouse_id', 'type', 'quantity',
         'document_type', 'document_number',
         'billing_invoice_id', 'purchase_invoice_id', 'notes',
     ];
 
     protected $casts = ['quantity' => 'decimal:2'];
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class);
+    }
 
     public function product()
     {
@@ -38,5 +45,10 @@ class InventoryMovement extends Model
     {
         return $this->hasOne(JournalEntry::class, 'source_id')
             ->where('source_type', 'inventory');
+    }
+
+    public function scopeForCustomer(Builder $query, int $customerId): Builder
+    {
+        return $query->where('customer_id', $customerId);
     }
 }
