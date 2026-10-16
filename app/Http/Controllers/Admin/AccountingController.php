@@ -17,41 +17,80 @@ class AccountingController extends Controller
 {
     public function __construct(private readonly AccountingPeriodService $periods) {}
 
+    // ── Tenant helper ───────────────────────────────────────────────────────
+
+    /**
+     * Devuelve el customer_id activo según el rol:
+     *  - Admin / Consultor: usa la sesión billing_tenant_id (empresa seleccionada)
+     *  - Inquilino / Customer: usa su propio customer_id
+     */
+    private function tenantCustomerId(): ?int
+    {
+        $user = auth()->user();
+        if (!$user) return null;
+
+        if ($user->isAdmin() || $user->isConsultant()) {
+            $id = session('billing_tenant_id');
+            return $id ? (int) $id : null;
+        }
+
+        return $user->customer_id ? (int) $user->customer_id : null;
+    }
+
+    private function requireTenant(): int
+    {
+        $id = $this->tenantCustomerId();
+
+        abort_if(
+            $id === null,
+            422,
+            'Seleccione un inquilino activo para acceder al módulo contable.'
+        );
+
+        // Primera vez: copiar catálogo plantilla
+        if (!AccountingAccount::customerHasCatalog($id)) {
+            AccountingAccount::copyDefaultsFor($id);
+        }
+
+        return $id;
+    }
+
     // ── Catálogo de cuentas ─────────────────────────────────────────────────
 
     public function catalogo(Request $request)
     {
+        $customerId = $this->requireTenant();
+
         $filter = $request->query('tipo', '');
         $search = trim((string) $request->query('search', ''));
 
-        $query = AccountingAccount::query()->orderBy('code');
+        $query = AccountingAccount::forCustomer($customerId)->orderBy('code');
 
         if ($filter !== '') {
             $query->where('type', $filter);
         }
 
         if ($search !== '') {
-            $query->where(function ($q) use ($search) {
-                $q->where('code', 'like', "%{$search}%")
-                  ->orWhere('name', 'like', "%{$search}%");
-            });
+            $query->where(fn($q) => $q
+                ->where('code', 'like', "%{$search}%")
+                ->orWhere('name', 'like', "%{$search}%"));
         }
 
         $accounts = $query->get();
 
-        $parents = AccountingAccount::query()
+        $parents = AccountingAccount::forCustomer($customerId)
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'level'])
-            ->map(fn ($a) => ['id' => $a->id, 'code' => $a->code, 'name' => "{$a->code} - {$a->name}"])
+            ->map(fn($a) => ['id' => $a->id, 'code' => $a->code, 'name' => "{$a->code} - {$a->name}"])
             ->values();
 
         $stats = [
-            'activo'     => AccountingAccount::where('type', 'activo')->count(),
-            'pasivo'     => AccountingAccount::where('type', 'pasivo')->count(),
-            'patrimonio' => AccountingAccount::where('type', 'patrimonio')->count(),
-            'gasto'      => AccountingAccount::where('type', 'gasto')->count(),
-            'ingreso'    => AccountingAccount::where('type', 'ingreso')->count(),
-            'total'      => AccountingAccount::count(),
+            'activo'     => AccountingAccount::forCustomer($customerId)->where('type', 'activo')->count(),
+            'pasivo'     => AccountingAccount::forCustomer($customerId)->where('type', 'pasivo')->count(),
+            'patrimonio' => AccountingAccount::forCustomer($customerId)->where('type', 'patrimonio')->count(),
+            'gasto'      => AccountingAccount::forCustomer($customerId)->where('type', 'gasto')->count(),
+            'ingreso'    => AccountingAccount::forCustomer($customerId)->where('type', 'ingreso')->count(),
+            'total'      => AccountingAccount::forCustomer($customerId)->count(),
         ];
 
         return Inertia::render('Admin/Accounting/Catalogo', compact('accounts', 'parents', 'stats', 'filter', 'search'));
@@ -59,17 +98,22 @@ class AccountingController extends Controller
 
     public function store(Request $request)
     {
+        $customerId = $this->requireTenant();
+
         $data = $request->validate([
-            'code'      => 'required|string|max:20|unique:accounting_accounts,code',
+            'code'      => ['required', 'string', 'max:20',
+                \Illuminate\Validation\Rule::unique('accounting_accounts')->where('customer_id', $customerId)],
             'name'      => 'required|string|max:200',
             'type'      => 'required|in:activo,pasivo,patrimonio,gasto,ingreso',
             'nature'    => 'required|in:deudora,acreedora',
-            'parent_id' => 'nullable|exists:accounting_accounts,id',
+            'parent_id' => ['nullable', \Illuminate\Validation\Rule::exists('accounting_accounts', 'id')
+                ->where('customer_id', $customerId)],
             'notes'     => 'nullable|string|max:1000',
         ]);
 
         $parent = $data['parent_id'] ? AccountingAccount::find($data['parent_id']) : null;
-        $data['level'] = $parent ? $parent->level + 1 : 1;
+        $data['level']       = $parent ? $parent->level + 1 : 1;
+        $data['customer_id'] = $customerId;
 
         $account = AccountingAccount::create($data);
 
@@ -78,12 +122,17 @@ class AccountingController extends Controller
 
     public function update(Request $request, AccountingAccount $account)
     {
+        $customerId = $this->requireTenant();
+        abort_unless($account->customer_id === $customerId, 403);
+
         $data = $request->validate([
-            'code'      => 'required|string|max:20|unique:accounting_accounts,code,'.$account->id,
+            'code'      => ['required', 'string', 'max:20',
+                \Illuminate\Validation\Rule::unique('accounting_accounts')->where('customer_id', $customerId)->ignore($account->id)],
             'name'      => 'required|string|max:200',
             'type'      => 'required|in:activo,pasivo,patrimonio,gasto,ingreso',
             'nature'    => 'required|in:deudora,acreedora',
-            'parent_id' => 'nullable|exists:accounting_accounts,id',
+            'parent_id' => ['nullable', \Illuminate\Validation\Rule::exists('accounting_accounts', 'id')
+                ->where('customer_id', $customerId)],
             'is_active' => 'boolean',
             'notes'     => 'nullable|string|max:1000',
         ]);
@@ -102,6 +151,9 @@ class AccountingController extends Controller
 
     public function destroy(AccountingAccount $account)
     {
+        $customerId = $this->requireTenant();
+        abort_unless($account->customer_id === $customerId, 403);
+
         if ($account->children()->exists()) {
             return response()->json(['success' => false, 'message' => 'No se puede eliminar una cuenta que tiene subcuentas.'], 422);
         }
@@ -115,15 +167,18 @@ class AccountingController extends Controller
 
     public function configuracion()
     {
+        $customerId = $this->requireTenant();
+
         $packages = AccountingPackage::with([
             'debitAccount', 'creditAccount',
             'secondaryDebitAccount', 'secondaryCreditAccount', 'costCenter',
         ])->orderBy('code')->get();
 
-        $accounts = AccountingAccount::where('is_active', true)
+        $accounts = AccountingAccount::forCustomer($customerId)
+            ->where('is_active', true)
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'type'])
-            ->map(fn ($a) => ['id' => $a->id, 'label' => $a->code . ' — ' . $a->name, 'type' => $a->type])
+            ->map(fn($a) => ['id' => $a->id, 'label' => $a->code . ' — ' . $a->name, 'type' => $a->type])
             ->values();
 
         $costCenters = CostCenter::orderBy('code')->get();
@@ -147,7 +202,6 @@ class AccountingController extends Controller
         ]);
 
         $data['code'] = strtoupper($data['code']);
-
         $package = AccountingPackage::create($data);
 
         return response()->json(['success' => true, 'message' => 'Paquete creado.', 'package' => $package]);
@@ -188,10 +242,10 @@ class AccountingController extends Controller
     public function storeCostCenter(Request $request)
     {
         $data = $request->validate([
-            'code' => 'required|string|max:20|unique:cost_centers,code',
-            'name' => 'required|string|max:120',
+            'code'        => 'required|string|max:20|unique:cost_centers,code',
+            'name'        => 'required|string|max:120',
             'description' => 'nullable|string|max:500',
-            'is_active' => 'boolean',
+            'is_active'   => 'boolean',
         ]);
 
         $data['code'] = strtoupper($data['code']);
@@ -203,10 +257,10 @@ class AccountingController extends Controller
     public function updateCostCenter(Request $request, CostCenter $costCenter)
     {
         $data = $request->validate([
-            'code' => 'required|string|max:20|unique:cost_centers,code,'.$costCenter->id,
-            'name' => 'required|string|max:120',
+            'code'        => 'required|string|max:20|unique:cost_centers,code,'.$costCenter->id,
+            'name'        => 'required|string|max:120',
             'description' => 'nullable|string|max:500',
-            'is_active' => 'boolean',
+            'is_active'   => 'boolean',
         ]);
 
         $data['code'] = strtoupper($data['code']);
@@ -233,24 +287,15 @@ class AccountingController extends Controller
         $year = (int) $request->query('year', now()->year);
 
         $yearPeriod = AccountingYearPeriod::where('year', $year)->first();
-        $periods = AccountingPeriod::where('year', $year)
-            ->orderBy('month')
-            ->get();
+        $periods    = AccountingPeriod::where('year', $year)->orderBy('month')->get();
 
-        $availableYears = AccountingYearPeriod::distinct()
-            ->orderByDesc('year')
-            ->pluck('year')
-            ->toArray();
+        $availableYears = AccountingYearPeriod::distinct()->orderByDesc('year')->pluck('year')->toArray();
 
-        foreach (AccountingPeriod::distinct()->pluck('year')->toArray() as $existingYear) {
-            if (! in_array($existingYear, $availableYears)) {
-                $availableYears[] = $existingYear;
-            }
+        foreach (AccountingPeriod::distinct()->pluck('year')->toArray() as $y) {
+            if (!in_array($y, $availableYears)) $availableYears[] = $y;
         }
 
-        if (! in_array(now()->year, $availableYears)) {
-            $availableYears[] = now()->year;
-        }
+        if (!in_array(now()->year, $availableYears)) $availableYears[] = now()->year;
 
         rsort($availableYears);
 
@@ -259,10 +304,7 @@ class AccountingController extends Controller
 
     public function generarPeriodos(Request $request)
     {
-        $data = $request->validate([
-            'year' => 'required|integer|min:2020|max:2099',
-        ]);
-
+        $data    = $request->validate(['year' => 'required|integer|min:2020|max:2099']);
         $created = $this->periods->createYearPeriods((int) $data['year']);
 
         return response()->json([
@@ -286,14 +328,11 @@ class AccountingController extends Controller
 
     public function cerrarAnioPeriodo(Request $request, AccountingYearPeriod $yearPeriod)
     {
-        if (! $yearPeriod->isOpen()) {
+        if (!$yearPeriod->isOpen()) {
             return response()->json(['success' => false, 'message' => 'El año contable ya está cerrado.'], 422);
         }
 
-        $data = $request->validate([
-            'notes' => 'nullable|string|max:500',
-        ]);
-
+        $data = $request->validate(['notes' => 'nullable|string|max:500']);
         $this->periods->closeYear($yearPeriod, $request->user()->id, $data['notes'] ?? null);
 
         return response()->json(['success' => true, 'message' => "Ejercicio {$yearPeriod->year} cerrado junto con sus meses abiertos."]);
@@ -302,7 +341,7 @@ class AccountingController extends Controller
     public function abrirPeriodo(Request $request, AccountingPeriod $period)
     {
         $yearPeriod = AccountingYearPeriod::where('year', $period->year)->first();
-        if (! $yearPeriod || ! $yearPeriod->isOpen()) {
+        if (!$yearPeriod || !$yearPeriod->isOpen()) {
             return response()->json(['success' => false, 'message' => 'Abra primero el año contable antes de abrir meses.'], 422);
         }
 
@@ -317,14 +356,11 @@ class AccountingController extends Controller
 
     public function cerrarPeriodo(Request $request, AccountingPeriod $period)
     {
-        if (! $period->isOpen()) {
+        if (!$period->isOpen()) {
             return response()->json(['success' => false, 'message' => 'El período ya está cerrado.'], 422);
         }
 
-        $data = $request->validate([
-            'notes' => 'nullable|string|max:500',
-        ]);
-
+        $data = $request->validate(['notes' => 'nullable|string|max:500']);
         $this->periods->closePeriod($period, $request->user()->id, $data['notes'] ?? null);
 
         return response()->json(['success' => true, 'message' => "Período {$period->full_name} cerrado."]);
@@ -334,62 +370,57 @@ class AccountingController extends Controller
 
     public function saldos(Request $request)
     {
-        $year      = (int) $request->query('year', now()->year);
-        $month     = (int) $request->query('month', now()->month);
-        $accountId = $request->query('account_id');
-        $acumulado = $request->boolean('acumulado', false);
+        $customerId = $this->requireTenant();
+        $year       = (int) $request->query('year',  now()->year);
+        $month      = (int) $request->query('month', now()->month);
+        $accountId  = $request->query('account_id');
+        $acumulado  = $request->boolean('acumulado', false);
 
         $period = AccountingPeriod::where('year', $year)->where('month', $month)->first();
 
-        // Consulta de saldos sobre partidas aprobadas
         $query = DB::table('journal_entry_lines as jel')
-            ->join('journal_entries as je', 'je.id', '=', 'jel.journal_entry_id')
-            ->join('accounting_accounts as aa', 'aa.id', '=', 'jel.account_id')
+            ->join('journal_entries as je',     'je.id',  '=', 'jel.journal_entry_id')
+            ->join('accounting_accounts as aa', 'aa.id',  '=', 'jel.account_id')
             ->where('je.status', 'aprobado')
-            ->when($accountId, fn ($q) => $q->where('jel.account_id', $accountId))
+            ->where('aa.customer_id', $customerId)
+            ->when($accountId, fn($q) => $q->where('jel.account_id', $accountId))
             ->groupBy('aa.id', 'aa.code', 'aa.name', 'aa.type', 'aa.nature')
             ->select([
                 'aa.id', 'aa.code', 'aa.name', 'aa.type', 'aa.nature',
-                DB::raw('SUM(jel.debit) as total_debit'),
+                DB::raw('SUM(jel.debit)  as total_debit'),
                 DB::raw('SUM(jel.credit) as total_credit'),
             ])
             ->orderBy('aa.code');
 
         if ($acumulado) {
-            // Saldo acumulado: desde 01-01-{year} hasta fin del mes seleccionado
-            $query->whereYear('je.entry_date', $year)
-                  ->whereRaw('MONTH(je.entry_date) <= ?', [$month]);
+            $query->whereYear('je.entry_date', $year)->whereRaw('MONTH(je.entry_date) <= ?', [$month]);
         } else {
-            // Solo movimientos del período seleccionado
-            $query->whereYear('je.entry_date', $year)
-                  ->whereMonth('je.entry_date', $month);
+            $query->whereYear('je.entry_date', $year)->whereMonth('je.entry_date', $month);
         }
 
         $balances = $query->get()->map(function ($row) {
             $debe  = (float) $row->total_debit;
             $haber = (float) $row->total_credit;
-            // Saldo natural: deudora = debe - haber, acreedora = haber - debe
             $saldo = $row->nature === 'deudora' ? $debe - $haber : $haber - $debe;
             return (object) [
-                'id'          => $row->id,
-                'code'        => $row->code,
-                'name'        => $row->name,
-                'type'        => $row->type,
-                'nature'      => $row->nature,
-                'total_debit' => $debe,
-                'total_credit'=> $haber,
-                'saldo'       => $saldo,
+                'id'           => $row->id,
+                'code'         => $row->code,
+                'name'         => $row->name,
+                'type'         => $row->type,
+                'nature'       => $row->nature,
+                'total_debit'  => $debe,
+                'total_credit' => $haber,
+                'saldo'        => $saldo,
             ];
         });
 
-        $summaryByType = $balances->groupBy('type')->map(fn ($g) => [
+        $summaryByType = $balances->groupBy('type')->map(fn($g) => [
             'total_debit'  => $g->sum('total_debit'),
             'total_credit' => $g->sum('total_credit'),
             'saldo'        => $g->sum('saldo'),
         ]);
 
-        $accounts = AccountingAccount::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
-
+        $accounts   = AccountingAccount::forCustomer($customerId)->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
         $allPeriods = AccountingPeriod::where('year', $year)->orderBy('month')->get();
 
         return Inertia::render('Admin/Accounting/Saldos', compact(
@@ -402,20 +433,20 @@ class AccountingController extends Controller
 
     public function balanzaComprobacion(Request $request)
     {
+        $customerId       = $this->requireTenant();
         $year             = (int) $request->query('year',  now()->year);
         $month            = (int) $request->query('month', now()->month);
         $acumulado        = $request->boolean('acumulado', false);
         $tipo             = $request->query('tipo', '');
         $soloConMovimiento = $request->boolean('solo_movimiento', false);
 
-        // Subquery: movimientos del período por cuenta (solo partidas aprobadas)
         $movsSub = DB::table('journal_entry_lines as jel')
             ->join('journal_entries as je', 'je.id', '=', 'jel.journal_entry_id')
             ->where('je.status', 'aprobado')
             ->whereYear('je.entry_date', $year)
             ->when($acumulado,
-                fn ($q) => $q->whereRaw('MONTH(je.entry_date) <= ?', [$month]),
-                fn ($q) => $q->whereMonth('je.entry_date', $month)
+                fn($q) => $q->whereRaw('MONTH(je.entry_date) <= ?', [$month]),
+                fn($q) => $q->whereMonth('je.entry_date', $month)
             )
             ->groupBy('jel.account_id')
             ->select([
@@ -424,15 +455,15 @@ class AccountingController extends Controller
                 DB::raw('SUM(jel.credit) as suma_haber'),
             ]);
 
-        // Base: todas las cuentas que aceptan movimientos (sin hijos = cuentas de detalle)
         $rows = DB::table('accounting_accounts as aa')
-            ->whereNotExists(fn ($q) => $q->select(DB::raw(1))
+            ->whereNotExists(fn($q) => $q->select(DB::raw(1))
                 ->from('accounting_accounts as ch')
                 ->whereColumn('ch.parent_id', 'aa.id'))
             ->where('aa.is_active', true)
-            ->when($tipo !== '', fn ($q) => $q->where('aa.type', $tipo))
+            ->where('aa.customer_id', $customerId)
+            ->when($tipo !== '', fn($q) => $q->where('aa.type', $tipo))
             ->leftJoinSub($movsSub, 'movs', 'movs.account_id', '=', 'aa.id')
-            ->when($soloConMovimiento, fn ($q) => $q->whereNotNull('movs.account_id'))
+            ->when($soloConMovimiento, fn($q) => $q->whereNotNull('movs.account_id'))
             ->select([
                 'aa.id', 'aa.code', 'aa.name', 'aa.type', 'aa.nature',
                 DB::raw('COALESCE(movs.suma_debe,  0) as suma_debe'),
@@ -445,21 +476,20 @@ class AccountingController extends Controller
                 $haber = (float) $r->suma_haber;
                 $neto  = $debe - $haber;
                 return (object) [
-                    'id'             => $r->id,
-                    'code'           => $r->code,
-                    'name'           => $r->name,
-                    'type'           => $r->type,
-                    'nature'         => $r->nature,
-                    'suma_debe'      => $debe,
-                    'suma_haber'     => $haber,
-                    'saldo_deudor'   => $neto > 0 ? $neto   : 0.0,
-                    'saldo_acreedor' => $neto < 0 ? abs($neto) : 0.0,
+                    'id'               => $r->id,
+                    'code'             => $r->code,
+                    'name'             => $r->name,
+                    'type'             => $r->type,
+                    'nature'           => $r->nature,
+                    'suma_debe'        => $debe,
+                    'suma_haber'       => $haber,
+                    'saldo_deudor'     => $neto > 0 ? $neto        : 0.0,
+                    'saldo_acreedor'   => $neto < 0 ? abs($neto)   : 0.0,
                     'tiene_movimiento' => ($debe + $haber) > 0,
                 ];
             });
 
-        // Totales sólo sobre cuentas con movimiento (las en cero no afectan cuadre)
-        $conMovimiento      = $rows->filter(fn ($r) => $r->tiene_movimiento);
+        $conMovimiento      = $rows->filter(fn($r) => $r->tiene_movimiento);
         $totalSumaDebe      = $conMovimiento->sum('suma_debe');
         $totalSumaHaber     = $conMovimiento->sum('suma_haber');
         $totalSaldoDeudor   = $conMovimiento->sum('saldo_deudor');
@@ -484,35 +514,35 @@ class AccountingController extends Controller
 
     public function libroMayor(Request $request)
     {
-        $year      = (int) $request->query('year',  now()->year);
-        $month     = (int) $request->query('month', now()->month);
-        $accountId = $request->query('account_id');
-        $acumulado = $request->boolean('acumulado', false);
+        $customerId = $this->requireTenant();
+        $year       = (int) $request->query('year',  now()->year);
+        $month      = (int) $request->query('month', now()->month);
+        $accountId  = $request->query('account_id');
+        $acumulado  = $request->boolean('acumulado', false);
 
         $startDate = $acumulado
             ? sprintf('%04d-01-01', $year)
             : sprintf('%04d-%02d-01', $year, $month);
         $endDate = \Carbon\Carbon::create($year, $month, 1)->endOfMonth()->toDateString();
 
-        // Cuentas con movimiento en el período (de detalle = sin hijos)
         $accountsQuery = DB::table('accounting_accounts as aa')
-            ->whereNotExists(fn ($q) => $q->select(DB::raw(1))
+            ->whereNotExists(fn($q) => $q->select(DB::raw(1))
                 ->from('accounting_accounts as ch')
                 ->whereColumn('ch.parent_id', 'aa.id'))
             ->where('aa.is_active', true)
-            ->whereExists(fn ($q) => $q->select(DB::raw(1))
+            ->where('aa.customer_id', $customerId)
+            ->whereExists(fn($q) => $q->select(DB::raw(1))
                 ->from('journal_entry_lines as jel')
                 ->join('journal_entries as je', 'je.id', '=', 'jel.journal_entry_id')
                 ->whereColumn('jel.account_id', 'aa.id')
                 ->where('je.status', 'aprobado')
                 ->whereBetween('je.entry_date', [$startDate, $endDate]))
-            ->when($accountId, fn ($q) => $q->where('aa.id', $accountId))
+            ->when($accountId, fn($q) => $q->where('aa.id', $accountId))
             ->orderBy('aa.code')
             ->get(['aa.id', 'aa.code', 'aa.name', 'aa.type', 'aa.nature']);
 
         $accountIds = $accountsQuery->pluck('id');
 
-        // Saldos iniciales (movimientos ANTES de $startDate, acumulados desde siempre)
         $saldosIniciales = DB::table('journal_entry_lines as jel')
             ->join('journal_entries as je', 'je.id', '=', 'jel.journal_entry_id')
             ->whereIn('jel.account_id', $accountIds)
@@ -527,9 +557,8 @@ class AccountingController extends Controller
             ->get()
             ->keyBy('account_id');
 
-        // Movimientos del período
         $movements = DB::table('journal_entry_lines as jel')
-            ->join('journal_entries as je', 'je.id', '=', 'jel.journal_entry_id')
+            ->join('journal_entries as je',      'je.id', '=', 'jel.journal_entry_id')
             ->leftJoin('accounting_packages as ap', 'ap.id', '=', 'je.accounting_package_id')
             ->whereIn('jel.account_id', $accountIds)
             ->where('je.status', 'aprobado')
@@ -551,14 +580,12 @@ class AccountingController extends Controller
             ->get()
             ->groupBy('account_id');
 
-        // Construir el ledger por cuenta con saldo corrido
         $ledger = $accountsQuery->map(function ($account) use ($saldosIniciales, $movements) {
-            $si = $saldosIniciales->get($account->id);
+            $si       = $saldosIniciales->get($account->id);
             $siDebit  = $si ? (float) $si->total_debit  : 0.0;
             $siCredit = $si ? (float) $si->total_credit : 0.0;
 
-            // Saldo inicial en términos naturales de la cuenta
-            $saldoInicial = $account->nature === 'deudora'
+            $saldoInicial  = $account->nature === 'deudora'
                 ? $siDebit - $siCredit
                 : $siCredit - $siDebit;
 
@@ -567,18 +594,18 @@ class AccountingController extends Controller
                 $debe  = (float) $m->debe;
                 $haber = (float) $m->haber;
                 $saldoCorrente += $account->nature === 'deudora'
-                    ? $debe - $haber
+                    ? $debe  - $haber
                     : $haber - $debe;
                 return (object) [
-                    'entry_id'      => $m->entry_id,
-                    'entry_number'  => $m->entry_number,
-                    'entry_date'    => $m->entry_date,
-                    'description'   => $m->description,
+                    'entry_id'        => $m->entry_id,
+                    'entry_number'    => $m->entry_number,
+                    'entry_date'      => $m->entry_date,
+                    'description'     => $m->description,
                     'source_document' => $m->source_document,
-                    'package_code'  => $m->package_code,
-                    'debe'          => $debe,
-                    'haber'         => $haber,
-                    'saldo'         => $saldoCorrente,
+                    'package_code'    => $m->package_code,
+                    'debe'            => $debe,
+                    'haber'           => $haber,
+                    'saldo'           => $saldoCorrente,
                 ];
             });
 
@@ -592,7 +619,8 @@ class AccountingController extends Controller
             ];
         });
 
-        $allAccounts = AccountingAccount::whereNotExists(fn ($q) => $q->select(DB::raw(1))
+        $allAccounts = AccountingAccount::forCustomer($customerId)
+            ->whereNotExists(fn($q) => $q->select(DB::raw(1))
                 ->from('accounting_accounts as ch')
                 ->whereColumn('ch.parent_id', 'accounting_accounts.id'))
             ->where('is_active', true)
@@ -618,21 +646,22 @@ class AccountingController extends Controller
 
     public function balanceGeneral(Request $request)
     {
+        $customerId = $this->requireTenant();
         $year  = (int) $request->query('year',  now()->year);
         $month = (int) $request->query('month', now()->month);
 
-        // Secciones de nivel 2 para agrupar cuentas
-        $sections = AccountingAccount::whereIn('type', ['activo', 'pasivo', 'patrimonio'])
+        $sections = AccountingAccount::forCustomer($customerId)
+            ->whereIn('type', ['activo', 'pasivo', 'patrimonio'])
             ->where('level', 2)
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'type']);
 
-        // Balances acumulados desde el 01-01 hasta fin del mes seleccionado
         $rows = DB::table('journal_entry_lines as jel')
-            ->join('journal_entries as je', 'je.id', '=', 'jel.journal_entry_id')
-            ->join('accounting_accounts as aa', 'aa.id', '=', 'jel.account_id')
-            ->join('accounting_accounts as par', 'par.id', '=', 'aa.parent_id')
+            ->join('journal_entries as je',         'je.id',       '=', 'jel.journal_entry_id')
+            ->join('accounting_accounts as aa',     'aa.id',       '=', 'jel.account_id')
+            ->join('accounting_accounts as par',    'par.id',      '=', 'aa.parent_id')
             ->where('je.status', 'aprobado')
+            ->where('aa.customer_id', $customerId)
             ->whereIn('aa.type', ['activo', 'pasivo', 'patrimonio'])
             ->where('aa.level', 3)
             ->whereYear('je.entry_date', $year)
@@ -657,10 +686,8 @@ class AccountingController extends Controller
                 ]);
             });
 
-        // Agrupar por sección (nivel 2) y luego por tipo
         $bySection = $rows->groupBy('section_code');
-
-        $period = AccountingPeriod::where('year', $year)->where('month', $month)->first();
+        $period    = AccountingPeriod::where('year', $year)->where('month', $month)->first();
 
         $availableYears = AccountingPeriod::distinct()->orderByDesc('year')->pluck('year')->toArray();
         if (!in_array(now()->year, $availableYears)) {
@@ -677,27 +704,29 @@ class AccountingController extends Controller
 
     public function estadoResultados(Request $request)
     {
-        $year      = (int) $request->query('year',  now()->year);
-        $month     = (int) $request->query('month', now()->month);
-        $acumulado = $request->boolean('acumulado', false);
+        $customerId = $this->requireTenant();
+        $year       = (int) $request->query('year',  now()->year);
+        $month      = (int) $request->query('month', now()->month);
+        $acumulado  = $request->boolean('acumulado', false);
 
-        // Secciones de nivel 2 para ingresos y gastos
-        $sections = AccountingAccount::whereIn('type', ['ingreso', 'gasto'])
+        $sections = AccountingAccount::forCustomer($customerId)
+            ->whereIn('type', ['ingreso', 'gasto'])
             ->where('level', 2)
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'type']);
 
         $rows = DB::table('journal_entry_lines as jel')
-            ->join('journal_entries as je', 'je.id', '=', 'jel.journal_entry_id')
-            ->join('accounting_accounts as aa', 'aa.id', '=', 'jel.account_id')
-            ->join('accounting_accounts as par', 'par.id', '=', 'aa.parent_id')
+            ->join('journal_entries as je',         'je.id',  '=', 'jel.journal_entry_id')
+            ->join('accounting_accounts as aa',     'aa.id',  '=', 'jel.account_id')
+            ->join('accounting_accounts as par',    'par.id', '=', 'aa.parent_id')
             ->where('je.status', 'aprobado')
+            ->where('aa.customer_id', $customerId)
             ->whereIn('aa.type', ['ingreso', 'gasto'])
             ->where('aa.level', 3)
             ->whereYear('je.entry_date', $year)
             ->when($acumulado,
-                fn ($q) => $q->whereRaw('MONTH(je.entry_date) <= ?', [$month]),
-                fn ($q) => $q->whereMonth('je.entry_date', $month)
+                fn($q) => $q->whereRaw('MONTH(je.entry_date) <= ?', [$month]),
+                fn($q) => $q->whereMonth('je.entry_date', $month)
             )
             ->groupBy('aa.id', 'aa.code', 'aa.name', 'aa.type', 'aa.nature', 'aa.parent_id', 'par.code', 'par.name')
             ->select([
@@ -719,7 +748,7 @@ class AccountingController extends Controller
                 ]);
             });
 
-        $bySection    = $rows->groupBy('section_code');
+        $bySection     = $rows->groupBy('section_code');
         $totalIngresos = $rows->where('type', 'ingreso')->sum('saldo');
         $totalGastos   = $rows->where('type', 'gasto')->sum('saldo');
         $utilidad      = $totalIngresos - $totalGastos;
