@@ -45,7 +45,7 @@ function StatusBadge({ status }) {
 }
 
 export default function Dashboard({ stats, recent }) {
-    const { auth, billingTenant } = usePage().props;
+    const { auth, activeCompany } = usePage().props;
     return (
         <AppLayout title="Facturación — Dashboard">
             <div className="section-top">

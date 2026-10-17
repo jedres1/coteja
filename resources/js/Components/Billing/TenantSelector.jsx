@@ -2,17 +2,17 @@ import { useState } from 'react';
 import { router } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 
-export default function TenantSelector({ billingTenant, availableCustomers = [], setRoute, clearRoute }) {
+export default function TenantSelector({ activeCompany, availableCompanies = [] }) {
     const [selectOpen, setSelectOpen] = useState(false);
     const [loading, setLoading] = useState(false);
 
-    if (!availableCustomers.length) return null;
+    if (availableCompanies.length <= 1) return null;
 
-    function selectCompany(customerId) {
+    function selectCompany(companyId) {
         setLoading(true);
         router.post(
-            route(setRoute),
-            { customer_id: customerId },
+            route('admin.empresa.cambiar'),
+            { company_id: companyId },
             { preserveScroll: true, onFinish: () => { setLoading(false); setSelectOpen(false); } }
         );
     }
@@ -20,7 +20,7 @@ export default function TenantSelector({ billingTenant, availableCustomers = [],
     function clearCompany() {
         setLoading(true);
         router.post(
-            route(clearRoute),
+            route('admin.empresa.salir'),
             {},
             { preserveScroll: true, onFinish: () => setLoading(false) }
         );
@@ -30,17 +30,17 @@ export default function TenantSelector({ billingTenant, availableCustomers = [],
         <div style={{
             display: 'flex', alignItems: 'center', gap: 10,
             padding: '8px 14px', marginBottom: 12,
-            background: billingTenant ? '#eff6ff' : '#f9fafb',
-            border: `1px solid ${billingTenant ? '#bfdbfe' : '#e5e7eb'}`,
+            background: activeCompany ? '#eff6ff' : '#f9fafb',
+            border: `1px solid ${activeCompany ? '#bfdbfe' : '#e5e7eb'}`,
             borderRadius: 8, fontSize: 13,
         }}>
             <span style={{ color: '#6b7280', fontWeight: 500 }}>
                 Empresa activa:
             </span>
 
-            {billingTenant ? (
+            {activeCompany ? (
                 <>
-                    <span style={{ fontWeight: 700, color: '#1d4ed8' }}>{billingTenant.name}</span>
+                    <span style={{ fontWeight: 700, color: '#1d4ed8' }}>{activeCompany.name}</span>
                     <button
                         type="button"
                         disabled={loading}
@@ -61,7 +61,7 @@ export default function TenantSelector({ billingTenant, availableCustomers = [],
                     onClick={() => setSelectOpen((o) => !o)}
                     style={{ padding: '4px 12px', fontSize: 12, background: '#fff', border: '1px solid #d1d5db', borderRadius: 5, cursor: 'pointer', fontWeight: 600 }}
                 >
-                    {billingTenant ? 'Cambiar empresa' : 'Seleccionar empresa'}
+                    {activeCompany ? 'Cambiar empresa' : 'Seleccionar empresa'}
                 </button>
 
                 {selectOpen && (
@@ -70,16 +70,16 @@ export default function TenantSelector({ billingTenant, availableCustomers = [],
                         background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8,
                         boxShadow: '0 4px 16px rgba(0,0,0,0.12)', minWidth: 240, maxHeight: 280, overflowY: 'auto',
                     }}>
-                        {availableCustomers.map((c) => (
+                        {availableCompanies.map((c) => (
                             <button
                                 key={c.id}
                                 type="button"
                                 onClick={() => selectCompany(c.id)}
                                 style={{
                                     display: 'block', width: '100%', textAlign: 'left',
-                                    padding: '9px 14px', border: 'none', background: billingTenant?.id === c.id ? '#eff6ff' : 'transparent',
-                                    cursor: 'pointer', fontSize: 13, fontWeight: billingTenant?.id === c.id ? 700 : 400,
-                                    color: billingTenant?.id === c.id ? '#1d4ed8' : '#111827',
+                                    padding: '9px 14px', border: 'none', background: activeCompany?.id === c.id ? '#eff6ff' : 'transparent',
+                                    cursor: 'pointer', fontSize: 13, fontWeight: activeCompany?.id === c.id ? 700 : 400,
+                                    color: activeCompany?.id === c.id ? '#1d4ed8' : '#111827',
                                     borderBottom: '1px solid #f3f4f6',
                                 }}
                             >

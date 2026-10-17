@@ -3,7 +3,6 @@
 namespace App\Http\Middleware;
 
 use App\Models\Company;
-use App\Models\Customer;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -43,34 +42,48 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'status' => fn () => $request->session()->get('status'),
             ],
-            'billingTenant' => function () use ($request, $user) {
-                if (! $user || ! $user->canAccessAdmin()) {
+            'activeCompany' => function () use ($request, $user) {
+                if (! $user || ! $user->canAccessAdmin()) return null;
+
+                $companyId = $request->session()->get('active_company_id');
+
+                // Auto-select the only company for single-company inquilinos
+                if (! $companyId && $user->isInquilino()) {
+                    $companies = $user->accessibleCompanies;
+                    if ($companies->count() === 1) {
+                        $companyId = $companies->first()->id;
+                        $request->session()->put('active_company_id', $companyId);
+                    }
+                }
+
+                if (! $companyId) return null;
+
+                $company = Company::find($companyId, ['id', 'business_name', 'module_accesses']);
+                if (! $company) return null;
+
+                if ($user->isInquilino() && ! $user->accessibleCompanies()->where('companies.id', $companyId)->exists()) {
+                    $request->session()->forget('active_company_id');
                     return null;
                 }
-                $tenantId = $request->session()->get('billing_tenant_id');
-                if (! $tenantId) {
-                    return null;
-                }
-                $customer = Customer::find($tenantId, ['id', 'name']);
-                if (! $customer) {
-                    return null;
-                }
-                $modules = Company::where('customer_id', $tenantId)
-                    ->whereNotNull('module_accesses')
-                    ->get(['module_accesses'])
-                    ->pluck('module_accesses')
-                    ->flatten()
-                    ->filter()
-                    ->unique()
-                    ->values()
-                    ->toArray();
-                return ['id' => $customer->id, 'name' => $customer->name, 'modules' => $modules];
+
+                return [
+                    'id'      => $company->id,
+                    'name'    => $company->business_name,
+                    'modules' => $company->module_accesses ?? [],
+                ];
             },
-            'availableCustomers' => function () use ($user) {
-                if (! $user || ! $user->isAdmin()) return [];
-                return Customer::where('status', 'active')->orderBy('name')
-                    ->get(['id', 'name'])
-                    ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])
+            'availableCompanies' => function () use ($user) {
+                if (! $user || ! $user->canAccessAdmin()) return [];
+                if ($user->isAdmin()) {
+                    return Company::orderBy('business_name')
+                        ->get(['id', 'business_name'])
+                        ->map(fn ($c) => ['id' => $c->id, 'name' => $c->business_name])
+                        ->toArray();
+                }
+                return $user->accessibleCompanies()
+                    ->orderBy('business_name')
+                    ->get(['companies.id', 'companies.business_name'])
+                    ->map(fn ($c) => ['id' => $c->id, 'name' => $c->business_name])
                     ->toArray();
             },
         ]);

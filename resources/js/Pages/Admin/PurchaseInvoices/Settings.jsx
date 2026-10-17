@@ -241,8 +241,8 @@ export default function Settings({
     accountingAccounts, costCenters, purchasePackage, payablePackage,
     missingPurchaseEntries, missingPayableEntries,
 }) {
-    const { auth, billingTenant } = usePage().props;
-    const tenantModules = billingTenant?.modules ?? null;
+    const { auth, activeCompany } = usePage().props;
+    const tenantModules = activeCompany?.modules ?? null;
     const hasAccounting = tenantModules
         ? tenantModules.includes('accounting')
         : (auth?.user?.modules?.accounting ?? false);

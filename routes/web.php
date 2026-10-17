@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\JournalController;
 use App\Http\Controllers\Admin\BankTransactionController;
 use App\Http\Controllers\Admin\PurchaseInvoiceController;
 use App\Http\Controllers\Admin\SupplierController;
+use App\Http\Controllers\Admin\CompanySwitcherController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\FacturaElectronicaSVController;
@@ -25,9 +26,11 @@ Route::middleware('guest')->group(function () {
 
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
 
-// ── Dashboard: accesible a todos los roles ─────────────────────────────────────
+// ── Dashboard y selector de empresa: accesible a todos los roles ──────────────
 Route::middleware(['auth', 'role:admin,inquilino'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', DashboardController::class)->name('dashboard');
+    Route::post('empresa/cambiar', [CompanySwitcherController::class, 'set'])->name('empresa.cambiar');
+    Route::post('empresa/salir', [CompanySwitcherController::class, 'clear'])->name('empresa.salir');
 });
 
 // ── Solo admin: gestión global ────────────────────────────────────────────────
@@ -178,8 +181,6 @@ Route::middleware(['auth', 'role:admin,inquilino', 'module:billing'])->prefix('a
         Route::get('billing/facturas', 'facturasPage')->name('billing.facturas');
         Route::get('billing/nueva-factura', 'nuevaFacturaPage')->name('billing.nueva-factura');
         Route::get('billing/facturas/{invoice}/corregir', 'editarFactura')->name('billing.editar-factura');
-        Route::post('billing/empresa-activa', 'setActiveTenant')->name('billing.empresa.set');
-        Route::post('billing/empresa-salir', 'clearActiveTenant')->name('billing.empresa.clear');
         Route::get('billing/dashboard', 'billingDashboardPage')->name('billing.dashboard');
         Route::get('billing/clientes', 'clientesPage')->name('billing.clientes');
         Route::post('billing/clientes', 'guardarCliente')->name('billing.clientes.store');

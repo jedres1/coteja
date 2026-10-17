@@ -169,8 +169,8 @@ function ConceptForm({ concept, accounts, hasAccounting, onCancel }) {
 }
 
 export default function Concepts({ concepts, accounts, legalConcepts }) {
-    const { auth, billingTenant } = usePage().props;
-    const tenantModules = billingTenant?.modules ?? null;
+    const { auth, activeCompany } = usePage().props;
+    const tenantModules = activeCompany?.modules ?? null;
     const hasAccounting = tenantModules
         ? tenantModules.includes('accounting')
         : (auth?.user?.modules?.accounting ?? false);

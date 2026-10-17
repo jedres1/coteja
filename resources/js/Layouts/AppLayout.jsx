@@ -44,7 +44,7 @@ function NavLink({ href, children, routePattern, isActive }) {
 }
 
 export default function AppLayout({ title, children }) {
-    const { auth, flash, billingTenant, availableCustomers = [] } = usePage().props;
+    const { auth, flash, activeCompany, availableCompanies = [] } = usePage().props;
     const user = auth?.user;
     const [darkMode, setDarkMode] = useState(() => {
         const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('coteja-theme') : null;
@@ -68,7 +68,7 @@ export default function AppLayout({ title, children }) {
     const isInquilino = user?.is_inquilino;
     const canAccessAdmin = user?.can_access_admin;
     // Cuando hay empresa activa, los módulos visibles son los de esa empresa; si no, los del usuario
-    const tenantModules = billingTenant?.modules ?? null;
+    const tenantModules = activeCompany?.modules ?? null;
     const mod = tenantModules
         ? Object.fromEntries(['purchases','banking','accounting','payroll','billing','inventory'].map(m => [m, tenantModules.includes(m)]))
         : (user?.modules ?? {});
@@ -97,7 +97,7 @@ export default function AppLayout({ title, children }) {
                             </NavLink>
 
                             {/* Administración de negocio: solo admin */}
-                            {isAdmin && !billingTenant && (
+                            {isAdmin && !activeCompany && (
                                 <NavGroup
                                     label="Administración"
                                     routePatterns={['admin.users.*','admin.companies.*','admin.releases.*','admin.backups.*']}
@@ -206,12 +206,10 @@ export default function AppLayout({ title, children }) {
                         <span className="topbar-name">{user?.name}</span>
                         <span className="topbar-email">{user?.email}</span>
                     </div>
-                    {isAdmin && availableCustomers.length > 0 && (
+                    {availableCompanies.length > 1 && (
                         <TenantSelector
-                            billingTenant={billingTenant}
-                            availableCustomers={availableCustomers}
-                            setRoute="admin.factura-sv.billing.empresa.set"
-                            clearRoute="admin.factura-sv.billing.empresa.clear"
+                            activeCompany={activeCompany}
+                            availableCompanies={availableCompanies}
                         />
                     )}
                 </div>

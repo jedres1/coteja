@@ -587,8 +587,12 @@ class PurchaseInvoiceController extends Controller
     {
         $user = $request->user();
         if (! $user) return null;
-        if ($user->role === 'customer') return $user->customer_id;
-        return $request->session()->get('billing_tenant_id');
+
+        $companyId = $request->session()->get('active_company_id');
+        if (! $companyId) return null;
+
+        $company = \App\Models\Company::find($companyId, ['customer_id']);
+        return $company?->customer_id ? (int) $company->customer_id : null;
     }
 
     /** Devuelve los customer_ids accesibles para el usuario. Null significa sin restricción (admin sin tenant activo). */
@@ -598,11 +602,11 @@ class PurchaseInvoiceController extends Controller
         if (! $user) return null;
 
         if ($user->isAdmin()) {
-            $tenantId = $request->session()->get('billing_tenant_id');
-            return $tenantId ? [(int) $tenantId] : null;
+            $tenantId = $this->activeTenantId($request);
+            return $tenantId ? [$tenantId] : null;
         }
 
-        return $user->accessibleCompanies()->pluck('customer_id')->unique()->values()->all();
+        return $user->accessibleCompanies()->pluck('customer_id')->unique()->filter()->values()->all();
     }
 
     private function validatedData(Request $request, ?PurchaseInvoice $purchaseInvoice = null): array

@@ -13,12 +13,11 @@ class SaveJournalEntryRequest extends FormRequest
         $user = $this->user();
         if (!$user) return null;
 
-        if ($user->isAdmin()) {
-            $id = session('billing_tenant_id');
-            return $id ? (int) $id : null;
-        }
+        $companyId = session('active_company_id');
+        if (!$companyId) return null;
 
-        return $user->customer_id ? (int) $user->customer_id : null;
+        $company = \App\Models\Company::find($companyId, ['customer_id']);
+        return $company?->customer_id ? (int) $company->customer_id : null;
     }
 
     public function rules(): array

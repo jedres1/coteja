@@ -80,18 +80,22 @@ class User extends Authenticatable
 
     public function hasModuleAccess(string $module): bool
     {
-        if ($this->isAdmin()) {
-            return true;
+        if ($this->isAdmin()) return true;
+
+        $companyId = session('active_company_id');
+        if ($companyId) {
+            $company = $this->accessibleCompanies()
+                ->where('companies.id', $companyId)
+                ->first();
+            return $company && in_array($module, $company->module_accesses ?? [], true);
         }
 
-        $companyModules = $this->accessibleCompanies
+        // No active company: show union so nav reflects all possible modules
+        return $this->accessibleCompanies
             ->pluck('module_accesses')
             ->flatten()
             ->filter()
             ->unique()
-            ->values()
-            ->all();
-
-        return in_array($module, $companyModules, true);
+            ->contains($module);
     }
 }

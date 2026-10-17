@@ -4,8 +4,8 @@ import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 
 export default function PayrollSettings({ settings, accounts }) {
-    const { auth, billingTenant } = usePage().props;
-    const tenantModules = billingTenant?.modules ?? null;
+    const { auth, activeCompany } = usePage().props;
+    const tenantModules = activeCompany?.modules ?? null;
     const hasPayroll = tenantModules
         ? tenantModules.includes('payroll')
         : (auth?.user?.modules?.payroll ?? false);

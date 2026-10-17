@@ -993,14 +993,14 @@ class FacturaElectronicaSVController extends Controller
 
     public function setActiveTenant(Request $request)
     {
-        $request->validate(['customer_id' => 'required|integer|exists:customers,id']);
-        $request->session()->put('billing_tenant_id', $request->input('customer_id'));
+        $request->validate(['company_id' => 'required|integer|exists:companies,id']);
+        $request->session()->put('active_company_id', $request->integer('company_id'));
         return back()->with('status', 'Empresa activa actualizada.');
     }
 
     public function clearActiveTenant(Request $request)
     {
-        $request->session()->forget('billing_tenant_id');
+        $request->session()->forget('active_company_id');
         return back()->with('status', 'Empresa activa eliminada.');
     }
 
@@ -1068,24 +1068,18 @@ class FacturaElectronicaSVController extends Controller
     private function activeTenantId(Request $request): ?int
     {
         $user = $request->user();
-        if (! $user) {
-            return null;
-        }
-        if ($user->isAdmin()) {
-            $id = $request->session()->get('billing_tenant_id');
-            return $id ? (int) $id : null;
-        }
-        return $user->customer_id ? (int) $user->customer_id : null;
+        if (! $user) return null;
+
+        $companyId = $request->session()->get('active_company_id');
+        if (! $companyId) return null;
+
+        $company = \App\Models\Company::find($companyId, ['customer_id']);
+        return $company?->customer_id ? (int) $company->customer_id : null;
     }
 
     private function availableCustomersForUser(Request $request): array
     {
-        $user = $request->user();
-        if (! $user || ! $user->isAdmin()) return [];
-        return Customer::where('status', 'active')->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])
-            ->values()->all();
+        return [];
     }
 
     private function buildReceivableBaseQuery(Request $request, ?int $tenantId): Builder
