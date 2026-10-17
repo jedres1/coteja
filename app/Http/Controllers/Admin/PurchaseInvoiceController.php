@@ -295,18 +295,14 @@ class PurchaseInvoiceController extends Controller
         $customerIds = $this->accessibleCustomerIds($request);
 
         $invoices = PurchaseInvoice::with('supplier')
-            ->when($customerIds !== null, fn ($q) => $q->where(function ($q2) use ($customerIds) {
-                $q2->whereIn('customer_id', $customerIds)->orWhereNull('customer_id');
-            }))
+            ->when($customerIds !== null, fn ($q) => $q->whereIn('customer_id', $customerIds))
             ->when(!$showAll, fn ($q) => $q->where('status', 'extracted'))
             ->latest('purchase_date')
             ->latest()
             ->paginate(25)
             ->withQueryString();
 
-        $total = PurchaseInvoice::when($customerIds !== null, fn ($q) => $q->where(function ($q2) use ($customerIds) {
-                $q2->whereIn('customer_id', $customerIds)->orWhereNull('customer_id');
-            }))
+        $total = PurchaseInvoice::when($customerIds !== null, fn ($q) => $q->whereIn('customer_id', $customerIds))
             ->where('status', 'extracted')->count();
 
         return Inertia::render('Admin/PurchaseInvoices/PendingApproval', compact('invoices', 'total', 'showAll'));

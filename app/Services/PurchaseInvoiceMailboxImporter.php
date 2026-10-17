@@ -83,7 +83,7 @@ class PurchaseInvoiceMailboxImporter
                     $messageProcessed = false;
 
                     foreach ($jsonAttachments as $attachment) {
-                        $result = $this->importJson($attachment['content'], $attachment['filename'], $uid, $summary);
+                        $result = $this->importJson($attachment['content'], $attachment['filename'], $uid, $summary, $customerId);
                         $summary[$result]++;
                         $messageProcessed = $messageProcessed || in_array($result, ['imported', 'duplicates'], true);
                     }
@@ -180,25 +180,27 @@ class PurchaseInvoiceMailboxImporter
         return $details;
     }
 
-    public function hasDuplicateInvoice(int|string|null $supplierId, string $invoiceNumber, ?string $codigoGeneracion = null): bool
+    public function hasDuplicateInvoice(int|string|null $supplierId, string $invoiceNumber, ?string $codigoGeneracion = null, ?int $customerId = null): bool
     {
         if ($supplierId === null && blank($codigoGeneracion)) {
             return false;
         }
 
-        return PurchaseInvoice::query()->where(function ($query) use ($supplierId, $invoiceNumber, $codigoGeneracion) {
-            if ($supplierId !== null) {
-                $query->where(function ($query) use ($supplierId, $invoiceNumber) {
-                    $query->where('supplier_id', $supplierId)
-                        ->where('invoice_number', $invoiceNumber);
-                });
-            }
+        return PurchaseInvoice::query()
+            ->when($customerId !== null, fn ($q) => $q->where('customer_id', $customerId))
+            ->where(function ($query) use ($supplierId, $invoiceNumber, $codigoGeneracion) {
+                if ($supplierId !== null) {
+                    $query->where(function ($query) use ($supplierId, $invoiceNumber) {
+                        $query->where('supplier_id', $supplierId)
+                            ->where('invoice_number', $invoiceNumber);
+                    });
+                }
 
-            if (! blank($codigoGeneracion)) {
-                $method = $supplierId === null ? 'where' : 'orWhere';
-                $query->{$method}('extracted_document_body', 'like', '%'.$codigoGeneracion.'%');
-            }
-        })
+                if (! blank($codigoGeneracion)) {
+                    $method = $supplierId === null ? 'where' : 'orWhere';
+                    $query->{$method}('extracted_document_body', 'like', '%'.$codigoGeneracion.'%');
+                }
+            })
             ->exists();
     }
 
@@ -251,7 +253,7 @@ class PurchaseInvoiceMailboxImporter
         }
     }
 
-    private function importJson(string $content, string $filename, string $uid, array &$summary): string
+    private function importJson(string $content, string $filename, string $uid, array &$summary, ?int $customerId = null): string
     {
         $data = json_decode($this->cleanJsonContent($content), true, 512, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE);
         $identification = $data['identificacion'] ?? [];
@@ -267,7 +269,7 @@ class PurchaseInvoiceMailboxImporter
             throw new RuntimeException("El adjunto {$filename} no contiene identificacion.numeroControl o emisor.nombre.");
         }
 
-        if ($this->hasDuplicateInvoice(null, $invoiceNumber, $codigoGeneracion)) {
+        if ($this->hasDuplicateInvoice(null, $invoiceNumber, $codigoGeneracion, $customerId)) {
             $summary['details'][] = [
                 'filename' => $filename,
                 'supplier' => $supplierName,
@@ -280,10 +282,10 @@ class PurchaseInvoiceMailboxImporter
             return 'duplicates';
         }
 
-        return DB::transaction(function () use ($data, $identification, $issuer, $summary_data, $invoiceNumber, $numeroControl, $codigoGeneracion, $supplierName, $filename, $uid, &$summary) {
-            $supplier = $this->supplierFromIssuer($issuer);
+        return DB::transaction(function () use ($data, $identification, $issuer, $summary_data, $invoiceNumber, $numeroControl, $codigoGeneracion, $supplierName, $filename, $uid, &$summary, $customerId) {
+            $supplier = $this->supplierFromIssuer($issuer, $customerId);
 
-            if ($this->hasDuplicateInvoice($supplier->id, $invoiceNumber, $codigoGeneracion)) {
+            if ($this->hasDuplicateInvoice($supplier->id, $invoiceNumber, $codigoGeneracion, $customerId)) {
                 $summary['details'][] = [
                     'filename' => $filename,
                     'supplier' => $supplierName,
@@ -298,7 +300,7 @@ class PurchaseInvoiceMailboxImporter
             try {
                 PurchaseInvoice::create([
                     'supplier_id' => $supplier->id,
-                    'customer_id' => null,
+                    'customer_id' => $customerId,
                     'document_type' => $this->documentType($identification['tipoDte'] ?? null),
                     'invoice_number' => $invoiceNumber,
                     'purchase_date' => $identification['fecEmi'] ?? now()->toDateString(),
@@ -356,21 +358,24 @@ class PurchaseInvoiceMailboxImporter
             || str_contains($message, 'duplicate');
     }
 
-    private function supplierFromIssuer(array $issuer): Supplier
+    private function supplierFromIssuer(array $issuer, ?int $customerId = null): Supplier
     {
         $documentNumber = $issuer['nit'] ?? $issuer['numDocumento'] ?? $issuer['nrc'] ?? null;
 
         $supplier = null;
 
         if (! blank($documentNumber)) {
-            $supplier = Supplier::where('document_number', $documentNumber)->first();
+            $supplier = Supplier::when($customerId, fn ($q) => $q->where('customer_id', $customerId))
+                ->where('document_number', $documentNumber)->first();
         } elseif (! blank($issuer['correo'] ?? null)) {
-            $supplier = Supplier::where('email', $issuer['correo'])->first();
+            $supplier = Supplier::when($customerId, fn ($q) => $q->where('customer_id', $customerId))
+                ->where('email', $issuer['correo'])->first();
         }
 
         $address = $issuer['direccion'] ?? [];
 
         $attributes = [
+            'customer_id' => $customerId,
             'name' => $issuer['nombre'] ?? 'Proveedor sin nombre',
             'email' => $issuer['correo'] ?? null,
             'phone' => $issuer['telefono'] ?? null,
@@ -389,7 +394,9 @@ class PurchaseInvoiceMailboxImporter
         ];
 
         if ($supplier) {
-            $supplier->fill(array_filter($attributes, fn ($value) => ! blank($value)));
+            $updateData = array_filter($attributes, fn ($value) => ! blank($value));
+            unset($updateData['customer_id']);
+            $supplier->fill($updateData);
             $supplier->save();
 
             return $supplier;
