@@ -345,6 +345,94 @@ class FacturaElectronicaSVController extends Controller
         return back()->with('status', 'Producto eliminado.');
     }
 
+    // ── Clientes de Facturación ────────────────────────────────────────────────
+
+    public function clientesPage(Request $request)
+    {
+        $tenantId = $this->activeTenantId($request);
+
+        return Inertia::render('Admin/Billing/Clientes', [
+            'clients' => \App\Models\BillingClient::forCustomer($tenantId)
+                ->orderBy('name')->get()
+                ->map(fn (\App\Models\BillingClient $c) => $this->formatClient($c)),
+            'availableCustomers' => $this->availableCustomersForUser($request),
+        ]);
+    }
+
+    public function guardarCliente(Request $request)
+    {
+        $tenantId = $this->activeTenantId($request);
+        $clientId = $request->input('id');
+
+        $data = $request->validate([
+            'id'                   => 'nullable|integer|exists:billing_clients,id',
+            'name'                 => 'required|string|max:255',
+            'trade_name'           => 'nullable|string|max:255',
+            'document_type'        => 'nullable|string|max:10',
+            'document_number'      => 'nullable|string|max:50',
+            'nrc'                  => 'nullable|string|max:30',
+            'business_activity'    => 'nullable|string|max:10',
+            'activity_description' => 'nullable|string|max:255',
+            'email'                => 'nullable|email|max:255',
+            'phone'                => 'nullable|string|max:30',
+            'billing_email'        => 'nullable|email|max:255',
+            'billing_phone'        => 'nullable|string|max:30',
+            'address_department'   => 'nullable|string|max:100',
+            'address_municipality' => 'nullable|string|max:100',
+            'address'              => 'nullable|string|max:500',
+            'preferred_dte_type'   => 'nullable|string|max:5',
+        ]);
+
+        $attributes = array_merge(
+            collect($data)->except('id')->all(),
+            ['customer_id' => $tenantId]
+        );
+
+        if ($clientId) {
+            $client = \App\Models\BillingClient::findOrFail($clientId);
+            if ($tenantId !== null) abort_unless($client->customer_id === $tenantId, 403);
+            $client->update($attributes);
+        } else {
+            $client = \App\Models\BillingClient::create($attributes);
+        }
+
+        return back()->with('status', $clientId ? 'Cliente actualizado.' : 'Cliente creado.');
+    }
+
+    public function destroyCliente(Request $request, \App\Models\BillingClient $client)
+    {
+        $tenantId = $this->activeTenantId($request);
+        if ($tenantId !== null) abort_unless($client->customer_id === $tenantId, 403);
+        abort_if($client->is_clients_varios, 403, 'No se puede eliminar el cliente "Clientes Varios".');
+
+        $client->delete();
+
+        return back()->with('status', 'Cliente eliminado.');
+    }
+
+    private function formatClient(\App\Models\BillingClient $c): array
+    {
+        return [
+            'id'                   => $c->id,
+            'name'                 => $c->name,
+            'tradeName'            => $c->trade_name,
+            'documentType'         => $c->document_type,
+            'documentNumber'       => $c->document_number,
+            'nrc'                  => $c->nrc,
+            'businessActivity'     => $c->business_activity,
+            'activityDescription'  => $c->activity_description,
+            'email'                => $c->email,
+            'phone'                => $c->phone,
+            'billingEmail'         => $c->billing_email,
+            'billingPhone'         => $c->billing_phone,
+            'addressDepartment'    => $c->address_department,
+            'addressMunicipality'  => $c->address_municipality,
+            'address'              => $c->address,
+            'preferredDteType'     => $c->preferred_dte_type,
+            'isClientesVarios'     => (bool) $c->is_clients_varios,
+        ];
+    }
+
     // ── Dashboard Facturación ──────────────────────────────────────────────────
 
     public function billingDashboardPage(Request $request)
@@ -476,7 +564,7 @@ class FacturaElectronicaSVController extends Controller
             'items'      => 'required|array',
             'resumen'    => 'required|array',
             'opciones'   => 'array',
-            'customerId' => 'nullable|integer|exists:customers,id',
+            'customerId' => 'nullable|integer|exists:billing_clients,id',
             'firma'      => 'nullable|array',
             'hacienda'   => 'nullable|array',
             'correo'     => 'nullable|array',
@@ -521,7 +609,7 @@ class FacturaElectronicaSVController extends Controller
                     'number_control'     => $numberControl,
                     'document_type'      => $tipo,
                     'issued_at'          => data_get($dte, 'identificacion.fecEmi', now()->toDateString()),
-                    'customer_id'        => $data['customerId'] ?? null,
+                    'billing_client_id'  => $data['customerId'] ?? null,
                     'customer_name'      => $data['cliente']['nombre'] ?? null,
                     'subtotal'           => (float) ($data['resumen']['subtotal'] ?? $data['resumen']['subTotal'] ?? 0),
                     'iva'                => (float) ($data['resumen']['iva'] ?? 0),
@@ -983,7 +1071,7 @@ class FacturaElectronicaSVController extends Controller
         if (! $user) {
             return null;
         }
-        if ($user->isAdmin() || $user->isConsultant()) {
+        if ($user->isAdmin()) {
             $id = $request->session()->get('billing_tenant_id');
             return $id ? (int) $id : null;
         }
@@ -993,21 +1081,11 @@ class FacturaElectronicaSVController extends Controller
     private function availableCustomersForUser(Request $request): array
     {
         $user = $request->user();
-        if (! $user) return [];
-        if ($user->isAdmin()) {
-            return Customer::where('status', 'active')->orderBy('name')
-                ->get(['id', 'name'])
-                ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])
-                ->values()->all();
-        }
-        if ($user->isConsultant()) {
-            $ids = $user->accessibleCompanies()->pluck('customer_id')->unique()->filter()->values();
-            return Customer::whereIn('id', $ids)->where('status', 'active')->orderBy('name')
-                ->get(['id', 'name'])
-                ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])
-                ->values()->all();
-        }
-        return [];
+        if (! $user || ! $user->isAdmin()) return [];
+        return Customer::where('status', 'active')->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])
+            ->values()->all();
     }
 
     private function buildReceivableBaseQuery(Request $request, ?int $tenantId): Builder
@@ -1084,13 +1162,13 @@ class FacturaElectronicaSVController extends Controller
     {
         $settings = BillingSetting::allAsArray($tenantId);
 
-        $customers = Customer::where('status', 'active')->orderBy('name')->get()
-            ->map(fn (Customer $c) => [
+        $customers = \App\Models\BillingClient::forCustomer($tenantId)->orderBy('name')->get()
+            ->map(fn (\App\Models\BillingClient $c) => [
                 'id'               => $c->id,
                 'name'             => $c->name,
                 'preferredDteType' => $c->preferred_dte_type,
                 'receptor'         => $c->toDteReceptor(),
-                'isClientesVarios' => $c->email === 'clientes.varios@coteja.internal',
+                'isClientesVarios' => (bool) $c->is_clients_varios,
             ]);
 
         $products = BillingProduct::with('productType')
@@ -1118,7 +1196,7 @@ class FacturaElectronicaSVController extends Controller
                 'documentos' => $settings['documentos'] ?? [],
             ],
             'correlativos'       => $this->buildCorrelativos($tenantId),
-            'clientesVariosId'   => Customer::where('email', 'clientes.varios@coteja.internal')->value('id'),
+            'clientesVariosId'   => \App\Models\BillingClient::forCustomer($tenantId)->where('is_clients_varios', true)->value('id'),
             'hasInventory'       => $request->user()?->hasModuleAccess('inventory') ?? false,
             'currentYear'        => now()->year,
             'availableCustomers' => $this->availableCustomersForUser($request),

@@ -5,8 +5,8 @@ import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
 import Modal from '@/Components/Modal';
 
-const roles = { admin: 'Administrador', customer: 'Cliente', consultant: 'Consultor', inquilino: 'Inquilino' };
-const roleBadges = { admin: 'role-admin', customer: 'role-customer', consultant: 'role-consultant', inquilino: 'role-inquilino' };
+const roles = { admin: 'Administrador', inquilino: 'Inquilino' };
+const roleBadges = { admin: 'role-admin', inquilino: 'role-inquilino' };
 
 // ─── UserForm ────────────────────────────────────────────────────────────────
 
@@ -14,31 +14,26 @@ function UserForm({ user, modules, customers, companies, onSuccess, onCancel }) 
     const isEdit = !!user;
 
     const { data, setData, post, put, processing, errors, reset } = useForm({
-        name:           user?.name ?? '',
-        email:          user?.email ?? '',
-        password:       '',
-        role:           user?.role ?? 'admin',
-        customer_id:    user?.customer?.id ? String(user.customer.id) : '',
-        is_active:      user?.is_active !== undefined ? String(Number(user.is_active)) : '1',
-        module_accesses: user?.module_accesses ?? [],
-        company_ids:    user?.accessibleCompanies?.map((c) => c.id) ?? [],
+        name:        user?.name ?? '',
+        email:       user?.email ?? '',
+        password:    '',
+        role:        user?.role ?? 'admin',
+        customer_id: user?.customer?.id ? String(user.customer.id) : '',
+        is_active:   user?.is_active !== undefined ? String(Number(user.is_active)) : '1',
+        company_ids: user?.accessibleCompanies?.map((c) => c.id) ?? [],
     });
 
     const [filteredCompanies, setFilteredCompanies] = useState([]);
 
-    // Derived: show customer fields only when role === 'customer'
-    const showCustomerFields = data.role === 'customer';
-    const showModuleNote = data.role === 'inquilino';
+    const showInquilinoFields = data.role === 'inquilino';
 
-    // When role changes away from customer, clear customer-specific fields
     useEffect(() => {
-        if (data.role !== 'customer') {
-            setData((prev) => ({ ...prev, customer_id: '', module_accesses: [], company_ids: [] }));
+        if (data.role === 'admin') {
+            setData((prev) => ({ ...prev, customer_id: '', company_ids: [] }));
             setFilteredCompanies([]);
         }
     }, [data.role]);
 
-    // When customer_id changes, filter companies and uncheck companies from other customers
     useEffect(() => {
         if (!data.customer_id) {
             setFilteredCompanies([]);
@@ -48,19 +43,12 @@ function UserForm({ user, modules, customers, companies, onSuccess, onCancel }) 
         const cid = Number(data.customer_id);
         const filtered = companies.filter((c) => c.customer_id === cid);
         setFilteredCompanies(filtered);
-        // Uncheck companies that no longer belong to selected customer
         const validIds = filtered.map((c) => c.id);
         setData((prev) => ({
             ...prev,
             company_ids: prev.company_ids.filter((id) => validIds.includes(id)),
         }));
     }, [data.customer_id]);
-
-    function toggleModule(key) {
-        setData('module_accesses', data.module_accesses.includes(key)
-            ? data.module_accesses.filter((m) => m !== key)
-            : [...data.module_accesses, key]);
-    }
 
     function toggleCompany(id) {
         setData('company_ids', data.company_ids.includes(id)
@@ -80,7 +68,6 @@ function UserForm({ user, modules, customers, companies, onSuccess, onCancel }) 
     return (
         <form onSubmit={handleSubmit}>
             <div className="form-grid">
-                {/* Name */}
                 <label className="full-width">
                     Nombre
                     <input
@@ -93,7 +80,6 @@ function UserForm({ user, modules, customers, companies, onSuccess, onCancel }) 
                     {errors.name && <p className="field-error">{errors.name}</p>}
                 </label>
 
-                {/* Email */}
                 <label>
                     Correo electrónico
                     <input
@@ -105,7 +91,6 @@ function UserForm({ user, modules, customers, companies, onSuccess, onCancel }) 
                     {errors.email && <p className="field-error">{errors.email}</p>}
                 </label>
 
-                {/* Password */}
                 <label>
                     Contraseña
                     <input
@@ -118,7 +103,6 @@ function UserForm({ user, modules, customers, companies, onSuccess, onCancel }) 
                     {errors.password && <p className="field-error">{errors.password}</p>}
                 </label>
 
-                {/* Role */}
                 <label>
                     Rol
                     <select value={data.role} onChange={(e) => setData('role', e.target.value)}>
@@ -129,7 +113,6 @@ function UserForm({ user, modules, customers, companies, onSuccess, onCancel }) 
                     {errors.role && <p className="field-error">{errors.role}</p>}
                 </label>
 
-                {/* Estado */}
                 <label>
                     Estado
                     <select value={data.is_active} onChange={(e) => setData('is_active', e.target.value)}>
@@ -139,15 +122,7 @@ function UserForm({ user, modules, customers, companies, onSuccess, onCancel }) 
                     {errors.is_active && <p className="field-error">{errors.is_active}</p>}
                 </label>
 
-                {/* Nota inquilino */}
-                {showModuleNote && (
-                    <p className="muted full-width" style={{ margin: 0, fontSize: 13 }}>
-                        El rol Inquilino tiene acceso a todos los módulos automáticamente, pero no puede acceder a páginas de parámetros ni configuración de módulos.
-                    </p>
-                )}
-
-                {/* Customer fields – visible only when role === 'customer' */}
-                {showCustomerFields && (
+                {showInquilinoFields && (
                     <>
                         <label className="full-width">
                             Inquilino vinculado
@@ -155,7 +130,7 @@ function UserForm({ user, modules, customers, companies, onSuccess, onCancel }) 
                                 value={data.customer_id}
                                 onChange={(e) => setData('customer_id', e.target.value)}
                             >
-                                <option value="">— Seleccionar cliente —</option>
+                                <option value="">— Seleccionar inquilino —</option>
                                 {customers.map((c) => (
                                     <option key={c.id} value={String(c.id)}>{c.name}</option>
                                 ))}
@@ -163,28 +138,6 @@ function UserForm({ user, modules, customers, companies, onSuccess, onCancel }) 
                             {errors.customer_id && <p className="field-error">{errors.customer_id}</p>}
                         </label>
 
-                        {/* Module accesses */}
-                        <div className="full-width">
-                            <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600, color: '#374151' }}>
-                                Módulos habilitados
-                            </p>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                                {Object.entries(modules).map(([key, label]) => (
-                                    <label key={key} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, fontWeight: 400 }}>
-                                        <input
-                                            type="checkbox"
-                                            style={{ width: 'auto' }}
-                                            checked={data.module_accesses.includes(key)}
-                                            onChange={() => toggleModule(key)}
-                                        />
-                                        {label}
-                                    </label>
-                                ))}
-                            </div>
-                            {errors.module_accesses && <p className="field-error">{errors.module_accesses}</p>}
-                        </div>
-
-                        {/* Company checkboxes – filtered by selected customer */}
                         {data.customer_id && filteredCompanies.length > 0 && (
                             <div className="full-width">
                                 <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600, color: '#374151' }}>
@@ -209,7 +162,7 @@ function UserForm({ user, modules, customers, companies, onSuccess, onCancel }) 
 
                         {data.customer_id && filteredCompanies.length === 0 && (
                             <p className="muted full-width" style={{ margin: 0 }}>
-                                Este cliente no tiene empresas registradas.
+                                Este inquilino no tiene empresas registradas.
                             </p>
                         )}
                     </>
@@ -237,7 +190,6 @@ export default function UsersIndex({ users, search, role, modules, customers, co
     const [showCreate, setShowCreate] = useState(false);
     const [editItem, setEditItem] = useState(null);
 
-    // Local state for search form
     const [searchVal, setSearchVal] = useState(search ?? '');
     const [roleVal, setRoleVal] = useState(role ?? '');
 
@@ -248,9 +200,7 @@ export default function UsersIndex({ users, search, role, modules, customers, co
 
     function handleDelete(user) {
         if (!confirm(`¿Eliminar al usuario "${user.name}"? Esta acción no se puede deshacer.`)) return;
-        router.delete(route('admin.users.destroy', user.id), {
-            onSuccess: () => {},
-        });
+        router.delete(route('admin.users.destroy', user.id));
     }
 
     const hasFilter = !!(search || role);
@@ -260,10 +210,8 @@ export default function UsersIndex({ users, search, role, modules, customers, co
             <Head title="Usuarios y acceso" />
 
             <style>{`
-                .role-admin      { background: #dbeafe; color: #1e40af; }
-                .role-customer   { background: #dcfce7; color: #166534; }
-                .role-consultant { background: #fef3c7; color: #92400e; }
-                .role-inquilino  { background: #f3e8ff; color: #6b21a8; }
+                .role-admin     { background: #dbeafe; color: #1e40af; }
+                .role-inquilino { background: #f3e8ff; color: #6b21a8; }
             `}</style>
 
             <div className="top">
@@ -273,7 +221,6 @@ export default function UsersIndex({ users, search, role, modules, customers, co
                 </button>
             </div>
 
-            {/* Search / filter bar */}
             <div className="card" style={{ marginBottom: 16 }}>
                 <form onSubmit={handleSearch} style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
                     <label style={{ flex: '1 1 180px', margin: 0 }}>
@@ -297,11 +244,7 @@ export default function UsersIndex({ users, search, role, modules, customers, co
                     <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
                         <button type="submit" className="btn">Buscar</button>
                         {hasFilter && (
-                            <Link
-                                href={route('admin.users.index')}
-                                className="btn secondary"
-                                preserveState={false}
-                            >
+                            <Link href={route('admin.users.index')} className="btn secondary" preserveState={false}>
                                 Limpiar
                             </Link>
                         )}
@@ -309,7 +252,6 @@ export default function UsersIndex({ users, search, role, modules, customers, co
                 </form>
             </div>
 
-            {/* Table */}
             <div className="card table-scroll">
                 <table>
                     <thead>
@@ -317,7 +259,7 @@ export default function UsersIndex({ users, search, role, modules, customers, co
                             <th>Usuario</th>
                             <th>Rol</th>
                             <th>Inquilino vinculado</th>
-                            <th>Empresas</th>
+                            <th>Empresas accesibles</th>
                             <th>Módulos</th>
                             <th>Estado</th>
                             <th>Creado</th>
@@ -332,21 +274,18 @@ export default function UsersIndex({ users, search, role, modules, customers, co
                         )}
                         {users.data.map((user) => (
                             <tr key={user.id}>
-                                {/* Usuario */}
                                 <td>
                                     <span style={{ fontWeight: 600 }}>{user.name}</span>
                                     <br />
                                     <span className="muted">{user.email}</span>
                                 </td>
 
-                                {/* Rol */}
                                 <td>
                                     <span className={`badge ${roleBadges[user.role] ?? ''}`}>
                                         {roles[user.role] ?? user.role}
                                     </span>
                                 </td>
 
-                                {/* Inquilino vinculado */}
                                 <td>
                                     {user.customer
                                         ? <span>{user.customer.name}<br /><span className="muted">{user.customer.email}</span></span>
@@ -354,10 +293,9 @@ export default function UsersIndex({ users, search, role, modules, customers, co
                                     }
                                 </td>
 
-                                {/* Empresas */}
                                 <td>
-                                    {(user.role === 'admin' || user.role === 'consultant' || user.role === 'inquilino')
-                                        ? <span style={{ fontSize: 12, color: '#6b7280', fontStyle: 'italic' }}>Todas las empresas</span>
+                                    {user.role === 'admin'
+                                        ? <span style={{ fontSize: 12, color: '#6b7280', fontStyle: 'italic' }}>Todas</span>
                                         : user.accessibleCompanies?.length > 0
                                             ? user.accessibleCompanies.map((c) => (
                                                 <span key={c.id} style={{ display: 'block', fontSize: 13 }}>{c.business_name}</span>
@@ -366,31 +304,29 @@ export default function UsersIndex({ users, search, role, modules, customers, co
                                     }
                                 </td>
 
-                                {/* Módulos */}
                                 <td>
-                                    {user.module_accesses?.length > 0
-                                        ? user.module_accesses.map((m) => (
-                                            <span key={m} style={{ display: 'block', fontSize: 12 }}>
-                                                {modules[m] ?? m}
-                                            </span>
-                                        ))
-                                        : <span className="muted">—</span>
+                                    {user.role === 'admin'
+                                        ? <span style={{ fontSize: 12, color: '#6b7280', fontStyle: 'italic' }}>Todos</span>
+                                        : user.customer?.module_accesses?.length > 0
+                                            ? user.customer.module_accesses.map((m) => (
+                                                <span key={m} style={{ display: 'block', fontSize: 12 }}>
+                                                    {modules[m] ?? m}
+                                                </span>
+                                            ))
+                                            : <span className="muted">—</span>
                                     }
                                 </td>
 
-                                {/* Estado */}
                                 <td>
                                     <span className={`badge ${user.is_active ? 'active' : 'suspended'}`}>
                                         {user.is_active ? 'Activo' : 'Inactivo'}
                                     </span>
                                 </td>
 
-                                {/* Creado */}
                                 <td className="muted">
                                     {user.created_at ? user.created_at.substring(0, 10) : '—'}
                                 </td>
 
-                                {/* Acción */}
                                 <td>
                                     <div style={{ display: 'flex', gap: 6 }}>
                                         <button
@@ -420,7 +356,6 @@ export default function UsersIndex({ users, search, role, modules, customers, co
                 <Pagination links={users.links} />
             </div>
 
-            {/* Create modal */}
             {showCreate && (
                 <Modal title="Nuevo usuario" onClose={() => setShowCreate(false)}>
                     <UserForm
@@ -433,7 +368,6 @@ export default function UsersIndex({ users, search, role, modules, customers, co
                 </Modal>
             )}
 
-            {/* Edit modal */}
             {editItem && (
                 <Modal title={`Editar usuario — ${editItem.name}`} onClose={() => setEditItem(null)}>
                     <UserForm

@@ -6,7 +6,7 @@ import Pagination from '@/Components/Pagination';
 import Modal from '@/Components/Modal';
 // ─── CustomerForm ─────────────────────────────────────────────────────────────
 
-function CustomerForm({ customer, geography, documentTypes, dteTypes, statuses, onSuccess, onCancel }) {
+function CustomerForm({ customer, geography, documentTypes, dteTypes, statuses, modules, onSuccess, onCancel }) {
     const isEdit = !!customer;
 
     const { data, setData, post, put, processing, errors } = useForm({
@@ -27,8 +27,14 @@ function CustomerForm({ customer, geography, documentTypes, dteTypes, statuses, 
         address:              customer?.address ?? '',
         billing_email:        customer?.billing_email ?? '',
         billing_phone:        customer?.billing_phone ?? '',
-        password:             '',
+        module_accesses:      customer?.module_accesses ?? [],
     });
+
+    function toggleModule(key) {
+        setData('module_accesses', data.module_accesses.includes(key)
+            ? data.module_accesses.filter((m) => m !== key)
+            : [...data.module_accesses, key]);
+    }
 
     const [activities, setActivities] = useState([]);
     useEffect(() => {
@@ -274,20 +280,26 @@ function CustomerForm({ customer, geography, documentTypes, dteTypes, statuses, 
                     {errors.billing_phone && <p className="field-error">{errors.billing_phone}</p>}
                 </label>
 
-                {/* Password – solo en creación */}
-                {!isEdit && (
-                    <label style={{ gridColumn: '1 / -1' }}>
-                        Contraseña de acceso <span style={{ color: '#ef4444' }}>*</span>
-                        <input
-                            type="password"
-                            value={data.password}
-                            onChange={(e) => setData('password', e.target.value)}
-                            autoComplete="new-password"
-                            required
-                        />
-                        {errors.password && <p className="field-error">{errors.password}</p>}
-                    </label>
-                )}
+                {/* Módulos habilitados */}
+                <div style={{ gridColumn: '1 / -1' }}>
+                    <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600, color: '#374151' }}>
+                        Módulos habilitados
+                    </p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                        {Object.entries(modules).map(([key, label]) => (
+                            <label key={key} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, fontWeight: 400 }}>
+                                <input
+                                    type="checkbox"
+                                    style={{ width: 'auto' }}
+                                    checked={data.module_accesses.includes(key)}
+                                    onChange={() => toggleModule(key)}
+                                />
+                                {label}
+                            </label>
+                        ))}
+                    </div>
+                    {errors.module_accesses && <p className="field-error">{errors.module_accesses}</p>}
+                </div>
             </div>
 
             <div className="form-actions" style={{ marginTop: 20 }}>
@@ -304,7 +316,7 @@ function CustomerForm({ customer, geography, documentTypes, dteTypes, statuses, 
 
 // ─── Index page ───────────────────────────────────────────────────────────────
 
-export default function CustomersIndex({ customers, search, geography, documentTypes, dteTypes, statuses }) {
+export default function CustomersIndex({ customers, search, geography, documentTypes, dteTypes, statuses, modules }) {
     const [showCreate, setShowCreate] = useState(false);
     const [editItem, setEditItem] = useState(null);
     const [searchVal, setSearchVal] = useState(search ?? '');
@@ -482,6 +494,7 @@ export default function CustomersIndex({ customers, search, geography, documentT
                         documentTypes={documentTypes}
                         dteTypes={dteTypes}
                         statuses={statuses}
+                        modules={modules}
                         onSuccess={() => setShowCreate(false)}
                         onCancel={() => setShowCreate(false)}
                     />
@@ -497,6 +510,7 @@ export default function CustomersIndex({ customers, search, geography, documentT
                         documentTypes={documentTypes}
                         dteTypes={dteTypes}
                         statuses={statuses}
+                        modules={modules}
                         onSuccess={() => setEditItem(null)}
                         onCancel={() => setEditItem(null)}
                     />

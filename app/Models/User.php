@@ -68,16 +68,6 @@ class User extends Authenticatable
         return $this->role === 'admin';
     }
 
-    public function isCustomer(): bool
-    {
-        return $this->role === 'customer';
-    }
-
-    public function isConsultant(): bool
-    {
-        return $this->role === 'consultant';
-    }
-
     public function isInquilino(): bool
     {
         return $this->role === 'inquilino';
@@ -85,15 +75,15 @@ class User extends Authenticatable
 
     public function canAccessAdmin(): bool
     {
-        return in_array($this->role, ['admin', 'consultant', 'inquilino'], true);
+        return in_array($this->role, ['admin', 'inquilino'], true);
     }
 
     public function hasModuleAccess(string $module): bool
     {
-        if ($this->canAccessAdmin()) {
+        if ($this->isAdmin()) {
             return true;
         }
 
-        return in_array($module, $this->module_accesses ?? [], true);
+        return in_array($module, $this->customer?->module_accesses ?? [], true);
     }
 }

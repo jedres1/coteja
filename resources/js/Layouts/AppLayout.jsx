@@ -65,7 +65,6 @@ export default function AppLayout({ title, children }) {
     };
 
     const isAdmin = user?.is_admin;
-    const isConsultant = user?.is_consultant;
     const isInquilino = user?.is_inquilino;
     const canAccessAdmin = user?.can_access_admin;
     // Cuando hay empresa activa, los módulos visibles son los de esa empresa; si no, los del usuario
@@ -91,24 +90,21 @@ export default function AppLayout({ title, children }) {
                 </div>
 
                 <nav className="nav">
-                    {canAccessAdmin ? (
+                    {canAccessAdmin && (
                         <>
                             <NavLink href={route('admin.dashboard')} routePattern="admin.dashboard">
                                 Dashboard
                             </NavLink>
 
-                            {/* Administración de negocio: solo admin, oculto si hay empresa activa */}
+                            {/* Administración de negocio: solo admin */}
                             {isAdmin && !billingTenant && (
                                 <NavGroup
-                                    label="Administración de negocio"
-                                    routePatterns={['admin.users.*','admin.customers.*','admin.companies.*','admin.plans.*','admin.licenses.*','admin.payments.*','admin.releases.*','admin.backups.*']}
+                                    label="Administración"
+                                    routePatterns={['admin.users.*','admin.customers.*','admin.companies.*','admin.releases.*','admin.backups.*']}
                                 >
                                     <NavLink href={route('admin.users.index')} routePattern="admin.users.*">Usuarios y acceso</NavLink>
                                     <NavLink href={route('admin.customers.index')} routePattern="admin.customers.*">Inquilinos</NavLink>
                                     <NavLink href={route('admin.companies.index')} routePattern="admin.companies.*">Empresas</NavLink>
-                                    <NavLink href={route('admin.plans.index')} routePattern="admin.plans.*">Planes</NavLink>
-                                    <NavLink href={route('admin.licenses.index')} routePattern="admin.licenses.*">Licencias</NavLink>
-                                    <NavLink href={route('admin.payments.index')} routePattern="admin.payments.*">Cobros</NavLink>
                                     <NavLink href={route('admin.releases.index')} routePattern="admin.releases.*">Descargas</NavLink>
                                     <NavLink href={route('admin.backups.index')} routePattern="admin.backups.*">Backups</NavLink>
                                 </NavGroup>
@@ -179,23 +175,13 @@ export default function AppLayout({ title, children }) {
                                     <NavLink href={route('admin.factura-sv.billing.facturas')} routePattern="admin.factura-sv.billing.facturas">Facturas</NavLink>
                                     <NavLink href={route('admin.factura-sv.billing.nueva-factura')} routePattern="admin.factura-sv.billing.nueva-factura">Nueva Factura</NavLink>
                                     <NavLink href={route('admin.factura-sv.billing.cuentas-por-cobrar')} routePattern="admin.factura-sv.billing.cuentas-por-cobrar">Cuentas por cobrar</NavLink>
+                                    <NavLink href={route('admin.factura-sv.billing.clientes')} routePattern="admin.factura-sv.billing.clientes">Clientes</NavLink>
                                     <NavLink href={route('admin.factura-sv.billing.productos')} routePattern="admin.factura-sv.billing.productos">Servicios</NavLink>
                                     {!isInquilino && (
                                         <NavLink href={route('admin.factura-sv.billing.configuracion')} routePattern="admin.factura-sv.billing.configuracion">Configuración</NavLink>
                                     )}
                                 </NavGroup>
                             )}
-                        </>
-                    ) : (
-                        <>
-                            <NavLink href={route('client.dashboard')} routePattern="client.dashboard">Mi cuenta</NavLink>
-                            {mod.billing && (
-                                <NavLink href={route('client.billing')} routePattern="client.billing">Mis facturas</NavLink>
-                            )}
-                            {mod.purchases && (
-                                <NavLink href={route('client.purchases')} routePattern="client.purchases">Mis compras</NavLink>
-                            )}
-                            <NavLink href={route('client.profile')} routePattern="client.profile">Mi perfil</NavLink>
                         </>
                     )}
 
@@ -221,7 +207,7 @@ export default function AppLayout({ title, children }) {
                         <span className="topbar-name">{user?.name}</span>
                         <span className="topbar-email">{user?.email}</span>
                     </div>
-                    {(isAdmin || isConsultant) && availableCustomers.length > 0 && (
+                    {isAdmin && availableCustomers.length > 0 && (
                         <TenantSelector
                             billingTenant={billingTenant}
                             availableCustomers={availableCustomers}

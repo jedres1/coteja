@@ -597,7 +597,7 @@ class PurchaseInvoiceController extends Controller
         $user = $request->user();
         if (! $user) return null;
 
-        if ($user->isAdmin() || $user->isConsultant()) {
+        if ($user->isAdmin()) {
             $tenantId = $request->session()->get('billing_tenant_id');
             return $tenantId ? [(int) $tenantId] : null;
         }

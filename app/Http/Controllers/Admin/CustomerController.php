@@ -6,10 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreCustomerRequest;
 use App\Http\Requests\UpdateCustomerRequest;
 use App\Models\Customer;
-use App\Models\User;
 use App\Traits\ExportsCsv;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
 
 class CustomerController extends Controller
@@ -45,25 +43,22 @@ class CustomerController extends Controller
             'documentTypes' => ['13' => 'DUI', '36' => 'NIT', '37' => 'Otro / extranjero', '03' => 'Pasaporte', '02' => 'Carnet residente'],
             'dteTypes' => ['01' => 'Factura', '03' => 'CCF', '05' => 'Nota crédito', '06' => 'Nota débito', '07' => 'Retención', '11' => 'Exportación', '14' => 'Sujeto excluido'],
             'statuses' => ['active' => 'Activo', 'suspended' => 'Suspendido'],
+            'modules' => [
+                'billing'    => 'Facturación',
+                'purchases'  => 'Compras',
+                'inventory'  => 'Inventario',
+                'accounting' => 'Contabilidad',
+                'banking'    => 'Control Bancario',
+                'payroll'    => 'Control de Nómina',
+            ],
         ]);
     }
 
     public function store(StoreCustomerRequest $request)
     {
-        $data = $request->validated();
+        Customer::create($request->validated());
 
-        $customer = Customer::create($data);
-
-        User::create([
-            'customer_id' => $customer->id,
-            'name' => $customer->name,
-            'email' => $customer->email,
-            'role' => 'customer',
-            'is_active' => $customer->status === 'active',
-            'password' => Hash::make($data['password']),
-        ]);
-
-        return back()->with('status', 'Cliente creado.');
+        return back()->with('status', 'Inquilino creado.');
     }
 
     public function update(UpdateCustomerRequest $request, Customer $customer)

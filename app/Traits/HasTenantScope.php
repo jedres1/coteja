@@ -9,7 +9,7 @@ trait HasTenantScope
         $user = auth()->user();
         if (!$user) return null;
 
-        if ($user->isAdmin() || $user->isConsultant()) {
+        if ($user->isAdmin()) {
             $id = session('billing_tenant_id');
             return $id ? (int) $id : null;
         }

@@ -3,7 +3,6 @@
 namespace App\Http\Middleware;
 
 use App\Models\Customer;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -29,7 +28,6 @@ class HandleInertiaRequests extends Middleware
                     'role'             => $user->role,
                     'can_access_admin' => $user->canAccessAdmin(),
                     'is_admin'         => $user->isAdmin(),
-                    'is_consultant'    => $user->isConsultant(),
                     'is_inquilino'     => $user->isInquilino(),
                     'modules'          => [
                         'purchases'  => $user->hasModuleAccess('purchases'),
@@ -52,35 +50,18 @@ class HandleInertiaRequests extends Middleware
                 if (! $tenantId) {
                     return null;
                 }
-                $customer = Customer::find($tenantId, ['id', 'name']);
+                $customer = Customer::find($tenantId, ['id', 'name', 'module_accesses']);
                 if (! $customer) {
                     return null;
                 }
-                $modules = User::where('customer_id', $tenantId)
-                    ->whereNotNull('module_accesses')
-                    ->pluck('module_accesses')
-                    ->flatten()
-                    ->unique()
-                    ->values()
-                    ->toArray();
-                return ['id' => $customer->id, 'name' => $customer->name, 'modules' => $modules];
+                return ['id' => $customer->id, 'name' => $customer->name, 'modules' => $customer->module_accesses ?? []];
             },
             'availableCustomers' => function () use ($user) {
-                if (! $user) return [];
-                if ($user->isAdmin()) {
-                    return Customer::where('status', 'active')->orderBy('name')
-                        ->get(['id', 'name'])
-                        ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])
-                        ->toArray();
-                }
-                if ($user->isConsultant()) {
-                    $ids = $user->accessibleCompanies()->pluck('customer_id')->unique()->filter()->values();
-                    return Customer::whereIn('id', $ids)->where('status', 'active')->orderBy('name')
-                        ->get(['id', 'name'])
-                        ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])
-                        ->toArray();
-                }
-                return [];
+                if (! $user || ! $user->isAdmin()) return [];
+                return Customer::where('status', 'active')->orderBy('name')
+                    ->get(['id', 'name'])
+                    ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])
+                    ->toArray();
             },
         ]);
     }

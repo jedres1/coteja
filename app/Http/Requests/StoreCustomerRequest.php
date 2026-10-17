@@ -26,7 +26,9 @@ class StoreCustomerRequest extends FormRequest
             'billing_email'        => ['nullable', 'email', 'max:255'],
             'billing_phone'        => ['nullable', 'string', 'max:50'],
             'status'               => ['required', 'in:active,suspended,prospect'],
-            'password'             => ['required', 'string', 'min:8'],
+            'module_accesses'      => ['nullable', 'array'],
+            'module_accesses.*'    => ['in:billing,purchases,inventory,accounting,banking,payroll'],
+            'notes'                => ['nullable', 'string', 'max:2000'],
         ];
     }
 }

@@ -6,10 +6,7 @@ use App\Http\Controllers\Admin\BackupController;
 use App\Http\Controllers\Admin\CompanyController;
 use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\DashboardController;
-use App\Http\Controllers\Admin\LicenseController;
-use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\PayrollController;
-use App\Http\Controllers\Admin\PlanController;
 use App\Http\Controllers\Admin\AccountingController;
 use App\Http\Controllers\Admin\JournalController;
 use App\Http\Controllers\Admin\BankTransactionController;
@@ -17,11 +14,7 @@ use App\Http\Controllers\Admin\PurchaseInvoiceController;
 use App\Http\Controllers\Admin\SupplierController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\Client\PortalController;
 use App\Http\Controllers\FacturaElectronicaSVController;
-use App\Models\BillingDteCorrelative;
-use App\Models\BillingSetting;
-use App\Models\Customer;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login');
@@ -33,27 +26,24 @@ Route::middleware('guest')->group(function () {
 
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
 
-// Admin + Consultant + Inquilino: dashboard y acceso al panel
-Route::middleware(['auth', 'role:admin,consultant,inquilino'])->prefix('admin')->name('admin.')->group(function () {
+// ── Dashboard: accesible a todos los roles ─────────────────────────────────────
+Route::middleware(['auth', 'role:admin,inquilino'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', DashboardController::class)->name('dashboard');
-
-    // Solo admin: gestión de negocio
-    Route::middleware('role:admin')->group(function () {
-        Route::resource('users', UserController::class)->only(['index', 'store', 'update', 'destroy']);
-        Route::get('customers/export', [CustomerController::class, 'export'])->name('customers.export');
-        Route::resource('customers', CustomerController::class)->only(['index', 'store', 'update', 'destroy']);
-        Route::resource('companies', CompanyController::class)->only(['index', 'store', 'update']);
-        Route::resource('plans', PlanController::class)->only(['index', 'store', 'update']);
-        Route::resource('licenses', LicenseController::class)->only(['index', 'store', 'update']);
-        Route::resource('payments', PaymentController::class)->only(['index', 'store', 'update']);
-        Route::resource('releases', AppReleaseController::class)->only(['index', 'store']);
-        Route::get('backups', [BackupController::class, 'index'])->name('backups.index');
-        Route::get('backups/{backup}/download', [BackupController::class, 'download'])->name('backups.download');
-    });
 });
 
-// ── Módulo Compras: operaciones (incluye inquilino) ───────────────────────────
-Route::middleware(['auth', 'role:admin,consultant,customer,inquilino', 'module:purchases'])->prefix('admin')->name('admin.')->group(function () {
+// ── Solo admin: gestión global ────────────────────────────────────────────────
+Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::resource('users', UserController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::get('customers/export', [CustomerController::class, 'export'])->name('customers.export');
+    Route::resource('customers', CustomerController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('companies', CompanyController::class)->only(['index', 'store', 'update']);
+    Route::resource('releases', AppReleaseController::class)->only(['index', 'store']);
+    Route::get('backups', [BackupController::class, 'index'])->name('backups.index');
+    Route::get('backups/{backup}/download', [BackupController::class, 'download'])->name('backups.download');
+});
+
+// ── Módulo Compras: operaciones (admin + inquilino) ───────────────────────────
+Route::middleware(['auth', 'role:admin,inquilino', 'module:purchases'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('suppliers/export', [SupplierController::class, 'export'])->name('suppliers.export');
     Route::resource('suppliers', SupplierController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::post('purchase-invoices/extract', [PurchaseInvoiceController::class, 'extract'])->name('purchase-invoices.extract');
@@ -68,16 +58,16 @@ Route::middleware(['auth', 'role:admin,consultant,customer,inquilino', 'module:p
     Route::resource('purchase-invoices', PurchaseInvoiceController::class)->only(['index', 'store', 'update', 'destroy']);
 });
 
-// ── Módulo Compras: parámetros (sin inquilino) ────────────────────────────────
-Route::middleware(['auth', 'role:admin,consultant,customer', 'module:purchases'])->prefix('admin')->name('admin.')->group(function () {
+// ── Módulo Compras: parámetros (solo admin) ───────────────────────────────────
+Route::middleware(['auth', 'role:admin', 'module:purchases'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('purchase-invoices/settings', [PurchaseInvoiceController::class, 'settingsIndex'])->name('purchase-invoices.settings');
     Route::post('purchase-invoices/settings', [PurchaseInvoiceController::class, 'settingsUpdate'])->name('purchase-invoices.settings.update');
     Route::post('purchase-invoices/settings/accounting', [PurchaseInvoiceController::class, 'accountingSettingsUpdate'])->name('purchase-invoices.settings.accounting');
     Route::post('purchase-invoices/settings/generate-missing-entries', [PurchaseInvoiceController::class, 'generateMissingEntries'])->name('purchase-invoices.settings.generate-missing-entries');
 });
 
-// ── Módulo Control Bancario: operaciones (incluye inquilino) ──────────────────
-Route::middleware(['auth', 'role:admin,consultant,customer,inquilino', 'module:banking'])->prefix('admin')->name('admin.')->group(function () {
+// ── Módulo Control Bancario: operaciones (admin + inquilino) ──────────────────
+Route::middleware(['auth', 'role:admin,inquilino', 'module:banking'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('control-bancario', [BankTransactionController::class, 'index'])->name('bank-transactions.index');
     Route::post('control-bancario', [BankTransactionController::class, 'store'])->name('bank-transactions.store');
 
@@ -98,8 +88,8 @@ Route::middleware(['auth', 'role:admin,consultant,customer,inquilino', 'module:b
     Route::post('control-bancario/conciliacion/{reconciliation}/complete', [BankTransactionController::class, 'completeReconciliation'])->name('bank-transactions.reconciliations.complete');
 });
 
-// ── Módulo Contabilidad: operaciones (incluye inquilino) ──────────────────────
-Route::middleware(['auth', 'role:admin,consultant,customer,inquilino', 'module:accounting'])->prefix('admin')->name('admin.')->group(function () {
+// ── Módulo Contabilidad: operaciones (admin + inquilino) ──────────────────────
+Route::middleware(['auth', 'role:admin,inquilino', 'module:accounting'])->prefix('admin')->name('admin.')->group(function () {
     Route::prefix('contabilidad')->name('accounting.')->controller(AccountingController::class)->group(function () {
         Route::get('catalogo', 'catalogo')->name('catalogo');
         Route::post('catalogo', 'store')->name('catalogo.store');
@@ -135,8 +125,8 @@ Route::middleware(['auth', 'role:admin,consultant,customer,inquilino', 'module:a
     });
 });
 
-// ── Módulo Contabilidad: parámetros (sin inquilino) ───────────────────────────
-Route::middleware(['auth', 'role:admin,consultant,customer', 'module:accounting'])->prefix('admin')->name('admin.')->group(function () {
+// ── Módulo Contabilidad: parámetros (solo admin) ──────────────────────────────
+Route::middleware(['auth', 'role:admin', 'module:accounting'])->prefix('admin')->name('admin.')->group(function () {
     Route::prefix('contabilidad')->name('accounting.')->controller(AccountingController::class)->group(function () {
         Route::get('configuracion', 'configuracion')->name('configuracion');
         Route::post('paquetes', 'storePackage')->name('paquetes.store');
@@ -148,8 +138,8 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:accounting'
     });
 });
 
-// ── Módulo Inventario: operaciones (incluye inquilino) ────────────────────────
-Route::middleware(['auth', 'role:admin,consultant,customer,inquilino', 'module:inventory'])->prefix('admin')->name('admin.')->group(function () {
+// ── Módulo Inventario: operaciones (admin + inquilino) ────────────────────────
+Route::middleware(['auth', 'role:admin,inquilino', 'module:inventory'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('inventario/tipos-producto', [InventoryController::class, 'productTypes'])->name('inventory.product-types');
     Route::post('inventario/tipos-producto', [InventoryController::class, 'storeProductType'])->name('inventory.product-types.store');
     Route::delete('inventario/tipos-producto/{productType}', [InventoryController::class, 'destroyProductType'])->name('inventory.product-types.destroy');
@@ -160,14 +150,14 @@ Route::middleware(['auth', 'role:admin,consultant,customer,inquilino', 'module:i
     Route::post('inventario/movimientos', [InventoryController::class, 'storeMovement'])->name('inventory.movements.store');
 });
 
-// ── Módulo Inventario: parámetros (sin inquilino) ─────────────────────────────
-Route::middleware(['auth', 'role:admin,consultant,customer', 'module:inventory'])->prefix('admin')->name('admin.')->group(function () {
+// ── Módulo Inventario: parámetros (solo admin) ─────────────────────────────────
+Route::middleware(['auth', 'role:admin', 'module:inventory'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('inventario/parametros', [InventoryController::class, 'parameters'])->name('inventory.parameters');
     Route::post('inventario/parametros', [InventoryController::class, 'saveParameters'])->name('inventory.parameters.save');
 });
 
-// ── Módulo Facturación: operaciones (incluye inquilino) ───────────────────────
-Route::middleware(['auth', 'role:admin,consultant,customer,inquilino', 'module:billing'])->prefix('admin')->name('admin.')->group(function () {
+// ── Módulo Facturación: operaciones (admin + inquilino) ───────────────────────
+Route::middleware(['auth', 'role:admin,inquilino', 'module:billing'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('factura-sv', function () {
         return redirect()->route('admin.factura-sv.billing.dashboard');
     })->name('factura-sv');
@@ -194,14 +184,17 @@ Route::middleware(['auth', 'role:admin,consultant,customer,inquilino', 'module:b
         Route::post('billing/empresa-activa', 'setActiveTenant')->name('billing.empresa.set');
         Route::post('billing/empresa-salir', 'clearActiveTenant')->name('billing.empresa.clear');
         Route::get('billing/dashboard', 'billingDashboardPage')->name('billing.dashboard');
+        Route::get('billing/clientes', 'clientesPage')->name('billing.clientes');
+        Route::post('billing/clientes', 'guardarCliente')->name('billing.clientes.store');
+        Route::delete('billing/clientes/{client}', 'destroyCliente')->name('billing.clientes.destroy');
         Route::get('productos', 'productos')->name('productos');
         Route::post('productos', 'guardarProducto')->name('productos.guardar');
         Route::post('pdf', 'pdf')->name('pdf');
     });
 });
 
-// ── Módulo Facturación: parámetros (sin inquilino) ────────────────────────────
-Route::middleware(['auth', 'role:admin,consultant,customer', 'module:billing'])->prefix('admin')->name('admin.')->group(function () {
+// ── Módulo Facturación: parámetros (solo admin) ────────────────────────────────
+Route::middleware(['auth', 'role:admin', 'module:billing'])->prefix('admin')->name('admin.')->group(function () {
     Route::prefix('factura-sv')->name('factura-sv.')->controller(FacturaElectronicaSVController::class)->group(function () {
         Route::get('billing/configuracion', 'configuracionPage')->name('billing.configuracion');
         Route::post('configuracion', 'guardarConfiguracion')->name('configuracion.guardar');
@@ -212,8 +205,8 @@ Route::middleware(['auth', 'role:admin,consultant,customer', 'module:billing'])-
     });
 });
 
-// ── Módulo Nómina: operaciones (incluye inquilino) ────────────────────────────
-Route::middleware(['auth', 'role:admin,consultant,customer,inquilino', 'module:payroll'])->prefix('admin')->name('admin.')->group(function () {
+// ── Módulo Nómina: operaciones (admin + inquilino) ────────────────────────────
+Route::middleware(['auth', 'role:admin,inquilino', 'module:payroll'])->prefix('admin')->name('admin.')->group(function () {
     Route::prefix('nomina')->name('payroll.')->controller(PayrollController::class)->group(function () {
         Route::get('', 'index')->name('index');
         Route::get('conceptos', 'conceptsIndex')->name('concepts.index');
@@ -233,21 +226,11 @@ Route::middleware(['auth', 'role:admin,consultant,customer,inquilino', 'module:p
     });
 });
 
-// ── Módulo Nómina: parámetros (sin inquilino) ─────────────────────────────────
-Route::middleware(['auth', 'role:admin,consultant,customer', 'module:payroll'])->prefix('admin')->name('admin.')->group(function () {
+// ── Módulo Nómina: parámetros (solo admin) ────────────────────────────────────
+Route::middleware(['auth', 'role:admin', 'module:payroll'])->prefix('admin')->name('admin.')->group(function () {
     Route::prefix('nomina')->name('payroll.')->controller(PayrollController::class)->group(function () {
         Route::get('configuracion', 'settingsIndex')->name('settings.index');
         Route::post('configuracion', 'saveSettings')->name('settings.save');
         Route::put('conceptos/{concept}/cuentas', 'updateConceptAccounts')->name('concepts.accounts.update');
     });
-});
-
-Route::middleware(['auth', 'role:customer'])->prefix('cliente')->name('client.')->group(function () {
-    Route::get('/',          [PortalController::class, 'dashboard'])->name('dashboard');
-    Route::get('/perfil',    [PortalController::class, 'profile'])->name('profile');
-    Route::put('/perfil/password', [PortalController::class, 'updatePassword'])->name('profile.password');
-    Route::get('/facturacion', [PortalController::class, 'billing'])->middleware('module:billing')->name('billing');
-    Route::get('/compras',     [PortalController::class, 'purchases'])->middleware('module:purchases')->name('purchases');
-    Route::post('/empresa-activa', [PortalController::class, 'switchCompany'])->name('companies.switch');
-    Route::get('/backups/{backup}/download', [PortalController::class, 'backup'])->name('backups.download');
 });

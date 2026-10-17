@@ -51,10 +51,7 @@ class UserController extends Controller
         unset($data['company_ids']);
 
         $user = User::create($data);
-        $allCompanyIds = $data['customer_id']
-            ? Company::where('customer_id', $data['customer_id'])->pluck('id')->all()
-            : $companyIds;
-        $user->accessibleCompanies()->sync($allCompanyIds);
+        $user->accessibleCompanies()->sync($companyIds);
 
         return back()->with('status', 'Usuario creado.');
     }
@@ -77,10 +74,7 @@ class UserController extends Controller
         unset($data['company_ids']);
 
         $user->update($data);
-        $allCompanyIds = $data['customer_id']
-            ? Company::where('customer_id', $data['customer_id'])->pluck('id')->all()
-            : $companyIds;
-        $user->accessibleCompanies()->sync($allCompanyIds);
+        $user->accessibleCompanies()->sync($companyIds);
 
         return back()->with('status', 'Usuario actualizado.');
     }
@@ -104,39 +98,35 @@ class UserController extends Controller
             'customer_id' => ['nullable', 'exists:customers,id'],
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user?->id)],
-            'role' => ['required', 'in:admin,customer,consultant,inquilino'],
+            'role' => ['required', 'in:admin,inquilino'],
             'is_active' => ['nullable', 'boolean'],
             'password' => [$isUpdate ? 'nullable' : 'required', 'string', 'min:8'],
-            'module_accesses' => ['nullable', 'array'],
-            'module_accesses.*' => ['in:billing,purchases,inventory,accounting,banking,payroll'],
             'company_ids' => ['nullable', 'array'],
             'company_ids.*' => ['integer', 'exists:companies,id'],
         ]);
 
         $data['is_active'] = (bool) ($data['is_active'] ?? false);
 
-        if ($data['role'] !== 'customer') {
+        if ($data['role'] === 'admin') {
             $data['customer_id'] = null;
-            $data['module_accesses'] = [];
             $data['company_ids'] = [];
         } else {
-            $data['module_accesses'] = array_values($data['module_accesses'] ?? ['billing', 'purchases']);
             $data['company_ids'] = array_values($data['company_ids'] ?? []);
         }
 
-        if ($data['role'] === 'customer' && empty($data['customer_id'])) {
+        if ($data['role'] === 'inquilino' && empty($data['customer_id'])) {
             validator([], [])->after(function ($validator) {
-                $validator->errors()->add('customer_id', 'Seleccione el cliente vinculado para usuarios con rol Cliente.');
+                $validator->errors()->add('customer_id', 'Seleccione el inquilino vinculado.');
             })->validate();
         }
 
-        if ($data['role'] === 'customer' && empty($data['company_ids'])) {
+        if ($data['role'] === 'inquilino' && empty($data['company_ids'])) {
             validator([], [])->after(function ($validator) {
-                $validator->errors()->add('company_ids', 'Seleccione al menos una empresa para este usuario cliente.');
+                $validator->errors()->add('company_ids', 'Seleccione al menos una empresa para este usuario.');
             })->validate();
         }
 
-        if ($data['role'] === 'customer' && !empty($data['company_ids'])) {
+        if ($data['role'] === 'inquilino' && !empty($data['company_ids'])) {
             $validCompanyIds = Company::where('customer_id', $data['customer_id'])
                 ->whereIn('id', $data['company_ids'])
                 ->pluck('id')
@@ -145,7 +135,7 @@ class UserController extends Controller
 
             if (count($validCompanyIds) !== count($data['company_ids'])) {
                 validator([], [])->after(function ($validator) {
-                    $validator->errors()->add('company_ids', 'Todas las empresas seleccionadas deben pertenecer al cliente vinculado.');
+                    $validator->errors()->add('company_ids', 'Todas las empresas seleccionadas deben pertenecer al inquilino vinculado.');
                 })->validate();
             }
         }

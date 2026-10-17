@@ -32,7 +32,15 @@ class Customer extends Model
         'billing_phone',
         'status',
         'notes',
+        'module_accesses',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'module_accesses' => 'array',
+        ];
+    }
 
     public function toDteReceptor(): array
     {
