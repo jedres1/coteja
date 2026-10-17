@@ -10,45 +10,25 @@ const roleBadges = { admin: 'role-admin', inquilino: 'role-inquilino' };
 
 // ─── UserForm ────────────────────────────────────────────────────────────────
 
-function UserForm({ user, modules, customers, companies, onSuccess, onCancel }) {
+function UserForm({ user, modules, companies, onSuccess, onCancel }) {
     const isEdit = !!user;
 
-    const { data, setData, post, put, processing, errors, reset } = useForm({
+    const { data, setData, post, put, processing, errors } = useForm({
         name:        user?.name ?? '',
         email:       user?.email ?? '',
         password:    '',
         role:        user?.role ?? 'admin',
-        customer_id: user?.customer?.id ? String(user.customer.id) : '',
         is_active:   user?.is_active !== undefined ? String(Number(user.is_active)) : '1',
         company_ids: user?.accessibleCompanies?.map((c) => c.id) ?? [],
     });
-
-    const [filteredCompanies, setFilteredCompanies] = useState([]);
 
     const showInquilinoFields = data.role === 'inquilino';
 
     useEffect(() => {
         if (data.role === 'admin') {
-            setData((prev) => ({ ...prev, customer_id: '', company_ids: [] }));
-            setFilteredCompanies([]);
+            setData((prev) => ({ ...prev, company_ids: [] }));
         }
     }, [data.role]);
-
-    useEffect(() => {
-        if (!data.customer_id) {
-            setFilteredCompanies([]);
-            setData((prev) => ({ ...prev, company_ids: [] }));
-            return;
-        }
-        const cid = Number(data.customer_id);
-        const filtered = companies.filter((c) => c.customer_id === cid);
-        setFilteredCompanies(filtered);
-        const validIds = filtered.map((c) => c.id);
-        setData((prev) => ({
-            ...prev,
-            company_ids: prev.company_ids.filter((id) => validIds.includes(id)),
-        }));
-    }, [data.customer_id]);
 
     function toggleCompany(id) {
         setData('company_ids', data.company_ids.includes(id)
@@ -123,49 +103,29 @@ function UserForm({ user, modules, customers, companies, onSuccess, onCancel }) 
                 </label>
 
                 {showInquilinoFields && (
-                    <>
-                        <label className="full-width">
-                            Inquilino vinculado
-                            <select
-                                value={data.customer_id}
-                                onChange={(e) => setData('customer_id', e.target.value)}
-                            >
-                                <option value="">— Seleccionar inquilino —</option>
-                                {customers.map((c) => (
-                                    <option key={c.id} value={String(c.id)}>{c.name}</option>
+                    <div className="full-width">
+                        <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600, color: '#374151' }}>
+                            Empresas accesibles <span style={{ color: 'red' }}>*</span>
+                        </p>
+                        {companies.length === 0 ? (
+                            <p className="muted" style={{ margin: 0 }}>No hay empresas registradas.</p>
+                        ) : (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                                {companies.map((company) => (
+                                    <label key={company.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, fontWeight: 400 }}>
+                                        <input
+                                            type="checkbox"
+                                            style={{ width: 'auto' }}
+                                            checked={data.company_ids.includes(company.id)}
+                                            onChange={() => toggleCompany(company.id)}
+                                        />
+                                        {company.business_name}
+                                    </label>
                                 ))}
-                            </select>
-                            {errors.customer_id && <p className="field-error">{errors.customer_id}</p>}
-                        </label>
-
-                        {data.customer_id && filteredCompanies.length > 0 && (
-                            <div className="full-width">
-                                <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600, color: '#374151' }}>
-                                    Empresas accesibles
-                                </p>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                                    {filteredCompanies.map((company) => (
-                                        <label key={company.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, fontWeight: 400 }}>
-                                            <input
-                                                type="checkbox"
-                                                style={{ width: 'auto' }}
-                                                checked={data.company_ids.includes(company.id)}
-                                                onChange={() => toggleCompany(company.id)}
-                                            />
-                                            {company.business_name}
-                                        </label>
-                                    ))}
-                                </div>
-                                {errors.company_ids && <p className="field-error">{errors.company_ids}</p>}
                             </div>
                         )}
-
-                        {data.customer_id && filteredCompanies.length === 0 && (
-                            <p className="muted full-width" style={{ margin: 0 }}>
-                                Este inquilino no tiene empresas registradas.
-                            </p>
-                        )}
-                    </>
+                        {errors.company_ids && <p className="field-error">{errors.company_ids}</p>}
+                    </div>
                 )}
             </div>
 
@@ -183,7 +143,7 @@ function UserForm({ user, modules, customers, companies, onSuccess, onCancel }) 
 
 // ─── Index page ───────────────────────────────────────────────────────────────
 
-export default function UsersIndex({ users, search, role, modules, customers, companies }) {
+export default function UsersIndex({ users, search, role, modules, companies }) {
     const { auth } = usePage().props;
     const currentUserId = auth?.user?.id;
 
@@ -258,7 +218,6 @@ export default function UsersIndex({ users, search, role, modules, customers, co
                         <tr>
                             <th>Usuario</th>
                             <th>Rol</th>
-                            <th>Inquilino vinculado</th>
                             <th>Empresas accesibles</th>
                             <th>Módulos</th>
                             <th>Estado</th>
@@ -284,13 +243,6 @@ export default function UsersIndex({ users, search, role, modules, customers, co
                                     <span className={`badge ${roleBadges[user.role] ?? ''}`}>
                                         {roles[user.role] ?? user.role}
                                     </span>
-                                </td>
-
-                                <td>
-                                    {user.customer
-                                        ? <span>{user.customer.name}<br /><span className="muted">{user.customer.email}</span></span>
-                                        : <span className="muted">—</span>
-                                    }
                                 </td>
 
                                 <td>
@@ -360,7 +312,6 @@ export default function UsersIndex({ users, search, role, modules, customers, co
                 <Modal title="Nuevo usuario" onClose={() => setShowCreate(false)}>
                     <UserForm
                         modules={modules}
-                        customers={customers}
                         companies={companies}
                         onSuccess={() => setShowCreate(false)}
                         onCancel={() => setShowCreate(false)}
@@ -373,7 +324,6 @@ export default function UsersIndex({ users, search, role, modules, customers, co
                     <UserForm
                         user={editItem}
                         modules={modules}
-                        customers={customers}
                         companies={companies}
                         onSuccess={() => setEditItem(null)}
                         onCancel={() => setEditItem(null)}

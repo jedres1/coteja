@@ -20,7 +20,15 @@ class Company extends Model
         'email',
         'phone',
         'environment',
+        'module_accesses',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'module_accesses' => 'array',
+        ];
+    }
 
     public function customer()
     {

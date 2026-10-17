@@ -4,7 +4,6 @@ use App\Http\Controllers\Admin\AppReleaseController;
 use App\Http\Controllers\Admin\InventoryController;
 use App\Http\Controllers\Admin\BackupController;
 use App\Http\Controllers\Admin\CompanyController;
-use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\PayrollController;
 use App\Http\Controllers\Admin\AccountingController;
@@ -34,8 +33,6 @@ Route::middleware(['auth', 'role:admin,inquilino'])->prefix('admin')->name('admi
 // ── Solo admin: gestión global ────────────────────────────────────────────────
 Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::resource('users', UserController::class)->only(['index', 'store', 'update', 'destroy']);
-    Route::get('customers/export', [CustomerController::class, 'export'])->name('customers.export');
-    Route::resource('customers', CustomerController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('companies', CompanyController::class)->only(['index', 'store', 'update']);
     Route::resource('releases', AppReleaseController::class)->only(['index', 'store']);
     Route::get('backups', [BackupController::class, 'index'])->name('backups.index');

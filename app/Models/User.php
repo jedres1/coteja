@@ -84,6 +84,14 @@ class User extends Authenticatable
             return true;
         }
 
-        return in_array($module, $this->customer?->module_accesses ?? [], true);
+        $companyModules = $this->accessibleCompanies
+            ->pluck('module_accesses')
+            ->flatten()
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        return in_array($module, $companyModules, true);
     }
 }

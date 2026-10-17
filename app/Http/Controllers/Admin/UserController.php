@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
-use App\Models\Customer;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -19,24 +18,16 @@ class UserController extends Controller
         $role = $request->query('role');
 
         return Inertia::render('Admin/Users/Index', [
-            'users' => User::with(['customer', 'accessibleCompanies'])
+            'users' => User::with('accessibleCompanies')
                 ->when($role, fn ($query) => $query->where('role', $role))
-                ->when($search !== '', function ($query) use ($search) {
-                    $query->where(function ($query) use ($search) {
-                        $query->where('name', 'like', "%{$search}%")
-                            ->orWhere('email', 'like', "%{$search}%")
-                            ->orWhereHas('customer', function ($query) use ($search) {
-                                $query->where('name', 'like', "%{$search}%")
-                                    ->orWhere('email', 'like', "%{$search}%")
-                                    ->orWhere('document_number', 'like', "%{$search}%");
-                            });
-                    });
-                })
+                ->when($search !== '', fn ($query) => $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('email', 'like', "%{$search}%");
+                }))
                 ->latest()
                 ->paginate(15)
                 ->withQueryString(),
-            'customers' => Customer::with('companies')->orderBy('name')->get(),
-            'companies' => Company::with('customer')->orderBy('business_name')->get(),
+            'companies' => Company::orderBy('business_name')->get(['id', 'business_name', 'customer_id']),
             'modules' => $this->availableCustomerModules(),
             'search' => $search,
             'role' => $role,
@@ -95,47 +86,26 @@ class UserController extends Controller
         $isUpdate = $user !== null;
 
         $data = $request->validate([
-            'customer_id' => ['nullable', 'exists:customers,id'],
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user?->id)],
-            'role' => ['required', 'in:admin,inquilino'],
-            'is_active' => ['nullable', 'boolean'],
-            'password' => [$isUpdate ? 'nullable' : 'required', 'string', 'min:8'],
-            'company_ids' => ['nullable', 'array'],
-            'company_ids.*' => ['integer', 'exists:companies,id'],
+            'name'         => ['required', 'string', 'max:255'],
+            'email'        => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user?->id)],
+            'role'         => ['required', 'in:admin,inquilino'],
+            'is_active'    => ['nullable', 'boolean'],
+            'password'     => [$isUpdate ? 'nullable' : 'required', 'string', 'min:8'],
+            'company_ids'  => ['nullable', 'array'],
+            'company_ids.*'=> ['integer', 'exists:companies,id'],
         ]);
 
         $data['is_active'] = (bool) ($data['is_active'] ?? false);
+        $data['customer_id'] = null;
 
         if ($data['role'] === 'admin') {
-            $data['customer_id'] = null;
             $data['company_ids'] = [];
         } else {
             $data['company_ids'] = array_values($data['company_ids'] ?? []);
-        }
 
-        if ($data['role'] === 'inquilino' && empty($data['customer_id'])) {
-            validator([], [])->after(function ($validator) {
-                $validator->errors()->add('customer_id', 'Seleccione el inquilino vinculado.');
-            })->validate();
-        }
-
-        if ($data['role'] === 'inquilino' && empty($data['company_ids'])) {
-            validator([], [])->after(function ($validator) {
-                $validator->errors()->add('company_ids', 'Seleccione al menos una empresa para este usuario.');
-            })->validate();
-        }
-
-        if ($data['role'] === 'inquilino' && !empty($data['company_ids'])) {
-            $validCompanyIds = Company::where('customer_id', $data['customer_id'])
-                ->whereIn('id', $data['company_ids'])
-                ->pluck('id')
-                ->map(fn ($id) => (int) $id)
-                ->all();
-
-            if (count($validCompanyIds) !== count($data['company_ids'])) {
-                validator([], [])->after(function ($validator) {
-                    $validator->errors()->add('company_ids', 'Todas las empresas seleccionadas deben pertenecer al inquilino vinculado.');
+            if (empty($data['company_ids'])) {
+                validator([], [])->after(function ($v) {
+                    $v->errors()->add('company_ids', 'Seleccione al menos una empresa para este usuario.');
                 })->validate();
             }
         }

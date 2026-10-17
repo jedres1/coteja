@@ -100,10 +100,9 @@ export default function AppLayout({ title, children }) {
                             {isAdmin && !billingTenant && (
                                 <NavGroup
                                     label="Administración"
-                                    routePatterns={['admin.users.*','admin.customers.*','admin.companies.*','admin.releases.*','admin.backups.*']}
+                                    routePatterns={['admin.users.*','admin.companies.*','admin.releases.*','admin.backups.*']}
                                 >
                                     <NavLink href={route('admin.users.index')} routePattern="admin.users.*">Usuarios y acceso</NavLink>
-                                    <NavLink href={route('admin.customers.index')} routePattern="admin.customers.*">Inquilinos</NavLink>
                                     <NavLink href={route('admin.companies.index')} routePattern="admin.companies.*">Empresas</NavLink>
                                     <NavLink href={route('admin.releases.index')} routePattern="admin.releases.*">Descargas</NavLink>
                                     <NavLink href={route('admin.backups.index')} routePattern="admin.backups.*">Backups</NavLink>
