@@ -4,14 +4,16 @@ use App\Http\Controllers\Admin\AppReleaseController;
 use App\Http\Controllers\Admin\InventoryController;
 use App\Http\Controllers\Admin\BackupController;
 use App\Http\Controllers\Admin\CompanyController;
+use App\Http\Controllers\Admin\CompanySwitcherController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\LicenseController;
 use App\Http\Controllers\Admin\PayrollController;
+use App\Http\Controllers\Admin\PlanController;
 use App\Http\Controllers\Admin\AccountingController;
 use App\Http\Controllers\Admin\JournalController;
 use App\Http\Controllers\Admin\BankTransactionController;
 use App\Http\Controllers\Admin\PurchaseInvoiceController;
 use App\Http\Controllers\Admin\SupplierController;
-use App\Http\Controllers\Admin\CompanySwitcherController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\FacturaElectronicaSVController;
@@ -37,6 +39,8 @@ Route::middleware(['auth', 'role:admin,inquilino'])->prefix('admin')->name('admi
 Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::resource('users', UserController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('companies', CompanyController::class)->only(['index', 'store', 'update']);
+    Route::resource('licenses', LicenseController::class)->only(['index', 'store', 'update']);
+    Route::resource('plans', PlanController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('releases', AppReleaseController::class)->only(['index', 'store']);
     Route::get('backups', [BackupController::class, 'index'])->name('backups.index');
     Route::get('backups/{backup}/download', [BackupController::class, 'download'])->name('backups.download');
