@@ -775,7 +775,8 @@ class AccountingController extends Controller
         $ventas = BillingInvoice::where('company_id', $companyId)
             ->whereYear('issued_at', $year)
             ->whereMonth('issued_at', $month)
-            ->where('status', '!=', 'anulado')
+            ->whereNotNull('reception_stamp')
+            ->where('status', '!=', 'ANULADO')
             ->orderBy('issued_at')->orderBy('id')
             ->get()
             ->values()
@@ -785,7 +786,7 @@ class AccountingController extends Controller
             ->where('company_id', $companyId)
             ->whereYear('purchase_date', $year)
             ->whereMonth('purchase_date', $month)
-            ->whereNotIn('status', ['rechazado'])
+            ->where('status', 'approved')
             ->orderBy('purchase_date')->orderBy('id')
             ->get()
             ->values()
@@ -807,7 +808,8 @@ class AccountingController extends Controller
         $ventas = BillingInvoice::where('company_id', $companyId)
             ->whereYear('issued_at', $year)
             ->whereMonth('issued_at', $month)
-            ->where('status', '!=', 'anulado')
+            ->whereNotNull('reception_stamp')
+            ->where('status', '!=', 'ANULADO')
             ->orderBy('issued_at')->orderBy('id')
             ->get();
 
@@ -845,7 +847,7 @@ class AccountingController extends Controller
             ->where('company_id', $companyId)
             ->whereYear('purchase_date', $year)
             ->whereMonth('purchase_date', $month)
-            ->whereNotIn('status', ['rechazado'])
+            ->where('status', 'approved')
             ->orderBy('purchase_date')->orderBy('id')
             ->get();
 
