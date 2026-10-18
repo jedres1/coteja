@@ -39,6 +39,11 @@ class Company extends Model
         return $this->hasMany(License::class);
     }
 
+    public function latestLicense()
+    {
+        return $this->hasOne(License::class)->latest();
+    }
+
     public function payments()
     {
         return $this->hasMany(Payment::class);

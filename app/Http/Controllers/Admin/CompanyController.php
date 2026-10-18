@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
+use App\Models\Plan;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -21,7 +22,8 @@ class CompanyController extends Controller
     public function index()
     {
         return Inertia::render('Admin/Companies/Index', [
-            'companies' => Company::latest()->paginate(15),
+            'companies' => Company::with('latestLicense.plan')->latest()->paginate(15),
+            'plans'     => Plan::where('is_active', true)->orderBy('name')->get(),
             'modules'   => self::MODULES,
         ]);
     }
