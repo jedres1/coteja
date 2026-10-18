@@ -20,7 +20,6 @@ function CustomerForm({ customer, geography, documentTypes, dteTypes, statuses, 
         trade_name:           customer?.trade_name ?? '',
         preferred_dte_type:   customer?.preferred_dte_type ?? '',
         business_activity:    customer?.business_activity ?? '',
-        activity_description: customer?.activity_description ?? '',
         address_department:   customer?.address_department ?? '',
         address_municipality: customer?.address_municipality ?? '',
         address_district:     customer?.address_district ?? '',
@@ -187,17 +186,6 @@ function CustomerForm({ customer, geography, documentTypes, dteTypes, statuses, 
                         ))}
                     </datalist>
                     {errors.business_activity && <p className="field-error">{errors.business_activity}</p>}
-                </label>
-
-                {/* Activity description */}
-                <label>
-                    Descripción de actividad
-                    <input
-                        type="text"
-                        value={data.activity_description}
-                        onChange={(e) => setData('activity_description', e.target.value)}
-                    />
-                    {errors.activity_description && <p className="field-error">{errors.activity_description}</p>}
                 </label>
 
                 {/* Department */}

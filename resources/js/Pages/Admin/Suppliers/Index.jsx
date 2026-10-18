@@ -35,7 +35,6 @@ function SupplierForm({ supplier, geography, onSuccess, onCancel }) {
         document_number:      supplier?.document_number ?? '',
         nrc:                  supplier?.nrc ?? '',
         business_activity:    supplier?.business_activity ?? '',
-        activity_description: supplier?.activity_description ?? '',
         address_department:   supplier?.address_department ?? '',
         address_municipality: supplier?.address_municipality ?? '',
         address_district:     supplier?.address_district ?? '',
@@ -186,17 +185,6 @@ function SupplierForm({ supplier, geography, onSuccess, onCancel }) {
                     {errors.business_activity && <p className="field-error">{errors.business_activity}</p>}
                 </label>
 
-                {/* Activity description */}
-                <label>
-                    Descripción de actividad
-                    <input
-                        type="text"
-                        value={data.activity_description}
-                        onChange={(e) => setData('activity_description', e.target.value)}
-                        maxLength={255}
-                    />
-                    {errors.activity_description && <p className="field-error">{errors.activity_description}</p>}
-                </label>
 
                 {/* Department */}
                 <label>
