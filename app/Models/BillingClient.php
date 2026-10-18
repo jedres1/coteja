@@ -8,6 +8,7 @@ class BillingClient extends Model
 {
     protected $fillable = [
         'customer_id',
+        'company_id',
         'name',
         'trade_name',
         'document_type',
@@ -61,10 +62,17 @@ class BillingClient extends Model
         ];
     }
 
-    public function scopeForCustomer($query, ?int $customerId)
+    public function scopeForCustomer($query, ?int $companyId)
     {
-        return $customerId
-            ? $query->where('customer_id', $customerId)
-            : $query->whereNull('customer_id');
+        return $companyId
+            ? $query->where('company_id', $companyId)
+            : $query->whereNull('company_id');
+    }
+
+    public function scopeForCompany($query, ?int $companyId)
+    {
+        return $companyId
+            ? $query->where('company_id', $companyId)
+            : $query->whereNull('company_id');
     }
 }

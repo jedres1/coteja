@@ -41,17 +41,17 @@ class PurchaseInvoiceController extends Controller
             'mailbox'    => $settings['mailbox_mailbox']     ?? $env['mailbox'],
             'onlyUnseen' => $settings['mailbox_only_unseen'] ?? $env['only_unseen'],
             'limit'      => $settings['mailbox_limit']       ?? $env['limit'],
-            'accountingAccounts' => AccountingAccount::when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))
+            'accountingAccounts' => AccountingAccount::when($tenantId !== null, fn ($q) => $q->forCompany($tenantId))
                 ->where('is_active', true)->orderBy('code')->get(),
-            'costCenters' => CostCenter::when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))
+            'costCenters' => CostCenter::when($tenantId !== null, fn ($q) => $q->forCompany($tenantId))
                 ->where('is_active', true)->orderBy('code')->get(),
-            'purchasePackage' => AccountingPackage::when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))
+            'purchasePackage' => AccountingPackage::when($tenantId !== null, fn ($q) => $q->forCompany($tenantId))
                 ->where('code', 'CP')->first(),
-            'payablePackage' => AccountingPackage::when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))
+            'payablePackage' => AccountingPackage::when($tenantId !== null, fn ($q) => $q->forCompany($tenantId))
                 ->where('code', 'CXP')->first(),
-            'missingPurchaseEntries' => PurchaseInvoice::when($tenantId !== null, fn ($q) => $q->where('customer_id', $tenantId))
+            'missingPurchaseEntries' => PurchaseInvoice::when($tenantId !== null, fn ($q) => $q->where('company_id', $tenantId))
                 ->where('status', 'approved')->whereDoesntHave('journalEntry')->count(),
-            'missingPayableEntries' => PurchaseInvoice::when($tenantId !== null, fn ($q) => $q->where('customer_id', $tenantId))
+            'missingPayableEntries' => PurchaseInvoice::when($tenantId !== null, fn ($q) => $q->where('company_id', $tenantId))
                 ->where('payment_status', 'paid')
                 ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('journal_entries')
                     ->whereColumn('journal_entries.source_id', 'purchase_invoices.id')
@@ -68,8 +68,8 @@ class PurchaseInvoiceController extends Controller
         $activeAccount    = Rule::exists('accounting_accounts', 'id')->where('is_active', true);
         $activeCostCenter = Rule::exists('cost_centers', 'id')->where('is_active', true);
         if ($tenantId !== null) {
-            $activeAccount->where('customer_id', $tenantId);
-            $activeCostCenter->where('customer_id', $tenantId);
+            $activeAccount->where('company_id', $tenantId);
+            $activeCostCenter->where('company_id', $tenantId);
         }
 
         $data = $request->validate([
@@ -82,7 +82,7 @@ class PurchaseInvoiceController extends Controller
         ]);
 
         DB::transaction(function () use ($data, $tenantId) {
-            AccountingPackage::when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))
+            AccountingPackage::when($tenantId !== null, fn ($q) => $q->forCompany($tenantId))
                 ->where('code', 'CP')->update([
                     'debit_account_id'  => $data['purchase_debit_account_id'],
                     'credit_account_id' => $data['purchase_credit_account_id'],
@@ -90,7 +90,7 @@ class PurchaseInvoiceController extends Controller
                     'is_active'         => true,
                     'type'              => 'automatico',
                 ]);
-            AccountingPackage::when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))
+            AccountingPackage::when($tenantId !== null, fn ($q) => $q->forCompany($tenantId))
                 ->where('code', 'CXP')->update([
                     'debit_account_id'  => $data['payable_debit_account_id'],
                     'credit_account_id' => $data['payable_credit_account_id'],
@@ -113,7 +113,7 @@ class PurchaseInvoiceController extends Controller
         $failures        = 0;
 
         $invoices = PurchaseInvoice::with('supplier')
-            ->when($tenantId !== null, fn ($q) => $q->where('customer_id', $tenantId))
+            ->when($tenantId !== null, fn ($q) => $q->where('company_id', $tenantId))
             ->where('status', 'approved')
             ->whereDoesntHave('journalEntry')
             ->get();
@@ -130,7 +130,7 @@ class PurchaseInvoiceController extends Controller
         }
 
         $paidInvoices = PurchaseInvoice::with(['supplier', 'bankTransactions'])
-            ->when($tenantId !== null, fn ($q) => $q->where('customer_id', $tenantId))
+            ->when($tenantId !== null, fn ($q) => $q->where('company_id', $tenantId))
             ->where('payment_status', 'paid')
             ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('journal_entries')
                 ->whereColumn('journal_entries.source_id', 'purchase_invoices.id')
@@ -195,7 +195,7 @@ class PurchaseInvoiceController extends Controller
 
         $baseQuery = fn () => PurchaseInvoice::whereIn('payment_status', ['pending', 'partial'])
             ->whereNotIn('status', ['extracted', 'rejected'])
-            ->when($customerIds !== null, fn ($q) => $q->whereIn('customer_id', $customerIds))
+            ->when($customerIds !== null, fn ($q) => $q->whereIn('company_id', $customerIds))
             ->when($from !== '', fn ($q) => $q->whereDate('purchase_date', '>=', $from))
             ->when($to   !== '', fn ($q) => $q->whereDate('purchase_date', '<=', $to))
             ->when($search !== '', function ($q) use ($search) {
@@ -228,7 +228,7 @@ class PurchaseInvoiceController extends Controller
         });
 
         $tenantId     = $this->activeTenantId($request);
-        $bankAccounts = BankAccount::when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))
+        $bankAccounts = BankAccount::when($tenantId !== null, fn ($q) => $q->forCompany($tenantId))
             ->where('is_active', true)->orderBy('bank_name')->orderBy('name')->get();
 
         return Inertia::render('Admin/PurchaseInvoices/AccountsPayable', compact('invoices', 'totals', 'search', 'from', 'to', 'bankAccounts'));
@@ -238,7 +238,7 @@ class PurchaseInvoiceController extends Controller
     {
         $tenantId        = $this->activeTenantId($request);
         $bankAccountRule = Rule::exists('bank_accounts', 'id')->where('is_active', true);
-        if ($tenantId !== null) $bankAccountRule->where('customer_id', $tenantId);
+        if ($tenantId !== null) $bankAccountRule->where('company_id', $tenantId);
 
         $data = $request->validate([
             'payment_status'   => ['required', 'in:paid,partial,pending'],
@@ -295,7 +295,7 @@ class PurchaseInvoiceController extends Controller
         $customerIds = $this->accessibleCustomerIds($request);
 
         $invoices = PurchaseInvoice::with('supplier')
-            ->when($customerIds !== null, fn ($q) => $q->whereIn('customer_id', $customerIds))
+            ->when($customerIds !== null, fn ($q) => $q->whereIn('company_id', $customerIds))
             ->when(!$showAll, fn ($q) => $q->where('status', 'extracted'))
             ->latest('purchase_date')
             ->latest()
@@ -412,7 +412,7 @@ class PurchaseInvoiceController extends Controller
         return Inertia::render('Admin/PurchaseInvoices/Index', [
             'invoices' => PurchaseInvoice::with(['supplier', 'customer'])
                 ->whereNotIn('status', ['extracted', 'rejected'])
-                ->when($customerIds !== null, fn ($q) => $q->whereIn('customer_id', $customerIds))
+                ->when($customerIds !== null, fn ($q) => $q->whereIn('company_id', $customerIds))
                 ->when($supplierId, fn ($q) => $q->where('supplier_id', $supplierId))
                 ->when($from !== '', fn ($q) => $q->whereDate('purchase_date', '>=', $from))
                 ->when($to   !== '', fn ($q) => $q->whereDate('purchase_date', '<=', $to))
@@ -446,8 +446,8 @@ class PurchaseInvoiceController extends Controller
     {
         $data     = $this->validatedData($request);
         $tenantId = $this->activeTenantId($request);
-        if ($tenantId !== null && empty($data['customer_id'])) {
-            $data['customer_id'] = $tenantId;
+        if ($tenantId !== null && empty($data['company_id'])) {
+            $data['company_id'] = $tenantId;
         }
         $data['created_by'] = $request->user()?->id;
         $data['updated_by'] = $request->user()?->id;
@@ -539,7 +539,7 @@ class PurchaseInvoiceController extends Controller
 
         $rows = PurchaseInvoice::with(['supplier', 'customer'])
             ->whereNotIn('status', ['extracted', 'rejected'])
-            ->when($customerIds !== null, fn ($q) => $q->whereIn('customer_id', $customerIds))
+            ->when($customerIds !== null, fn ($q) => $q->whereIn('company_id', $customerIds))
             ->when($supplierId, fn ($query) => $query->where('supplier_id', $supplierId))
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
@@ -585,15 +585,10 @@ class PurchaseInvoiceController extends Controller
         if (! $user) return null;
 
         $companyId = $request->session()->get('active_company_id');
-        if (! $companyId) return null;
-
-        $company = \App\Models\Company::find($companyId, ['customer_id']);
-        if (!$company) return null;
-
-        return $company->customer_id ? (int) $company->customer_id : -1;
+        return $companyId ? (int) $companyId : null;
     }
 
-    /** Devuelve los customer_ids accesibles para el usuario. Null significa sin restricción (admin sin tenant activo). */
+    /** Devuelve los company_ids accesibles para el usuario. Null significa sin restricción (admin sin tenant activo). */
     private function accessibleCustomerIds(Request $request): ?array
     {
         $user = $request->user();
@@ -604,7 +599,7 @@ class PurchaseInvoiceController extends Controller
             return $tenantId ? [$tenantId] : null;
         }
 
-        return $user->accessibleCompanies()->pluck('customer_id')->unique()->filter()->values()->all();
+        return $user->accessibleCompanies()->pluck('id')->unique()->filter()->values()->all();
     }
 
     private function validatedData(Request $request, ?PurchaseInvoice $purchaseInvoice = null): array

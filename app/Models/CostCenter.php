@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 class CostCenter extends Model
 {
     protected $fillable = [
-        'customer_id', 'code', 'name', 'description', 'is_active',
+        'customer_id', 'company_id', 'code', 'name', 'description', 'is_active',
     ];
 
     protected $casts = [
@@ -40,23 +40,34 @@ class CostCenter extends Model
 
     public function scopeForCustomer(Builder $query, int $customerId): Builder
     {
-        return $query->where('customer_id', $customerId);
+        return $query->where('company_id', $customerId);
     }
 
+    public function scopeForCompany(Builder $query, int $companyId): Builder
+    {
+        return $query->where('company_id', $companyId);
+    }
+
+    public static function companyHasCostCenters(int $companyId): bool
+    {
+        return static::where('company_id', $companyId)->exists();
+    }
+
+    /** @deprecated Use companyHasCostCenters */
     public static function customerHasCostCenters(int $customerId): bool
     {
-        return static::where('customer_id', $customerId)->exists();
+        return static::companyHasCostCenters($customerId);
     }
 
-    public static function copyDefaultsFor(int $customerId): void
+    public static function copyDefaultsFor(int $companyId): void
     {
-        $templates = static::whereNull('customer_id')->get();
+        $templates = static::whereNull('company_id')->whereNull('customer_id')->get();
         if ($templates->isEmpty()) return;
 
-        DB::transaction(function () use ($templates, $customerId) {
+        DB::transaction(function () use ($templates, $companyId) {
             foreach ($templates as $tpl) {
                 static::create([
-                    'customer_id' => $customerId,
+                    'company_id'  => $companyId,
                     'code'        => $tpl->code,
                     'name'        => $tpl->name,
                     'description' => $tpl->description,

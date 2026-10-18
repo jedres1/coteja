@@ -25,12 +25,12 @@ class AccountingController extends Controller
 
     public function catalogo(Request $request)
     {
-        $customerId = $this->requireTenant();
+        $companyId = $this->requireTenant();
 
         $filter = $request->query('tipo', '');
         $search = trim((string) $request->query('search', ''));
 
-        $query = AccountingAccount::forCustomer($customerId)->orderBy('code');
+        $query = AccountingAccount::forCompany($companyId)->orderBy('code');
 
         if ($filter !== '') {
             $query->where('type', $filter);
@@ -44,19 +44,19 @@ class AccountingController extends Controller
 
         $accounts = $query->get();
 
-        $parents = AccountingAccount::forCustomer($customerId)
+        $parents = AccountingAccount::forCompany($companyId)
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'level'])
             ->map(fn($a) => ['id' => $a->id, 'code' => $a->code, 'name' => "{$a->code} - {$a->name}"])
             ->values();
 
         $stats = [
-            'activo'     => AccountingAccount::forCustomer($customerId)->where('type', 'activo')->count(),
-            'pasivo'     => AccountingAccount::forCustomer($customerId)->where('type', 'pasivo')->count(),
-            'patrimonio' => AccountingAccount::forCustomer($customerId)->where('type', 'patrimonio')->count(),
-            'gasto'      => AccountingAccount::forCustomer($customerId)->where('type', 'gasto')->count(),
-            'ingreso'    => AccountingAccount::forCustomer($customerId)->where('type', 'ingreso')->count(),
-            'total'      => AccountingAccount::forCustomer($customerId)->count(),
+            'activo'     => AccountingAccount::forCompany($companyId)->where('type', 'activo')->count(),
+            'pasivo'     => AccountingAccount::forCompany($companyId)->where('type', 'pasivo')->count(),
+            'patrimonio' => AccountingAccount::forCompany($companyId)->where('type', 'patrimonio')->count(),
+            'gasto'      => AccountingAccount::forCompany($companyId)->where('type', 'gasto')->count(),
+            'ingreso'    => AccountingAccount::forCompany($companyId)->where('type', 'ingreso')->count(),
+            'total'      => AccountingAccount::forCompany($companyId)->count(),
         ];
 
         return Inertia::render('Admin/Accounting/Catalogo', compact('accounts', 'parents', 'stats', 'filter', 'search'));
@@ -64,22 +64,22 @@ class AccountingController extends Controller
 
     public function store(Request $request)
     {
-        $customerId = $this->requireTenant();
+        $companyId = $this->requireTenant();
 
         $data = $request->validate([
             'code'      => ['required', 'string', 'max:20',
-                \Illuminate\Validation\Rule::unique('accounting_accounts')->where('customer_id', $customerId)],
+                \Illuminate\Validation\Rule::unique('accounting_accounts')->where('company_id', $companyId)],
             'name'      => 'required|string|max:200',
             'type'      => 'required|in:activo,pasivo,patrimonio,gasto,ingreso',
             'nature'    => 'required|in:deudora,acreedora',
             'parent_id' => ['nullable', \Illuminate\Validation\Rule::exists('accounting_accounts', 'id')
-                ->where('customer_id', $customerId)],
+                ->where('company_id', $companyId)],
             'notes'     => 'nullable|string|max:1000',
         ]);
 
         $parent = $data['parent_id'] ? AccountingAccount::find($data['parent_id']) : null;
-        $data['level']       = $parent ? $parent->level + 1 : 1;
-        $data['customer_id'] = $customerId;
+        $data['level']      = $parent ? $parent->level + 1 : 1;
+        $data['company_id'] = $companyId;
 
         $account = AccountingAccount::create($data);
 
@@ -88,17 +88,17 @@ class AccountingController extends Controller
 
     public function update(Request $request, AccountingAccount $account)
     {
-        $customerId = $this->requireTenant();
-        abort_unless($account->customer_id === $customerId, 403);
+        $companyId = $this->requireTenant();
+        abort_unless($account->company_id === $companyId, 403);
 
         $data = $request->validate([
             'code'      => ['required', 'string', 'max:20',
-                \Illuminate\Validation\Rule::unique('accounting_accounts')->where('customer_id', $customerId)->ignore($account->id)],
+                \Illuminate\Validation\Rule::unique('accounting_accounts')->where('company_id', $companyId)->ignore($account->id)],
             'name'      => 'required|string|max:200',
             'type'      => 'required|in:activo,pasivo,patrimonio,gasto,ingreso',
             'nature'    => 'required|in:deudora,acreedora',
             'parent_id' => ['nullable', \Illuminate\Validation\Rule::exists('accounting_accounts', 'id')
-                ->where('customer_id', $customerId)],
+                ->where('company_id', $companyId)],
             'is_active' => 'boolean',
             'notes'     => 'nullable|string|max:1000',
         ]);
@@ -117,8 +117,8 @@ class AccountingController extends Controller
 
     public function destroy(AccountingAccount $account)
     {
-        $customerId = $this->requireTenant();
-        abort_unless($account->customer_id === $customerId, 403);
+        $companyId = $this->requireTenant();
+        abort_unless($account->company_id === $companyId, 403);
 
         if ($account->children()->exists()) {
             return response()->json(['success' => false, 'message' => 'No se puede eliminar una cuenta que tiene subcuentas.'], 422);
@@ -133,45 +133,45 @@ class AccountingController extends Controller
 
     public function configuracion()
     {
-        $customerId = $this->requireTenant();
+        $companyId = $this->requireTenant();
 
-        $packages = AccountingPackage::forCustomer($customerId)->with([
+        $packages = AccountingPackage::forCompany($companyId)->with([
             'debitAccount', 'creditAccount',
             'secondaryDebitAccount', 'secondaryCreditAccount', 'costCenter',
         ])->orderBy('code')->get();
 
-        $accounts = AccountingAccount::forCustomer($customerId)
+        $accounts = AccountingAccount::forCompany($companyId)
             ->where('is_active', true)
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'type'])
             ->map(fn($a) => ['id' => $a->id, 'label' => $a->code . ' — ' . $a->name, 'type' => $a->type])
             ->values();
 
-        $costCenters = CostCenter::forCustomer($customerId)->orderBy('code')->get();
+        $costCenters = CostCenter::forCompany($companyId)->orderBy('code')->get();
 
         return Inertia::render('Admin/Accounting/Configuracion', compact('packages', 'accounts', 'costCenters'));
     }
 
     public function storePackage(Request $request)
     {
-        $customerId = $this->requireTenant();
+        $companyId = $this->requireTenant();
 
         $data = $request->validate([
             'code'                        => ['required', 'string', 'max:10',
-                Rule::unique('accounting_packages', 'code')->where('customer_id', $customerId)],
+                Rule::unique('accounting_packages', 'code')->where('company_id', $companyId)],
             'name'                        => 'required|string|max:100',
             'description'                 => 'nullable|string|max:500',
             'type'                        => 'required|in:automatico,manual',
-            'debit_account_id'            => ['nullable', Rule::exists('accounting_accounts', 'id')->where('customer_id', $customerId)],
-            'credit_account_id'           => ['nullable', Rule::exists('accounting_accounts', 'id')->where('customer_id', $customerId)],
-            'secondary_debit_account_id'  => ['nullable', Rule::exists('accounting_accounts', 'id')->where('customer_id', $customerId)],
-            'secondary_credit_account_id' => ['nullable', Rule::exists('accounting_accounts', 'id')->where('customer_id', $customerId)],
-            'cost_center_id'              => ['nullable', Rule::exists('cost_centers', 'id')->where('customer_id', $customerId)],
+            'debit_account_id'            => ['nullable', Rule::exists('accounting_accounts', 'id')->where('company_id', $companyId)],
+            'credit_account_id'           => ['nullable', Rule::exists('accounting_accounts', 'id')->where('company_id', $companyId)],
+            'secondary_debit_account_id'  => ['nullable', Rule::exists('accounting_accounts', 'id')->where('company_id', $companyId)],
+            'secondary_credit_account_id' => ['nullable', Rule::exists('accounting_accounts', 'id')->where('company_id', $companyId)],
+            'cost_center_id'              => ['nullable', Rule::exists('cost_centers', 'id')->where('company_id', $companyId)],
             'is_active'                   => 'boolean',
         ]);
 
-        $data['code']        = strtoupper($data['code']);
-        $data['customer_id'] = $customerId;
+        $data['code']       = strtoupper($data['code']);
+        $data['company_id'] = $companyId;
         $package = AccountingPackage::create($data);
 
         return response()->json(['success' => true, 'message' => 'Paquete creado.', 'package' => $package]);
@@ -179,18 +179,18 @@ class AccountingController extends Controller
 
     public function updatePackage(Request $request, AccountingPackage $package)
     {
-        $customerId = $this->requireTenant();
-        abort_unless($package->customer_id === $customerId, 403);
+        $companyId = $this->requireTenant();
+        abort_unless($package->company_id === $companyId, 403);
 
         $data = $request->validate([
             'name'                        => 'required|string|max:100',
             'description'                 => 'nullable|string|max:500',
             'type'                        => 'required|in:automatico,manual',
-            'debit_account_id'            => ['nullable', Rule::exists('accounting_accounts', 'id')->where('customer_id', $customerId)],
-            'credit_account_id'           => ['nullable', Rule::exists('accounting_accounts', 'id')->where('customer_id', $customerId)],
-            'secondary_debit_account_id'  => ['nullable', Rule::exists('accounting_accounts', 'id')->where('customer_id', $customerId)],
-            'secondary_credit_account_id' => ['nullable', Rule::exists('accounting_accounts', 'id')->where('customer_id', $customerId)],
-            'cost_center_id'              => ['nullable', Rule::exists('cost_centers', 'id')->where('customer_id', $customerId)],
+            'debit_account_id'            => ['nullable', Rule::exists('accounting_accounts', 'id')->where('company_id', $companyId)],
+            'credit_account_id'           => ['nullable', Rule::exists('accounting_accounts', 'id')->where('company_id', $companyId)],
+            'secondary_debit_account_id'  => ['nullable', Rule::exists('accounting_accounts', 'id')->where('company_id', $companyId)],
+            'secondary_credit_account_id' => ['nullable', Rule::exists('accounting_accounts', 'id')->where('company_id', $companyId)],
+            'cost_center_id'              => ['nullable', Rule::exists('cost_centers', 'id')->where('company_id', $companyId)],
             'is_active'                   => 'boolean',
         ]);
 
@@ -201,8 +201,8 @@ class AccountingController extends Controller
 
     public function destroyPackage(AccountingPackage $package)
     {
-        $customerId = $this->requireTenant();
-        abort_unless($package->customer_id === $customerId, 403);
+        $companyId = $this->requireTenant();
+        abort_unless($package->company_id === $companyId, 403);
 
         if ($package->journalEntries()->exists()) {
             return response()->json(['success' => false, 'message' => 'No se puede eliminar un paquete que tiene asientos contables registrados.'], 422);
@@ -217,18 +217,18 @@ class AccountingController extends Controller
 
     public function storeCostCenter(Request $request)
     {
-        $customerId = $this->requireTenant();
+        $companyId = $this->requireTenant();
 
         $data = $request->validate([
             'code'        => ['required', 'string', 'max:20',
-                Rule::unique('cost_centers', 'code')->where('customer_id', $customerId)],
+                Rule::unique('cost_centers', 'code')->where('company_id', $companyId)],
             'name'        => 'required|string|max:120',
             'description' => 'nullable|string|max:500',
             'is_active'   => 'boolean',
         ]);
 
-        $data['code']        = strtoupper($data['code']);
-        $data['customer_id'] = $customerId;
+        $data['code']       = strtoupper($data['code']);
+        $data['company_id'] = $companyId;
         $center = CostCenter::create($data);
 
         return response()->json(['success' => true, 'message' => 'Centro de costo creado.', 'cost_center' => $center]);
@@ -236,12 +236,12 @@ class AccountingController extends Controller
 
     public function updateCostCenter(Request $request, CostCenter $costCenter)
     {
-        $customerId = $this->requireTenant();
-        abort_unless($costCenter->customer_id === $customerId, 403);
+        $companyId = $this->requireTenant();
+        abort_unless($costCenter->company_id === $companyId, 403);
 
         $data = $request->validate([
             'code'        => ['required', 'string', 'max:20',
-                Rule::unique('cost_centers', 'code')->where('customer_id', $customerId)->ignore($costCenter->id)],
+                Rule::unique('cost_centers', 'code')->where('company_id', $companyId)->ignore($costCenter->id)],
             'name'        => 'required|string|max:120',
             'description' => 'nullable|string|max:500',
             'is_active'   => 'boolean',
@@ -255,8 +255,8 @@ class AccountingController extends Controller
 
     public function destroyCostCenter(CostCenter $costCenter)
     {
-        $customerId = $this->requireTenant();
-        abort_unless($costCenter->customer_id === $customerId, 403);
+        $companyId = $this->requireTenant();
+        abort_unless($costCenter->company_id === $companyId, 403);
 
         if ($costCenter->accountingPackages()->exists() || $costCenter->journalEntryLines()->exists()) {
             return response()->json(['success' => false, 'message' => 'No se puede eliminar un centro de costo en uso. Puede desactivarlo.'], 422);
@@ -357,11 +357,11 @@ class AccountingController extends Controller
 
     public function saldos(Request $request)
     {
-        $customerId = $this->requireTenant();
-        $year       = (int) $request->query('year',  now()->year);
-        $month      = (int) $request->query('month', now()->month);
-        $accountId  = $request->query('account_id');
-        $acumulado  = $request->boolean('acumulado', false);
+        $companyId = $this->requireTenant();
+        $year      = (int) $request->query('year',  now()->year);
+        $month     = (int) $request->query('month', now()->month);
+        $accountId = $request->query('account_id');
+        $acumulado = $request->boolean('acumulado', false);
 
         $period = AccountingPeriod::where('year', $year)->where('month', $month)->first();
 
@@ -369,7 +369,7 @@ class AccountingController extends Controller
             ->join('journal_entries as je',     'je.id',  '=', 'jel.journal_entry_id')
             ->join('accounting_accounts as aa', 'aa.id',  '=', 'jel.account_id')
             ->where('je.status', 'aprobado')
-            ->where('aa.customer_id', $customerId)
+            ->where('aa.company_id', $companyId)
             ->when($accountId, fn($q) => $q->where('jel.account_id', $accountId))
             ->groupBy('aa.id', 'aa.code', 'aa.name', 'aa.type', 'aa.nature')
             ->select([
@@ -407,7 +407,7 @@ class AccountingController extends Controller
             'saldo'        => $g->sum('saldo'),
         ]);
 
-        $accounts   = AccountingAccount::forCustomer($customerId)->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
+        $accounts   = AccountingAccount::forCompany($companyId)->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
         $allPeriods = AccountingPeriod::where('year', $year)->orderBy('month')->get();
 
         return Inertia::render('Admin/Accounting/Saldos', compact(
@@ -420,7 +420,7 @@ class AccountingController extends Controller
 
     public function balanzaComprobacion(Request $request)
     {
-        $customerId       = $this->requireTenant();
+        $companyId        = $this->requireTenant();
         $year             = (int) $request->query('year',  now()->year);
         $month            = (int) $request->query('month', now()->month);
         $acumulado        = $request->boolean('acumulado', false);
@@ -429,7 +429,7 @@ class AccountingController extends Controller
 
         $movsSub = DB::table('journal_entry_lines as jel')
             ->join('journal_entries as je', 'je.id', '=', 'jel.journal_entry_id')
-            ->where('je.customer_id', $customerId)
+            ->where('je.company_id', $companyId)
             ->where('je.status', 'aprobado')
             ->whereYear('je.entry_date', $year)
             ->when($acumulado,
@@ -448,7 +448,7 @@ class AccountingController extends Controller
                 ->from('accounting_accounts as ch')
                 ->whereColumn('ch.parent_id', 'aa.id'))
             ->where('aa.is_active', true)
-            ->where('aa.customer_id', $customerId)
+            ->where('aa.company_id', $companyId)
             ->when($tipo !== '', fn($q) => $q->where('aa.type', $tipo))
             ->leftJoinSub($movsSub, 'movs', 'movs.account_id', '=', 'aa.id')
             ->when($soloConMovimiento, fn($q) => $q->whereNotNull('movs.account_id'))
@@ -502,11 +502,11 @@ class AccountingController extends Controller
 
     public function libroMayor(Request $request)
     {
-        $customerId = $this->requireTenant();
-        $year       = (int) $request->query('year',  now()->year);
-        $month      = (int) $request->query('month', now()->month);
-        $accountId  = $request->query('account_id');
-        $acumulado  = $request->boolean('acumulado', false);
+        $companyId = $this->requireTenant();
+        $year      = (int) $request->query('year',  now()->year);
+        $month     = (int) $request->query('month', now()->month);
+        $accountId = $request->query('account_id');
+        $acumulado = $request->boolean('acumulado', false);
 
         $startDate = $acumulado
             ? sprintf('%04d-01-01', $year)
@@ -518,7 +518,7 @@ class AccountingController extends Controller
                 ->from('accounting_accounts as ch')
                 ->whereColumn('ch.parent_id', 'aa.id'))
             ->where('aa.is_active', true)
-            ->where('aa.customer_id', $customerId)
+            ->where('aa.company_id', $companyId)
             ->whereExists(fn($q) => $q->select(DB::raw(1))
                 ->from('journal_entry_lines as jel')
                 ->join('journal_entries as je', 'je.id', '=', 'jel.journal_entry_id')
@@ -534,7 +534,7 @@ class AccountingController extends Controller
         $saldosIniciales = DB::table('journal_entry_lines as jel')
             ->join('journal_entries as je', 'je.id', '=', 'jel.journal_entry_id')
             ->whereIn('jel.account_id', $accountIds)
-            ->where('je.customer_id', $customerId)
+            ->where('je.company_id', $companyId)
             ->where('je.status', 'aprobado')
             ->where('je.entry_date', '<', $startDate)
             ->groupBy('jel.account_id')
@@ -550,7 +550,7 @@ class AccountingController extends Controller
             ->join('journal_entries as je',      'je.id', '=', 'jel.journal_entry_id')
             ->leftJoin('accounting_packages as ap', 'ap.id', '=', 'je.accounting_package_id')
             ->whereIn('jel.account_id', $accountIds)
-            ->where('je.customer_id', $customerId)
+            ->where('je.company_id', $companyId)
             ->where('je.status', 'aprobado')
             ->whereBetween('je.entry_date', [$startDate, $endDate])
             ->orderBy('jel.account_id')
@@ -609,7 +609,7 @@ class AccountingController extends Controller
             ];
         });
 
-        $allAccounts = AccountingAccount::forCustomer($customerId)
+        $allAccounts = AccountingAccount::forCompany($companyId)
             ->whereNotExists(fn($q) => $q->select(DB::raw(1))
                 ->from('accounting_accounts as ch')
                 ->whereColumn('ch.parent_id', 'accounting_accounts.id'))
@@ -636,11 +636,11 @@ class AccountingController extends Controller
 
     public function balanceGeneral(Request $request)
     {
-        $customerId = $this->requireTenant();
+        $companyId = $this->requireTenant();
         $year  = (int) $request->query('year',  now()->year);
         $month = (int) $request->query('month', now()->month);
 
-        $sections = AccountingAccount::forCustomer($customerId)
+        $sections = AccountingAccount::forCompany($companyId)
             ->whereIn('type', ['activo', 'pasivo', 'patrimonio'])
             ->where('level', 2)
             ->orderBy('code')
@@ -651,7 +651,7 @@ class AccountingController extends Controller
             ->join('accounting_accounts as aa',     'aa.id',       '=', 'jel.account_id')
             ->join('accounting_accounts as par',    'par.id',      '=', 'aa.parent_id')
             ->where('je.status', 'aprobado')
-            ->where('aa.customer_id', $customerId)
+            ->where('aa.company_id', $companyId)
             ->whereIn('aa.type', ['activo', 'pasivo', 'patrimonio'])
             ->where('aa.level', 3)
             ->whereYear('je.entry_date', $year)
@@ -694,12 +694,12 @@ class AccountingController extends Controller
 
     public function estadoResultados(Request $request)
     {
-        $customerId = $this->requireTenant();
-        $year       = (int) $request->query('year',  now()->year);
-        $month      = (int) $request->query('month', now()->month);
-        $acumulado  = $request->boolean('acumulado', false);
+        $companyId = $this->requireTenant();
+        $year      = (int) $request->query('year',  now()->year);
+        $month     = (int) $request->query('month', now()->month);
+        $acumulado = $request->boolean('acumulado', false);
 
-        $sections = AccountingAccount::forCustomer($customerId)
+        $sections = AccountingAccount::forCompany($companyId)
             ->whereIn('type', ['ingreso', 'gasto'])
             ->where('level', 2)
             ->orderBy('code')
@@ -710,7 +710,7 @@ class AccountingController extends Controller
             ->join('accounting_accounts as aa',     'aa.id',  '=', 'jel.account_id')
             ->join('accounting_accounts as par',    'par.id', '=', 'aa.parent_id')
             ->where('je.status', 'aprobado')
-            ->where('aa.customer_id', $customerId)
+            ->where('aa.company_id', $companyId)
             ->whereIn('aa.type', ['ingreso', 'gasto'])
             ->where('aa.level', 3)
             ->whereYear('je.entry_date', $year)

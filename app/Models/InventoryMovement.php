@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class InventoryMovement extends Model
 {
     protected $fillable = [
-        'customer_id', 'product_id', 'warehouse_id', 'type', 'quantity',
+        'customer_id', 'company_id', 'product_id', 'warehouse_id', 'type', 'quantity',
         'document_type', 'document_number',
         'billing_invoice_id', 'purchase_invoice_id', 'notes',
     ];
@@ -49,6 +49,11 @@ class InventoryMovement extends Model
 
     public function scopeForCustomer(Builder $query, int $customerId): Builder
     {
-        return $query->where('customer_id', $customerId);
+        return $query->where('company_id', $customerId);
+    }
+
+    public function scopeForCompany(Builder $query, int $companyId): Builder
+    {
+        return $query->where('company_id', $companyId);
     }
 }

@@ -64,7 +64,7 @@ class FacturaElectronicaSVController extends Controller
                 'payment_status' => $request->query('payment_status', ''),
             ],
             'availableCustomers' => $this->availableCustomersForUser($request),
-            'bankAccounts'       => BankAccount::when($tenantId, fn ($q) => $q->forCustomer($tenantId))
+            'bankAccounts'       => BankAccount::when($tenantId, fn ($q) => $q->forCompany($tenantId))
                 ->where('is_active', true)->orderBy('name')->get(['id', 'name', 'bank_name']),
         ]);
     }
@@ -97,7 +97,7 @@ class FacturaElectronicaSVController extends Controller
         if (! $request->query('from')) $request->merge(['from' => now()->startOfMonth()->toDateString()]);
         if (! $request->query('to'))   $request->merge(['to'   => $today]);
 
-        $scope    = fn ($q) => $q->when($tenantId !== null, fn ($q) => $q->where('tenant_customer_id', $tenantId));
+        $scope    = fn ($q) => $q->when($tenantId !== null, fn ($q) => $q->where('company_id', $tenantId));
 
         $invoices = $this->buildFacturasQuery($request, $tenantId)->paginate(15);
 
@@ -273,7 +273,7 @@ class FacturaElectronicaSVController extends Controller
 
         $codeRule = \Illuminate\Validation\Rule::unique('billing_products', 'code')->ignore($productId);
         if ($tenantId !== null) {
-            $codeRule->where('customer_id', $tenantId);
+            $codeRule->where('company_id', $tenantId);
         }
 
         $data = $request->validate([
@@ -294,7 +294,7 @@ class FacturaElectronicaSVController extends Controller
         if (! $hasInventory && ! $productTypeId) {
             $defaultName   = $data['type'] === '2' ? 'Servicio' : 'Bien Terminado';
             $defaultType   = ProductType::firstOrCreate(
-                ['name' => $defaultName, 'customer_id' => $tenantId],
+                ['name' => $defaultName, 'company_id' => $tenantId],
                 ['controls_inventory' => $data['type'] !== '2']
             );
             $productTypeId = $defaultType->id;
@@ -316,10 +316,10 @@ class FacturaElectronicaSVController extends Controller
 
         if ($existingId) {
             $product = BillingProduct::findOrFail($existingId);
-            if ($tenantId) abort_unless($product->customer_id === $tenantId, 403);
+            if ($tenantId) abort_unless($product->company_id === $tenantId, 403);
             $product->update($attributes);
         } else {
-            $product = BillingProduct::create(array_merge($attributes, ['customer_id' => $tenantId]));
+            $product = BillingProduct::create(array_merge($attributes, ['company_id' => $tenantId]));
         }
 
         $product->load('productType');
@@ -338,7 +338,7 @@ class FacturaElectronicaSVController extends Controller
     public function destroyProducto(Request $request, BillingProduct $product)
     {
         $tenantId = $this->activeTenantId($request);
-        if ($tenantId) abort_unless($product->customer_id === $tenantId, 403);
+        if ($tenantId) abort_unless($product->company_id === $tenantId, 403);
 
         $product->delete();
 
@@ -385,12 +385,12 @@ class FacturaElectronicaSVController extends Controller
 
         $attributes = array_merge(
             collect($data)->except('id')->all(),
-            ['customer_id' => $tenantId]
+            ['company_id' => $tenantId]
         );
 
         if ($clientId) {
             $client = \App\Models\BillingClient::findOrFail($clientId);
-            if ($tenantId !== null) abort_unless($client->customer_id === $tenantId, 403);
+            if ($tenantId !== null) abort_unless($client->company_id === $tenantId, 403);
             $client->update($attributes);
         } else {
             $client = \App\Models\BillingClient::create($attributes);
@@ -402,7 +402,7 @@ class FacturaElectronicaSVController extends Controller
     public function destroyCliente(Request $request, \App\Models\BillingClient $client)
     {
         $tenantId = $this->activeTenantId($request);
-        if ($tenantId !== null) abort_unless($client->customer_id === $tenantId, 403);
+        if ($tenantId !== null) abort_unless($client->company_id === $tenantId, 403);
         abort_if($client->is_clients_varios, 403, 'No se puede eliminar el cliente "Clientes Varios".');
 
         $client->delete();
@@ -439,7 +439,7 @@ class FacturaElectronicaSVController extends Controller
     {
         $tenantId = $this->activeTenantId($request);
         $today    = now()->toDateString();
-        $scope    = fn ($q) => $q->when($tenantId !== null, fn ($q) => $q->where('tenant_customer_id', $tenantId));
+        $scope    = fn ($q) => $q->when($tenantId !== null, fn ($q) => $q->where('company_id', $tenantId));
 
         return Inertia::render('Admin/Billing/Dashboard', [
             'stats'              => [
@@ -451,7 +451,7 @@ class FacturaElectronicaSVController extends Controller
                 'voidedCount'    => BillingInvoice::where('status', 'ANULADO')->tap($scope)->count(),
             ],
             'recent'             => BillingInvoice::query()
-                ->when($tenantId !== null, fn ($q) => $q->where('tenant_customer_id', $tenantId))
+                ->when($tenantId !== null, fn ($q) => $q->where('company_id', $tenantId))
                 ->latest('issued_at')->latest('id')->take(15)->get()
                 ->map(fn (BillingInvoice $invoice) => $this->formatFacturaItem($invoice)),
             'availableCustomers' => $this->availableCustomersForUser($request),
@@ -475,11 +475,11 @@ class FacturaElectronicaSVController extends Controller
         }
 
         $tenantId = $this->activeTenantId($request);
-        if ($tenantId !== null && $invoice->tenant_customer_id !== $tenantId) {
+        if ($tenantId !== null && $invoice->company_id !== $tenantId) {
             abort(403);
         }
 
-        $tenantId = $invoice->tenant_customer_id ?? $tenantId;
+        $tenantId = $invoice->company_id ?? $tenantId;
 
         return Inertia::render('Admin/Billing/NuevaFactura', [
             ...$this->buildInvoiceFormData($request, $tenantId),
@@ -536,7 +536,7 @@ class FacturaElectronicaSVController extends Controller
         foreach (($data['correlativos'] ?? []) as $documentType => $nextNumber) {
             BillingDteCorrelative::updateOrCreate(
                 [
-                    'customer_id'   => $tenantId,
+                    'company_id'    => $tenantId,
                     'document_type' => $documentType,
                     'year'          => now()->year,
                     'establishment' => $data['emisor']['codigo_establecimiento'] ?? 'M001',
@@ -606,6 +606,7 @@ class FacturaElectronicaSVController extends Controller
                 ['generation_code' => $generationCode],
                 [
                     'tenant_customer_id' => $tenantId,
+                    'company_id'         => $tenantId,
                     'number_control'     => $numberControl,
                     'document_type'      => $tipo,
                     'issued_at'          => data_get($dte, 'identificacion.fecEmi', now()->toDateString()),
@@ -730,7 +731,7 @@ class FacturaElectronicaSVController extends Controller
             return response()->json(['success' => false, 'message' => $msg], 422);
         }
 
-        $tenantId = $invoice->tenant_customer_id ?? $this->activeTenantId($request);
+        $tenantId = $invoice->company_id ?? $this->activeTenantId($request);
         $settings = BillingSetting::allAsArray($tenantId);
         $firma    = $this->dispatch->resolveSignSettings($settings['firma'] ?? [], $settings);
         $hacienda = $this->dispatch->resolveHaciendaSettings($settings['hacienda'] ?? [], $settings);
@@ -836,7 +837,7 @@ class FacturaElectronicaSVController extends Controller
             'codigoGeneracionR' => 'nullable|string|max:36',
         ]);
 
-        $tenantId = $invoice->tenant_customer_id ?? $this->activeTenantId($request);
+        $tenantId = $invoice->company_id ?? $this->activeTenantId($request);
 
         try {
             $result = $this->voids->process($invoice, BillingSetting::allAsArray($tenantId), $data);
@@ -886,7 +887,7 @@ class FacturaElectronicaSVController extends Controller
             'resumen.observaciones'      => 'nullable|string|max:3000',
         ]);
 
-        $tenantId = $invoice->tenant_customer_id ?? $this->activeTenantId($request);
+        $tenantId = $invoice->company_id ?? $this->activeTenantId($request);
 
         try {
             $result = $this->returns->process($invoice, BillingSetting::allAsArray($tenantId), $data);
@@ -966,7 +967,7 @@ class FacturaElectronicaSVController extends Controller
         $invoices = BillingInvoice::whereIn('id', $data['invoiceIds'])
             ->where('status', 'CONTINGENCIA')
             ->whereNotNull('signed_dte')
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_customer_id', $tenantId))
+            ->when($tenantId !== null, fn ($q) => $q->where('company_id', $tenantId))
             ->get();
 
         if ($invoices->isEmpty()) {
@@ -1071,12 +1072,7 @@ class FacturaElectronicaSVController extends Controller
         if (! $user) return null;
 
         $companyId = $request->session()->get('active_company_id');
-        if (! $companyId) return null;
-
-        $company = \App\Models\Company::find($companyId, ['customer_id']);
-        if (!$company) return null;
-
-        return $company->customer_id ? (int) $company->customer_id : -1;
+        return $companyId ? (int) $companyId : null;
     }
 
     private function availableCustomersForUser(Request $request): array
@@ -1086,7 +1082,7 @@ class FacturaElectronicaSVController extends Controller
 
     private function buildReceivableBaseQuery(Request $request, ?int $tenantId): Builder
     {
-        $tenantScope = fn ($q) => $q->when($tenantId !== null, fn ($q) => $q->where('tenant_customer_id', $tenantId));
+        $tenantScope = fn ($q) => $q->when($tenantId !== null, fn ($q) => $q->where('company_id', $tenantId));
 
         return BillingInvoice::query()
             ->tap($tenantScope)
@@ -1127,7 +1123,7 @@ class FacturaElectronicaSVController extends Controller
         $search = trim((string) $request->query('search', ''));
 
         return BillingInvoice::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_customer_id', $tenantId))
+            ->when($tenantId !== null, fn ($q) => $q->where('company_id', $tenantId))
             ->when($search !== '', fn ($q) => $q->where(function ($q) use ($search) {
                 $q->where('number_control', 'like', "%{$search}%")
                     ->orWhere('generation_code', 'like', "%{$search}%")
@@ -1147,8 +1143,8 @@ class FacturaElectronicaSVController extends Controller
     {
         return BillingDteCorrelative::query()
             ->where('year', now()->year)
-            ->when($tenantId !== null, fn ($q) => $q->where('customer_id', $tenantId))
-            ->when($tenantId === null, fn ($q) => $q->whereNull('customer_id'))
+            ->when($tenantId !== null, fn ($q) => $q->where('company_id', $tenantId))
+            ->when($tenantId === null, fn ($q) => $q->whereNull('company_id'))
             ->get()
             ->mapWithKeys(fn (BillingDteCorrelative $r) => [$r->document_type => $r->next_number])
             ->all();
@@ -1328,7 +1324,7 @@ class FacturaElectronicaSVController extends Controller
             return;
         }
 
-        $tenantId    = $invoice->tenant_customer_id;
+        $tenantId    = $invoice->company_id;
         $warehouseId = (int) BillingSetting::get('inventory_sales_warehouse_id', null, $tenantId);
         if (! $warehouseId) {
             return;
@@ -1342,7 +1338,7 @@ class FacturaElectronicaSVController extends Controller
         foreach ($itemsByCode as $code => $codeItems) {
             $product = BillingProduct::with('productType')
                 ->where('code', $code)
-                ->when($tenantId !== null, fn ($q) => $q->where('customer_id', $tenantId))
+                ->when($tenantId !== null, fn ($q) => $q->where('company_id', $tenantId))
                 ->first();
 
             if (! $product || ! ($product->productType?->controls_inventory ?? false)) {
@@ -1352,7 +1348,7 @@ class FacturaElectronicaSVController extends Controller
             $qty = collect($codeItems)->sum('cantidad');
 
             InventoryMovement::create([
-                'customer_id'        => $tenantId,
+                'company_id'         => $tenantId,
                 'product_id'         => $product->id,
                 'warehouse_id'       => $warehouseId,
                 'type'               => 'exit',

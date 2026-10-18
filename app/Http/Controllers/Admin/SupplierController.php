@@ -48,9 +48,9 @@ class SupplierController extends Controller
     public function store(SaveSupplierRequest $request)
     {
         Supplier::create(array_merge($request->validated(), [
-            'customer_id' => $this->tenantId(),
-            'created_by'  => $request->user()?->id,
-            'updated_by'  => $request->user()?->id,
+            'company_id' => $this->tenantId(),
+            'created_by' => $request->user()?->id,
+            'updated_by' => $request->user()?->id,
         ]));
 
         return back()->with('status', 'Proveedor creado.');
@@ -59,7 +59,7 @@ class SupplierController extends Controller
     public function update(SaveSupplierRequest $request, Supplier $supplier)
     {
         $tenantId = $this->tenantId();
-        if ($tenantId) abort_unless($supplier->customer_id === $tenantId, 403);
+        if ($tenantId) abort_unless($supplier->company_id === $tenantId, 403);
 
         $supplier->update(array_merge($request->validated(), [
             'updated_by' => $request->user()?->id,
@@ -71,7 +71,7 @@ class SupplierController extends Controller
     public function destroy(Supplier $supplier)
     {
         $tenantId = $this->tenantId();
-        if ($tenantId) abort_unless($supplier->customer_id === $tenantId, 403);
+        if ($tenantId) abort_unless($supplier->company_id === $tenantId, 403);
 
         if ($supplier->purchaseInvoices()->exists()) {
             return back()->withErrors('No se puede eliminar un proveedor con facturas de compra registradas.');

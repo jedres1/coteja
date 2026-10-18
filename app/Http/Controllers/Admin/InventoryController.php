@@ -37,7 +37,7 @@ class InventoryController extends Controller
         $codeRule = Rule::unique('product_types', 'code')->whereNull('code')->ignore(0);
         if ($request->filled('code')) {
             $codeRule = Rule::unique('product_types', 'code');
-            if ($tenantId !== null) $codeRule->where('customer_id', $tenantId);
+            if ($tenantId !== null) $codeRule->where('company_id', $tenantId);
             if ($request->filled('id')) $codeRule->ignore($request->input('id'));
         }
 
@@ -51,7 +51,7 @@ class InventoryController extends Controller
 
         if (!empty($data['id'])) {
             $productType = ProductType::findOrFail($data['id']);
-            if ($tenantId) abort_unless($productType->customer_id === $tenantId, 403);
+            if ($tenantId) abort_unless($productType->company_id === $tenantId, 403);
             $productType->update([
                 'name'               => $data['name'],
                 'code'               => $data['code'] ?? $productType->code,
@@ -60,7 +60,7 @@ class InventoryController extends Controller
             ]);
         } else {
             ProductType::create([
-                'customer_id'        => $tenantId,
+                'company_id'         => $tenantId,
                 'name'               => $data['name'],
                 'code'               => $data['code'] ?? null,
                 'controls_inventory' => $data['controls_inventory'] ?? false,
@@ -74,7 +74,7 @@ class InventoryController extends Controller
     public function destroyProductType(ProductType $productType)
     {
         $tenantId = $this->tenantId();
-        if ($tenantId) abort_unless($productType->customer_id === $tenantId, 403);
+        if ($tenantId) abort_unless($productType->company_id === $tenantId, 403);
 
         if ($productType->products()->exists()) {
             return back()->withErrors('No se puede eliminar: hay productos asignados a este tipo.');
@@ -108,7 +108,7 @@ class InventoryController extends Controller
 
         if (!empty($data['id'])) {
             $warehouse = Warehouse::findOrFail($data['id']);
-            if ($tenantId) abort_unless($warehouse->customer_id === $tenantId, 403);
+            if ($tenantId) abort_unless($warehouse->company_id === $tenantId, 403);
             $warehouse->update([
                 'name'         => $data['name'],
                 'code'         => $data['code'] ?? $warehouse->code,
@@ -119,7 +119,7 @@ class InventoryController extends Controller
             ]);
         } else {
             Warehouse::create([
-                'customer_id'  => $tenantId,
+                'company_id'   => $tenantId,
                 'name'         => $data['name'],
                 'code'         => $data['code'] ?? null,
                 'address'      => $data['address'] ?? null,
@@ -135,7 +135,7 @@ class InventoryController extends Controller
     public function destroyWarehouse(Warehouse $warehouse)
     {
         $tenantId = $this->tenantId();
-        if ($tenantId) abort_unless($warehouse->customer_id === $tenantId, 403);
+        if ($tenantId) abort_unless($warehouse->company_id === $tenantId, 403);
 
         if ($warehouse->movements()->exists()) {
             return back()->withErrors('No se puede eliminar: hay movimientos registrados en esta bodega.');
@@ -159,7 +159,7 @@ class InventoryController extends Controller
     {
         $tenantId      = $this->tenantId();
         $warehouseRule = Rule::exists('warehouses', 'id');
-        if ($tenantId !== null) $warehouseRule->where('customer_id', $tenantId);
+        if ($tenantId !== null) $warehouseRule->where('company_id', $tenantId);
 
         $data = $request->validate([
             'sales_warehouse_id' => ['required', $warehouseRule],
@@ -195,7 +195,7 @@ class InventoryController extends Controller
             ->orderBy('name')->get();
 
         $approvedPurchases = PurchaseInvoice::with('supplier')
-            ->when($tenantId !== null, fn ($q) => $q->where('customer_id', $tenantId))
+            ->when($tenantId !== null, fn ($q) => $q->where('company_id', $tenantId))
             ->where('status', 'approved')
             ->latest('purchase_date')
             ->limit(200)
@@ -221,9 +221,9 @@ class InventoryController extends Controller
         $warehouseRule = Rule::exists('warehouses', 'id');
         $purchaseRule  = Rule::exists('purchase_invoices', 'id');
         if ($tenantId !== null) {
-            $productRule->where('customer_id', $tenantId);
-            $warehouseRule->where('customer_id', $tenantId);
-            $purchaseRule->where('customer_id', $tenantId);
+            $productRule->where('company_id', $tenantId);
+            $warehouseRule->where('company_id', $tenantId);
+            $purchaseRule->where('company_id', $tenantId);
         }
 
         $data = $request->validate([
@@ -265,7 +265,7 @@ class InventoryController extends Controller
         }
 
         $movement = InventoryMovement::create([
-            'customer_id'         => $tenantId,
+            'company_id'          => $tenantId,
             'product_id'          => $data['product_id'],
             'warehouse_id'        => $data['warehouse_id'],
             'type'                => $data['type'],

@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 class AccountingAccount extends Model
 {
     protected $fillable = [
-        'customer_id', 'code', 'name', 'type', 'nature',
+        'customer_id', 'company_id', 'code', 'name', 'type', 'nature',
         'parent_id', 'level', 'is_active', 'notes',
     ];
 
@@ -37,7 +37,12 @@ class AccountingAccount extends Model
 
     public function scopeForCustomer(Builder $query, int $customerId): Builder
     {
-        return $query->where('customer_id', $customerId);
+        return $query->where('company_id', $customerId);
+    }
+
+    public function scopeForCompany(Builder $query, int $companyId): Builder
+    {
+        return $query->where('company_id', $companyId);
     }
 
     public function typeLabel(): string
@@ -73,9 +78,10 @@ class AccountingAccount extends Model
      * Copia el catálogo plantilla (customer_id=NULL) para un nuevo inquilino.
      * Preserva la jerarquía parent_id mapeando los IDs originales a los nuevos.
      */
-    public static function copyDefaultsFor(int $customerId): void
+    public static function copyDefaultsFor(int $companyId): void
     {
-        $templates = static::whereNull('customer_id')
+        $templates = static::whereNull('company_id')
+            ->whereNull('customer_id')
             ->orderBy('level')
             ->orderBy('code')
             ->get();
@@ -84,27 +90,33 @@ class AccountingAccount extends Model
 
         $idMap = [];
 
-        DB::transaction(function () use ($templates, $customerId, &$idMap) {
+        DB::transaction(function () use ($templates, $companyId, &$idMap) {
             foreach ($templates as $tpl) {
                 $new = static::create([
-                    'customer_id' => $customerId,
-                    'code'        => $tpl->code,
-                    'name'        => $tpl->name,
-                    'type'        => $tpl->type,
-                    'nature'      => $tpl->nature,
-                    'parent_id'   => $tpl->parent_id ? ($idMap[$tpl->parent_id] ?? null) : null,
-                    'level'       => $tpl->level,
-                    'is_active'   => $tpl->is_active,
-                    'notes'       => $tpl->notes,
+                    'company_id' => $companyId,
+                    'code'       => $tpl->code,
+                    'name'       => $tpl->name,
+                    'type'       => $tpl->type,
+                    'nature'     => $tpl->nature,
+                    'parent_id'  => $tpl->parent_id ? ($idMap[$tpl->parent_id] ?? null) : null,
+                    'level'      => $tpl->level,
+                    'is_active'  => $tpl->is_active,
+                    'notes'      => $tpl->notes,
                 ]);
                 $idMap[$tpl->id] = $new->id;
             }
         });
     }
 
-    /** True si el cliente ya tiene su propio catálogo. */
+    /** True si la empresa ya tiene su propio catálogo. */
+    public static function companyHasCatalog(int $companyId): bool
+    {
+        return static::where('company_id', $companyId)->exists();
+    }
+
+    /** @deprecated Use companyHasCatalog */
     public static function customerHasCatalog(int $customerId): bool
     {
-        return static::where('customer_id', $customerId)->exists();
+        return static::companyHasCatalog($customerId);
     }
 }

@@ -13,7 +13,7 @@ class JournalEntry extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'customer_id', 'entry_number', 'entry_date', 'description', 'reference',
+        'customer_id', 'company_id', 'entry_number', 'entry_date', 'description', 'reference',
         'status', 'created_by', 'updated_by', 'approved_by', 'approved_at', 'notes',
         'accounting_package_id', 'source_type', 'source_id', 'source_document',
     ];
@@ -65,11 +65,16 @@ class JournalEntry extends Model
 
     public function scopeForCustomer(Builder $query, int $customerId): Builder
     {
-        return $query->where('customer_id', $customerId);
+        return $query->where('company_id', $customerId);
+    }
+
+    public function scopeForCompany(Builder $query, int $companyId): Builder
+    {
+        return $query->where('company_id', $companyId);
     }
 
     // Debe llamarse dentro de un DB::transaction().
-    public static function nextNumber(?AccountingPackage $package, ?int $customerId = null): string
+    public static function nextNumber(?AccountingPackage $package, ?int $companyId = null): string
     {
         if ($package) {
             return $package->reserveNextNumber();
@@ -77,8 +82,8 @@ class JournalEntry extends Model
 
         $year  = now()->year;
         $query = static::where('entry_number', 'like', 'AS-%')->whereYear('created_at', $year);
-        if ($customerId) {
-            $query->where('customer_id', $customerId);
+        if ($companyId) {
+            $query->where('company_id', $companyId);
         }
         $max = $query->lockForUpdate()->max('entry_number');
         $seq = $max ? ((int) substr($max, -5)) + 1 : 1;

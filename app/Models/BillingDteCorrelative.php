@@ -8,6 +8,7 @@ class BillingDteCorrelative extends Model
 {
     protected $fillable = [
         'customer_id',
+        'company_id',
         'document_type',
         'year',
         'establishment',

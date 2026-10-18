@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 class AccountingPackage extends Model
 {
     protected $fillable = [
-        'customer_id', 'code', 'name', 'description', 'type',
+        'customer_id', 'company_id', 'code', 'name', 'description', 'type',
         'debit_account_id', 'credit_account_id',
         'secondary_debit_account_id', 'secondary_credit_account_id',
         'cost_center_id',
@@ -60,12 +60,23 @@ class AccountingPackage extends Model
 
     public function scopeForCustomer(Builder $query, int $customerId): Builder
     {
-        return $query->where('customer_id', $customerId);
+        return $query->where('company_id', $customerId);
     }
 
+    public function scopeForCompany(Builder $query, int $companyId): Builder
+    {
+        return $query->where('company_id', $companyId);
+    }
+
+    public static function companyHasPackages(int $companyId): bool
+    {
+        return static::where('company_id', $companyId)->exists();
+    }
+
+    /** @deprecated Use companyHasPackages */
     public static function customerHasPackages(int $customerId): bool
     {
-        return static::where('customer_id', $customerId)->exists();
+        return static::companyHasPackages($customerId);
     }
 
     // Must be called inside a DB::transaction()
@@ -82,33 +93,33 @@ class AccountingPackage extends Model
      * Mapea debit/credit account IDs usando el código de cuenta del cliente.
      * Debe llamarse después de CostCenter::copyDefaultsFor().
      */
-    public static function copyDefaultsFor(int $customerId): void
+    public static function copyDefaultsFor(int $companyId): void
     {
-        $templates = static::whereNull('customer_id')->get();
+        $templates = static::whereNull('company_id')->whereNull('customer_id')->get();
         if ($templates->isEmpty()) return;
 
-        // Mapa: código cuenta → id cuenta del cliente
-        $customerAccounts = AccountingAccount::where('customer_id', $customerId)->pluck('id', 'code');
+        // Mapa: código cuenta → id cuenta de la empresa
+        $companyAccounts = AccountingAccount::where('company_id', $companyId)->pluck('id', 'code');
         // Mapa: id cuenta plantilla → código cuenta plantilla
-        $templateAccountCodes = AccountingAccount::whereNull('customer_id')->pluck('code', 'id');
+        $templateAccountCodes = AccountingAccount::whereNull('company_id')->whereNull('customer_id')->pluck('code', 'id');
 
-        // Mapa: código centro → id centro del cliente
-        $customerCenters = CostCenter::where('customer_id', $customerId)->pluck('id', 'code');
+        // Mapa: código centro → id centro de la empresa
+        $companyCenters = CostCenter::where('company_id', $companyId)->pluck('id', 'code');
         // Mapa: id centro plantilla → código centro plantilla
-        $templateCenterCodes = CostCenter::whereNull('customer_id')->pluck('code', 'id');
+        $templateCenterCodes = CostCenter::whereNull('company_id')->whereNull('customer_id')->pluck('code', 'id');
 
         $resolveAccount = fn (?int $tplId) => $tplId
-            ? ($customerAccounts[$templateAccountCodes[$tplId] ?? ''] ?? null)
+            ? ($companyAccounts[$templateAccountCodes[$tplId] ?? ''] ?? null)
             : null;
 
         $resolveCenter = fn (?int $tplId) => $tplId
-            ? ($customerCenters[$templateCenterCodes[$tplId] ?? ''] ?? null)
+            ? ($companyCenters[$templateCenterCodes[$tplId] ?? ''] ?? null)
             : null;
 
-        DB::transaction(function () use ($templates, $customerId, $resolveAccount, $resolveCenter) {
+        DB::transaction(function () use ($templates, $companyId, $resolveAccount, $resolveCenter) {
             foreach ($templates as $tpl) {
                 static::create([
-                    'customer_id'                 => $customerId,
+                    'company_id'                  => $companyId,
                     'code'                        => $tpl->code,
                     'name'                        => $tpl->name,
                     'description'                 => $tpl->description,

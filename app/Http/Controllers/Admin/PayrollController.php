@@ -82,7 +82,7 @@ class PayrollController extends Controller
     {
         $tenantId = $this->tenantId();
         $codeRule = Rule::unique('employees', 'code');
-        if ($tenantId !== null) $codeRule->where('customer_id', $tenantId);
+        if ($tenantId !== null) $codeRule->where('company_id', $tenantId);
 
         $request->validate([
             'name'      => ['required', 'string', 'max:255'],
@@ -97,7 +97,7 @@ class PayrollController extends Controller
                 'position', 'department', 'hire_date', 'salary',
                 'bank_name', 'bank_account', 'is_active',
             ]),
-            ['customer_id' => $tenantId]
+            ['company_id' => $tenantId]
         ));
 
         if (! $employee->code) {
@@ -110,10 +110,10 @@ class PayrollController extends Controller
     public function updateEmployee(Request $request, Employee $employee)
     {
         $tenantId = $this->tenantId();
-        if ($tenantId) abort_unless($employee->customer_id === $tenantId, 403);
+        if ($tenantId) abort_unless($employee->company_id === $tenantId, 403);
 
         $codeRule = Rule::unique('employees', 'code')->ignore($employee->id);
-        if ($tenantId !== null) $codeRule->where('customer_id', $tenantId);
+        if ($tenantId !== null) $codeRule->where('company_id', $tenantId);
 
         $request->validate([
             'name'      => ['required', 'string', 'max:255'],
@@ -138,7 +138,7 @@ class PayrollController extends Controller
     public function destroyEmployee(Employee $employee)
     {
         $tenantId = $this->tenantId();
-        if ($tenantId) abort_unless($employee->customer_id === $tenantId, 403);
+        if ($tenantId) abort_unless($employee->company_id === $tenantId, 403);
 
         if ($employee->lines()->exists()) {
             $employee->update(['is_active' => false]);
@@ -161,7 +161,7 @@ class PayrollController extends Controller
         ]);
 
         $period = PayrollPeriod::create([
-            'customer_id'  => $tenantId,
+            'company_id'   => $tenantId,
             'name'         => $request->name,
             'period_start' => $request->period_start,
             'period_end'   => $request->period_end,
@@ -203,20 +203,20 @@ class PayrollController extends Controller
     public function showPeriod(PayrollPeriod $period)
     {
         $tenantId = $this->tenantId();
-        if ($tenantId) abort_unless($period->customer_id === $tenantId, 403);
+        if ($tenantId) abort_unless($period->company_id === $tenantId, 403);
 
         $period->load(['lines.employee', 'journalEntry']);
 
         return Inertia::render('Admin/Payroll/Period', [
             'period'   => $period,
-            'settings' => PayrollSetting::current($period->customer_id),
+            'settings' => PayrollSetting::current($period->company_id),
         ]);
     }
 
     public function updateLine(Request $request, PayrollLine $line)
     {
         $tenantId = $this->tenantId();
-        if ($tenantId) abort_unless($line->period->customer_id === $tenantId, 403);
+        if ($tenantId) abort_unless($line->period->company_id === $tenantId, 403);
 
         if ($line->period->isApplied()) {
             return back()->withErrors('No se pueden editar líneas de una nómina aplicada.');
@@ -231,9 +231,9 @@ class PayrollController extends Controller
             'notes'            => ['nullable', 'string'],
         ]);
 
-        $periodCustomerId = $line->period->customer_id;
-        $settings         = PayrollSetting::current($periodCustomerId);
-        $calculator       = new PayrollCalculatorService($settings, $periodCustomerId);
+        $periodCompanyId = $line->period->company_id;
+        $settings        = PayrollSetting::current($periodCompanyId);
+        $calculator      = new PayrollCalculatorService($settings, $periodCompanyId);
 
         $calc = $calculator->calculateLine($line->employee, [
             'overtime_hours'  => $request->overtime_hours ?? 0,
@@ -266,7 +266,7 @@ class PayrollController extends Controller
     public function applyPeriod(Request $request, PayrollPeriod $period)
     {
         $tenantId = $this->tenantId();
-        if ($tenantId) abort_unless($period->customer_id === $tenantId, 403);
+        if ($tenantId) abort_unless($period->company_id === $tenantId, 403);
 
         if (! $request->user()->hasModuleAccess('accounting')) {
             if ($period->status === 'aplicado') {
@@ -281,7 +281,7 @@ class PayrollController extends Controller
 
         try {
             $service = new PayrollEntryService();
-            $entry   = $service->createFromPayroll($period, auth()->id(), $period->customer_id);
+            $entry   = $service->createFromPayroll($period, auth()->id(), $period->company_id);
 
             if (! $entry) {
                 return back()->withErrors('No se pudo aplicar la nómina. Verifique que el período tenga líneas y no esté ya aplicado.');
@@ -296,7 +296,7 @@ class PayrollController extends Controller
     public function destroyPeriod(PayrollPeriod $period)
     {
         $tenantId = $this->tenantId();
-        if ($tenantId) abort_unless($period->customer_id === $tenantId, 403);
+        if ($tenantId) abort_unless($period->company_id === $tenantId, 403);
 
         if ($period->status !== 'borrador') {
             return back()->withErrors('Solo se pueden eliminar períodos en estado borrador.');
@@ -315,7 +315,7 @@ class PayrollController extends Controller
         $employeeIds = $data['employee_ids'] ?? [];
         unset($data['employee_ids']);
 
-        $concept = PayrollConcept::create(array_merge($data, ['customer_id' => $tenantId]));
+        $concept = PayrollConcept::create(array_merge($data, ['company_id' => $tenantId]));
 
         if (! $concept->applies_to_all) {
             $concept->employees()->sync($employeeIds);
@@ -327,7 +327,7 @@ class PayrollController extends Controller
     public function updateConcept(Request $request, PayrollConcept $concept)
     {
         $tenantId = $this->tenantId();
-        if ($tenantId) abort_unless($concept->customer_id === $tenantId, 403);
+        if ($tenantId) abort_unless($concept->company_id === $tenantId, 403);
 
         if ($concept->system_key) {
             return back()->withErrors('La fórmula legal se administra desde los parámetros de nómina; aquí solo se asignan sus cuentas.');
@@ -346,7 +346,7 @@ class PayrollController extends Controller
     public function destroyConcept(PayrollConcept $concept)
     {
         $tenantId = $this->tenantId();
-        if ($tenantId) abort_unless($concept->customer_id === $tenantId, 403);
+        if ($tenantId) abort_unless($concept->company_id === $tenantId, 403);
 
         if ($concept->system_key) {
             return back()->withErrors('Los conceptos legales no se pueden eliminar.');
@@ -362,7 +362,7 @@ class PayrollController extends Controller
         abort_unless($concept->system_key, 404);
 
         $tenantId = $this->tenantId();
-        if ($tenantId) abort_unless($concept->customer_id === $tenantId, 403);
+        if ($tenantId) abort_unless($concept->company_id === $tenantId, 403);
 
         $employerConcept = in_array($concept->system_key, ['isss_patronal', 'afp_patronal'], true);
         $data = $request->validate([
@@ -376,7 +376,7 @@ class PayrollController extends Controller
 
         $accountQuery = AccountingAccount::whereKey($data['account_id'])
             ->where('level', 3)->where('type', $expectedType);
-        if ($tenantId !== null) $accountQuery->where('customer_id', $tenantId);
+        if ($tenantId !== null) $accountQuery->where('company_id', $tenantId);
 
         if (! $accountQuery->exists()) {
             return back()->withErrors(['account_id' => 'Seleccione una cuenta de nivel 3 tipo ' . $expectedType . '.']);
@@ -385,7 +385,7 @@ class PayrollController extends Controller
         if ($employerConcept) {
             $payableQuery = AccountingAccount::whereKey($data['payable_account_id'])
                 ->where('level', 3)->where('type', 'pasivo');
-            if ($tenantId !== null) $payableQuery->where('customer_id', $tenantId);
+            if ($tenantId !== null) $payableQuery->where('company_id', $tenantId);
 
             if (! $payableQuery->exists()) {
                 return back()->withErrors(['payable_account_id' => 'Seleccione una cuenta de pasivo de nivel 3.']);
@@ -430,7 +430,7 @@ class PayrollController extends Controller
     public function exportPeriod(PayrollPeriod $period)
     {
         $tenantId = $this->tenantId();
-        if ($tenantId) abort_unless($period->customer_id === $tenantId, 403);
+        if ($tenantId) abort_unless($period->company_id === $tenantId, 403);
 
         $period->load('lines.employee');
 
@@ -478,7 +478,7 @@ class PayrollController extends Controller
 
         $payableQuery = AccountingAccount::whereKey($data['account_salaries_payable_id'])
             ->where('level', 3)->where('type', 'pasivo');
-        if ($tenantId !== null) $payableQuery->where('customer_id', $tenantId);
+        if ($tenantId !== null) $payableQuery->where('company_id', $tenantId);
 
         if (! $payableQuery->exists()) {
             throw \Illuminate\Validation\ValidationException::withMessages([
@@ -493,18 +493,18 @@ class PayrollController extends Controller
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private function ensureTenantPayrollSetup(?int $customerId): void
+    private function ensureTenantPayrollSetup(?int $companyId): void
     {
-        if ($customerId === null) return;
-        if (! PayrollConcept::customerHasSystemConcepts($customerId)) {
-            PayrollConcept::copySystemConceptsFor($customerId);
+        if ($companyId === null) return;
+        if (! PayrollConcept::companyHasSystemConcepts($companyId)) {
+            PayrollConcept::copySystemConceptsFor($companyId);
         }
     }
 
     private function validateConcept(Request $request, ?int $tenantId): array
     {
         $employeeRule = Rule::exists('employees', 'id');
-        if ($tenantId !== null) $employeeRule->where('customer_id', $tenantId);
+        if ($tenantId !== null) $employeeRule->where('company_id', $tenantId);
 
         $data = $request->validate([
             'name'               => ['required', 'string', 'max:255'],
@@ -538,7 +538,7 @@ class PayrollController extends Controller
         $accountType  = $data['type'] === 'beneficio' ? 'gasto' : 'pasivo';
         $accountQuery = AccountingAccount::whereKey($data['account_id'])
             ->where('level', 3)->where('type', $accountType);
-        if ($tenantId !== null) $accountQuery->where('customer_id', $tenantId);
+        if ($tenantId !== null) $accountQuery->where('company_id', $tenantId);
 
         if (! $accountQuery->exists()) {
             throw \Illuminate\Validation\ValidationException::withMessages([

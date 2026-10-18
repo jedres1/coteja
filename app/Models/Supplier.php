@@ -16,6 +16,7 @@ class Supplier extends Model
 
     protected $fillable = [
         'customer_id',
+        'company_id',
         'created_by',
         'updated_by',
         'name',
@@ -49,6 +50,11 @@ class Supplier extends Model
 
     public function scopeForCustomer(Builder $query, int $customerId): Builder
     {
-        return $query->where('customer_id', $customerId);
+        return $query->where('company_id', $customerId);
+    }
+
+    public function scopeForCompany(Builder $query, int $companyId): Builder
+    {
+        return $query->where('company_id', $companyId);
     }
 }

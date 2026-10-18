@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ProductType extends Model
 {
-    protected $fillable = ['customer_id', 'name', 'code', 'controls_inventory', 'is_active'];
+    protected $fillable = ['customer_id', 'company_id', 'name', 'code', 'controls_inventory', 'is_active'];
 
     protected $casts = [
         'controls_inventory' => 'boolean',
@@ -27,6 +27,11 @@ class ProductType extends Model
 
     public function scopeForCustomer(Builder $query, int $customerId): Builder
     {
-        return $query->where('customer_id', $customerId);
+        return $query->where('company_id', $customerId);
+    }
+
+    public function scopeForCompany(Builder $query, int $companyId): Builder
+    {
+        return $query->where('company_id', $companyId);
     }
 }

@@ -26,13 +26,13 @@ trait HasAccountingTenant
         );
 
         // Inicializar catálogos en la primera visita (orden: cuentas → centros → paquetes)
-        if (!AccountingAccount::customerHasCatalog($id)) {
+        if (!AccountingAccount::companyHasCatalog($id)) {
             AccountingAccount::copyDefaultsFor($id);
         }
-        if (!CostCenter::customerHasCostCenters($id)) {
+        if (!CostCenter::companyHasCostCenters($id)) {
             CostCenter::copyDefaultsFor($id);
         }
-        if (!AccountingPackage::customerHasPackages($id)) {
+        if (!AccountingPackage::companyHasPackages($id)) {
             AccountingPackage::copyDefaultsFor($id);
         }
 

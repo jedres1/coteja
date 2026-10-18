@@ -9,6 +9,7 @@ class PayrollSetting extends Model
 {
     protected $fillable = [
         'customer_id',
+        'company_id',
         'accounting_package_id',
         'account_salaries_id',
         'account_isss_employer_id',
@@ -42,15 +43,15 @@ class PayrollSetting extends Model
         'afp_employer_rate'  => 0.0875,
     ];
 
-    public static function current(?int $customerId = null): static
+    public static function current(?int $companyId = null): static
     {
-        if ($customerId !== null) {
-            return static::firstOrCreate(['customer_id' => $customerId], static::$defaults);
+        if ($companyId !== null) {
+            return static::firstOrCreate(['company_id' => $companyId], static::$defaults);
         }
 
-        $setting = static::whereNull('customer_id')->first();
+        $setting = static::whereNull('company_id')->whereNull('customer_id')->first();
         if (! $setting) {
-            $setting = static::create(array_merge(['customer_id' => null], static::$defaults));
+            $setting = static::create(array_merge(['company_id' => null, 'customer_id' => null], static::$defaults));
         }
         return $setting;
     }

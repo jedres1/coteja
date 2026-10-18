@@ -54,7 +54,7 @@ class BankTransactionController extends Controller
             'notes'           => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $data['customer_id'] = $tenantId;
+        $data['company_id'] = $tenantId;
         BankAccount::create($data);
 
         return back()->with('status', 'Cuenta bancaria creada.');
@@ -63,7 +63,7 @@ class BankTransactionController extends Controller
     public function updateAccount(Request $request, BankAccount $account)
     {
         $tenantId = $this->tenantId();
-        if ($tenantId) abort_unless($account->customer_id === $tenantId, 403);
+        if ($tenantId) abort_unless($account->company_id === $tenantId, 403);
 
         $data = $request->validate([
             'name'           => ['required', 'string', 'max:150'],
@@ -84,7 +84,7 @@ class BankTransactionController extends Controller
     public function destroyAccount(BankAccount $account)
     {
         $tenantId = $this->tenantId();
-        if ($tenantId) abort_unless($account->customer_id === $tenantId, 403);
+        if ($tenantId) abort_unless($account->company_id === $tenantId, 403);
 
         if ($account->bankTransactions()->count() || $account->billingPayments()->count()) {
             return back()->withErrors(['No se puede eliminar: la cuenta tiene transacciones asociadas.']);
@@ -171,7 +171,7 @@ class BankTransactionController extends Controller
         $tenantId = $this->tenantId();
 
         $accountRule = $tenantId
-            ? \Illuminate\Validation\Rule::exists('bank_accounts', 'id')->where('customer_id', $tenantId)
+            ? \Illuminate\Validation\Rule::exists('bank_accounts', 'id')->where('company_id', $tenantId)
             : 'exists:bank_accounts,id';
 
         $data = $request->validate([
@@ -198,7 +198,7 @@ class BankTransactionController extends Controller
             ->where('is_active', true)->orderBy('name')->get();
 
         $reconciliations = BankReconciliation::with('bankAccount')
-            ->when($tenantId, fn ($q) => $q->whereHas('bankAccount', fn ($a) => $a->where('customer_id', $tenantId)))
+            ->when($tenantId, fn ($q) => $q->whereHas('bankAccount', fn ($a) => $a->where('company_id', $tenantId)))
             ->orderByDesc('period_year')->orderByDesc('period_month')->get();
 
         return Inertia::render('Admin/BankTransactions/Reconciliations', compact('bankAccounts', 'reconciliations'));
@@ -209,7 +209,7 @@ class BankTransactionController extends Controller
         $tenantId = $this->tenantId();
 
         $accountRule = $tenantId
-            ? \Illuminate\Validation\Rule::exists('bank_accounts', 'id')->where('customer_id', $tenantId)
+            ? \Illuminate\Validation\Rule::exists('bank_accounts', 'id')->where('company_id', $tenantId)
             : 'exists:bank_accounts,id';
 
         $data = $request->validate([
@@ -240,7 +240,7 @@ class BankTransactionController extends Controller
     {
         $tenantId = $this->tenantId();
         if ($tenantId) {
-            abort_unless($reconciliation->bankAccount?->customer_id === $tenantId, 403);
+            abort_unless($reconciliation->bankAccount?->company_id === $tenantId, 403);
         }
 
         $account = $reconciliation->bankAccount;
@@ -291,7 +291,7 @@ class BankTransactionController extends Controller
     {
         $tenantId = $this->tenantId();
         if ($tenantId) {
-            abort_unless($reconciliation->bankAccount?->customer_id === $tenantId, 403);
+            abort_unless($reconciliation->bankAccount?->company_id === $tenantId, 403);
         }
 
         $request->validate([
@@ -316,7 +316,7 @@ class BankTransactionController extends Controller
     {
         $tenantId = $this->tenantId();
         if ($tenantId) {
-            abort_unless($reconciliation->bankAccount?->customer_id === $tenantId, 403);
+            abort_unless($reconciliation->bankAccount?->company_id === $tenantId, 403);
         }
 
         $request->validate([
@@ -343,7 +343,7 @@ class BankTransactionController extends Controller
     {
         $tenantId = $this->tenantId();
         if ($tenantId) {
-            abort_unless($reconciliation->bankAccount?->customer_id === $tenantId, 403);
+            abort_unless($reconciliation->bankAccount?->company_id === $tenantId, 403);
         }
 
         $reconciliation->update(['status' => 'completado', 'completed_at' => now()]);

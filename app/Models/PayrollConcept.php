@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 class PayrollConcept extends Model
 {
     protected $fillable = [
-        'customer_id', 'name', 'type', 'calculation_method', 'amount', 'rate', 'formula',
+        'customer_id', 'company_id', 'name', 'type', 'calculation_method', 'amount', 'rate', 'formula',
         'account_id', 'payable_account_id', 'system_key', 'applies_to_all', 'is_active',
     ];
 
@@ -43,20 +43,31 @@ class PayrollConcept extends Model
 
     public function scopeForCustomer(Builder $query, int $customerId): Builder
     {
-        return $query->where('customer_id', $customerId);
+        return $query->where('company_id', $customerId);
     }
 
+    public function scopeForCompany(Builder $query, int $companyId): Builder
+    {
+        return $query->where('company_id', $companyId);
+    }
+
+    public static function companyHasSystemConcepts(int $companyId): bool
+    {
+        return static::where('company_id', $companyId)->whereNotNull('system_key')->exists();
+    }
+
+    /** @deprecated Use companyHasSystemConcepts */
     public static function customerHasSystemConcepts(int $customerId): bool
     {
-        return static::where('customer_id', $customerId)->whereNotNull('system_key')->exists();
+        return static::companyHasSystemConcepts($customerId);
     }
 
-    public static function copySystemConceptsFor(int $customerId): void
+    public static function copySystemConceptsFor(int $companyId): void
     {
-        $templates = static::whereNull('customer_id')->whereNotNull('system_key')->get();
+        $templates = static::whereNull('company_id')->whereNull('customer_id')->whereNotNull('system_key')->get();
         foreach ($templates as $template) {
             static::firstOrCreate(
-                ['customer_id' => $customerId, 'system_key' => $template->system_key],
+                ['company_id' => $companyId, 'system_key' => $template->system_key],
                 [
                     'name'               => $template->name,
                     'type'               => $template->type,

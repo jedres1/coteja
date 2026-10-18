@@ -14,24 +14,19 @@ class SaveJournalEntryRequest extends FormRequest
         if (!$user) return null;
 
         $companyId = session('active_company_id');
-        if (!$companyId) return null;
-
-        $company = \App\Models\Company::find($companyId, ['customer_id']);
-        if (!$company) return null;
-
-        return $company->customer_id ? (int) $company->customer_id : -1;
+        return $companyId ? (int) $companyId : null;
     }
 
     public function rules(): array
     {
-        $customerId = $this->resolveCustomerId();
+        $companyId = $this->resolveCustomerId();
 
-        $accountRule = $customerId
-            ? Rule::exists('accounting_accounts', 'id')->where('customer_id', $customerId)
+        $accountRule = $companyId
+            ? Rule::exists('accounting_accounts', 'id')->where('company_id', $companyId)
             : 'exists:accounting_accounts,id';
 
-        $costCenterRule = $customerId
-            ? Rule::exists('cost_centers', 'id')->where('customer_id', $customerId)
+        $costCenterRule = $companyId
+            ? Rule::exists('cost_centers', 'id')->where('company_id', $companyId)
             : 'exists:cost_centers,id';
 
         return [

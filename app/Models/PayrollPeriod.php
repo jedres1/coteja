@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class PayrollPeriod extends Model
 {
     protected $fillable = [
-        'customer_id', 'name', 'period_start', 'period_end', 'status', 'notes',
+        'customer_id', 'company_id', 'name', 'period_start', 'period_end', 'status', 'notes',
         'journal_entry_id', 'applied_at', 'applied_by',
     ];
 
@@ -48,6 +48,11 @@ class PayrollPeriod extends Model
 
     public function scopeForCustomer(Builder $query, int $customerId): Builder
     {
-        return $query->where('customer_id', $customerId);
+        return $query->where('company_id', $customerId);
+    }
+
+    public function scopeForCompany(Builder $query, int $companyId): Builder
+    {
+        return $query->where('company_id', $companyId);
     }
 }
