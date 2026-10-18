@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Backup;
-use App\Models\Customer;
+use App\Models\Company;
 use App\Models\License;
 use App\Models\Payment;
 use Inertia\Inertia;
@@ -14,7 +14,7 @@ class DashboardController extends Controller
     public function __invoke()
     {
         return Inertia::render('Admin/Dashboard', [
-            'customersCount' => Customer::count(),
+            'companiesCount' => Company::count(),
             'activeLicensesCount' => License::where('status', 'active')->count(),
             'expiredLicensesCount' => License::whereDate('expires_at', '<', now())->count(),
             'monthlyRevenue' => Payment::where('status', 'paid')->whereMonth('paid_at', now()->month)->sum('total'),

@@ -19,7 +19,7 @@ function StatCard({ label, value, color = 'blue', sub }) {
     );
 }
 
-export default function Dashboard({ customersCount, activeLicensesCount, expiredLicensesCount, monthlyRevenue, recentLicenses, recentBackups }) {
+export default function Dashboard({ companiesCount, activeLicensesCount, expiredLicensesCount, monthlyRevenue, recentLicenses, recentBackups }) {
     return (
         <AppLayout>
             <Head title="Dashboard" />
@@ -32,7 +32,7 @@ export default function Dashboard({ customersCount, activeLicensesCount, expired
             </div>
 
             <div className="stats-grid" style={{ marginBottom: 24 }}>
-                <StatCard label="Clientes" value={customersCount} color="blue" />
+                <StatCard label="Empresas" value={companiesCount} color="blue" />
                 <StatCard label="Licencias activas" value={activeLicensesCount} color="green" />
                 <StatCard label="Licencias vencidas" value={expiredLicensesCount} color="red" />
                 <StatCard
