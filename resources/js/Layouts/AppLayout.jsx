@@ -208,7 +208,7 @@ export default function AppLayout({ title, children }) {
                         <span className="topbar-name">{user?.name}</span>
                         <span className="topbar-email">{user?.email}</span>
                     </div>
-                    {availableCompanies.length > 1 && (
+                    {availableCompanies.length > 0 && (
                         <TenantSelector
                             activeCompany={activeCompany}
                             availableCompanies={availableCompanies}

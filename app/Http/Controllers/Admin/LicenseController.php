@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\License;
 use App\Models\Plan;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -46,7 +47,23 @@ class LicenseController extends Controller
 
         License::create($data);
 
+        $this->linkUsersToCompany($company);
+
         return back()->with('status', 'Licencia creada.');
+    }
+
+    private function linkUsersToCompany(Company $company): void
+    {
+        $query = User::where('role', 'inquilino')
+            ->where(function ($q) use ($company) {
+                $q->whereNull('customer_id');
+                if ($company->customer_id) {
+                    $q->orWhere('customer_id', $company->customer_id);
+                }
+            });
+
+        $userIds = $query->pluck('id');
+        $company->users()->syncWithoutDetaching($userIds);
     }
 
     public function update(Request $request, License $license)
