@@ -4,6 +4,7 @@ import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
 import Modal from '@/Components/Modal';
+import { IconEye } from '@/Components/Icons';
 
 // ─── DteDetailView ────────────────────────────────────────────────────────────
 
@@ -456,11 +457,11 @@ export default function PendingApproval({ invoices, total, showAll }) {
                                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                                         <button
                                             type="button"
-                                            className="btn btn-sm secondary"
-                                            style={{ fontSize: 12, padding: '4px 8px' }}
+                                            className="btn secondary btn-icon"
+                                            title="Ver"
                                             onClick={() => setViewItem(invoice)}
                                         >
-                                            Ver
+                                            <IconEye />
                                         </button>
                                         {invoice.status === 'pending' && (
                                             <>

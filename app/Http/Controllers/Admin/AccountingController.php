@@ -764,7 +764,11 @@ class AccountingController extends Controller
 
     public function reportesFiscales(Request $request)
     {
-        $companyId = $this->requireTenant();
+        $companyId = $this->tenantId();
+        if ($companyId === null) {
+            return redirect()->route('admin.dashboard')
+                ->with('error', 'Seleccione una empresa activa para ver los reportes fiscales.');
+        }
         $year  = (int) $request->query('year',  now()->year);
         $month = (int) $request->query('month', now()->month);
 
@@ -792,7 +796,11 @@ class AccountingController extends Controller
 
     public function exportLibroVentas(Request $request)
     {
-        $companyId = $this->requireTenant();
+        $companyId = $this->tenantId();
+        if ($companyId === null) {
+            return redirect()->route('admin.dashboard')
+                ->with('error', 'Seleccione una empresa activa para exportar el libro de ventas.');
+        }
         $year  = (int) $request->query('year',  now()->year);
         $month = (int) $request->query('month', now()->month);
 
@@ -825,7 +833,11 @@ class AccountingController extends Controller
 
     public function exportLibroCompras(Request $request)
     {
-        $companyId = $this->requireTenant();
+        $companyId = $this->tenantId();
+        if ($companyId === null) {
+            return redirect()->route('admin.dashboard')
+                ->with('error', 'Seleccione una empresa activa para exportar el libro de compras.');
+        }
         $year  = (int) $request->query('year',  now()->year);
         $month = (int) $request->query('month', now()->month);
 

@@ -4,7 +4,7 @@ import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
 import Modal from '@/Components/Modal';
-import { IconTrash } from '@/Components/Icons';
+import { IconEye, IconTrash } from '@/Components/Icons';
 
 const DOC_LABELS = {
     ccf: 'CCF',
@@ -534,11 +534,11 @@ export default function PurchaseInvoicesIndex({ invoices, search, supplierId, su
                                     <div style={{ display: 'flex', gap: 6 }}>
                                         <button
                                             type="button"
-                                            className="btn secondary"
-                                            style={{ fontSize: 12, padding: '3px 10px' }}
+                                            className="btn secondary btn-icon"
+                                            title="Ver"
                                             onClick={() => setViewItem(inv)}
                                         >
-                                            Ver
+                                            <IconEye />
                                         </button>
                                         <button
                                             type="button"

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Head, useForm, Link } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
+import { IconEye } from '@/Components/Icons';
 
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
@@ -174,10 +175,10 @@ export default function Reconciliations({ reconciliations, bankAccounts }) {
                                 <td>
                                     <Link
                                         href={route('admin.bank-transactions.reconciliations.show', r.id)}
-                                        className="btn secondary"
-                                        style={{ fontSize: 12, padding: '3px 10px' }}
+                                        className="btn secondary btn-icon"
+                                        title="Ver detalle"
                                     >
-                                        Ver detalle
+                                        <IconEye />
                                     </Link>
                                 </td>
                             </tr>

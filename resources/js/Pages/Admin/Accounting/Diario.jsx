@@ -3,7 +3,7 @@ import { Head, router, Link } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
-import { IconTrash } from '@/Components/Icons';
+import { IconEye, IconTrash } from '@/Components/Icons';
 
 const fmt = (x) => Number(x ?? 0).toLocaleString('es-SV', { minimumFractionDigits: 2 });
 
@@ -134,10 +134,10 @@ export default function Diario({ entries, stats, search, status, from, to }) {
                                     <div style={{ display: 'flex', gap: 6 }}>
                                         <Link
                                             href={route('admin.accounting.diario.show', entry.id)}
-                                            className="btn secondary"
-                                            style={{ fontSize: 12, padding: '3px 10px' }}
+                                            className="btn secondary btn-icon"
+                                            title="Ver"
                                         >
-                                            Ver
+                                            <IconEye />
                                         </Link>
                                         {entry.status === 'borrador' && (
                                             <>

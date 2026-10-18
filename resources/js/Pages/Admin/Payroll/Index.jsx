@@ -3,7 +3,7 @@ import { Head, useForm, router } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
-import { IconEdit, IconTrash } from '@/Components/Icons';
+import { IconEdit, IconEye, IconTrash } from '@/Components/Icons';
 
 const fmt = (x) => Number(x).toLocaleString('es-SV', { minimumFractionDigits: 2 });
 
@@ -423,10 +423,11 @@ export default function PayrollIndex({ employees, periods, activeTab }) {
                                             <td>
                                                 <a
                                                     href={route('admin.payroll.periods.show', period.id)}
-                                                    className="btn secondary"
-                                                    style={{ fontSize: 12, padding: '3px 10px', textDecoration: 'none', display: 'inline-block' }}
+                                                    className="btn secondary btn-icon"
+                                                    title="Ver período"
+                                                    style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
                                                 >
-                                                    Ver
+                                                    <IconEye />
                                                 </a>
                                             </td>
                                         </tr>

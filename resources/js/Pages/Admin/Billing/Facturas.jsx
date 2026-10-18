@@ -4,6 +4,7 @@ import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
 import Modal from '@/Components/Modal';
+import { IconEye } from '@/Components/Icons';
 
 const DTE_TYPES = [
     { code: '01', label: 'Factura' },
@@ -829,11 +830,11 @@ export default function Facturas({ stats, invoices, filters, contingenciaInvoice
                                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                                         <button
                                             type="button"
-                                            className="btn secondary"
-                                            style={{ fontSize: 11, padding: '2px 8px' }}
+                                            className="btn secondary btn-icon"
+                                            title="Ver"
                                             onClick={() => setDetailInv(inv)}
                                         >
-                                            Ver
+                                            <IconEye />
                                         </button>
                                         {['FIRMADO', 'PENDIENTE'].includes(inv.status) && (
                                             <button
