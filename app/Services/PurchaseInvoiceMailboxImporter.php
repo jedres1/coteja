@@ -30,7 +30,7 @@ class PurchaseInvoiceMailboxImporter
         ];
     }
 
-    public function import(?string $from = null, ?string $to = null, ?int $customerId = null): array
+    public function import(?string $from = null, ?string $to = null, ?int $companyId = null): array
     {
         $config = $this->resolveConfig();
 
@@ -83,7 +83,7 @@ class PurchaseInvoiceMailboxImporter
                     $messageProcessed = false;
 
                     foreach ($jsonAttachments as $attachment) {
-                        $result = $this->importJson($attachment['content'], $attachment['filename'], $uid, $summary, $customerId);
+                        $result = $this->importJson($attachment['content'], $attachment['filename'], $uid, $summary, $companyId);
                         $summary[$result]++;
                         $messageProcessed = $messageProcessed || in_array($result, ['imported', 'duplicates'], true);
                     }
@@ -180,14 +180,14 @@ class PurchaseInvoiceMailboxImporter
         return $details;
     }
 
-    public function hasDuplicateInvoice(int|string|null $supplierId, string $invoiceNumber, ?string $codigoGeneracion = null, ?int $customerId = null): bool
+    public function hasDuplicateInvoice(int|string|null $supplierId, string $invoiceNumber, ?string $codigoGeneracion = null, ?int $companyId = null): bool
     {
         if ($supplierId === null && blank($codigoGeneracion)) {
             return false;
         }
 
         return PurchaseInvoice::query()
-            ->when($customerId !== null, fn ($q) => $q->where('customer_id', $customerId))
+            ->when($companyId !== null, fn ($q) => $q->where('company_id', $companyId))
             ->where(function ($query) use ($supplierId, $invoiceNumber, $codigoGeneracion) {
                 if ($supplierId !== null) {
                     $query->where(function ($query) use ($supplierId, $invoiceNumber) {
@@ -253,7 +253,7 @@ class PurchaseInvoiceMailboxImporter
         }
     }
 
-    private function importJson(string $content, string $filename, string $uid, array &$summary, ?int $customerId = null): string
+    private function importJson(string $content, string $filename, string $uid, array &$summary, ?int $companyId = null): string
     {
         $data = json_decode($this->cleanJsonContent($content), true, 512, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE);
         $identification = $data['identificacion'] ?? [];
@@ -269,7 +269,7 @@ class PurchaseInvoiceMailboxImporter
             throw new RuntimeException("El adjunto {$filename} no contiene identificacion.numeroControl o emisor.nombre.");
         }
 
-        if ($this->hasDuplicateInvoice(null, $invoiceNumber, $codigoGeneracion, $customerId)) {
+        if ($this->hasDuplicateInvoice(null, $invoiceNumber, $codigoGeneracion, $companyId)) {
             $summary['details'][] = [
                 'filename' => $filename,
                 'supplier' => $supplierName,
@@ -282,10 +282,10 @@ class PurchaseInvoiceMailboxImporter
             return 'duplicates';
         }
 
-        return DB::transaction(function () use ($data, $identification, $issuer, $summary_data, $invoiceNumber, $numeroControl, $codigoGeneracion, $supplierName, $filename, $uid, &$summary, $customerId) {
-            $supplier = $this->supplierFromIssuer($issuer, $customerId);
+        return DB::transaction(function () use ($data, $identification, $issuer, $summary_data, $invoiceNumber, $numeroControl, $codigoGeneracion, $supplierName, $filename, $uid, &$summary, $companyId) {
+            $supplier = $this->supplierFromIssuer($issuer, $companyId);
 
-            if ($this->hasDuplicateInvoice($supplier->id, $invoiceNumber, $codigoGeneracion, $customerId)) {
+            if ($this->hasDuplicateInvoice($supplier->id, $invoiceNumber, $codigoGeneracion, $companyId)) {
                 $summary['details'][] = [
                     'filename' => $filename,
                     'supplier' => $supplierName,
@@ -300,7 +300,7 @@ class PurchaseInvoiceMailboxImporter
             try {
                 PurchaseInvoice::create([
                     'supplier_id' => $supplier->id,
-                    'customer_id' => $customerId,
+                    'company_id' => $companyId,
                     'document_type' => $this->documentType($identification['tipoDte'] ?? null),
                     'invoice_number' => $invoiceNumber,
                     'purchase_date' => $identification['fecEmi'] ?? now()->toDateString(),
@@ -358,24 +358,24 @@ class PurchaseInvoiceMailboxImporter
             || str_contains($message, 'duplicate');
     }
 
-    private function supplierFromIssuer(array $issuer, ?int $customerId = null): Supplier
+    private function supplierFromIssuer(array $issuer, ?int $companyId = null): Supplier
     {
         $documentNumber = $issuer['nit'] ?? $issuer['numDocumento'] ?? $issuer['nrc'] ?? null;
 
         $supplier = null;
 
         if (! blank($documentNumber)) {
-            $supplier = Supplier::when($customerId, fn ($q) => $q->where('customer_id', $customerId))
+            $supplier = Supplier::when($companyId, fn ($q) => $q->where('company_id', $companyId))
                 ->where('document_number', $documentNumber)->first();
         } elseif (! blank($issuer['correo'] ?? null)) {
-            $supplier = Supplier::when($customerId, fn ($q) => $q->where('customer_id', $customerId))
+            $supplier = Supplier::when($companyId, fn ($q) => $q->where('company_id', $companyId))
                 ->where('email', $issuer['correo'])->first();
         }
 
         $address = $issuer['direccion'] ?? [];
 
         $attributes = [
-            'customer_id' => $customerId,
+            'company_id' => $companyId,
             'name' => $issuer['nombre'] ?? 'Proveedor sin nombre',
             'email' => $issuer['correo'] ?? null,
             'phone' => $issuer['telefono'] ?? null,
@@ -395,7 +395,7 @@ class PurchaseInvoiceMailboxImporter
 
         if ($supplier) {
             $updateData = array_filter($attributes, fn ($value) => ! blank($value));
-            unset($updateData['customer_id']);
+            unset($updateData['company_id']);
             $supplier->fill($updateData);
             $supplier->save();
 
