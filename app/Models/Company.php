@@ -44,6 +44,17 @@ class Company extends Model
         return $this->hasMany(License::class);
     }
 
+    public function activeLicense()
+    {
+        return $this->hasOne(License::class)
+            ->where('status', 'active')
+            ->where(function ($q) {
+                $q->whereNull('expires_at')
+                  ->orWhere('expires_at', '>=', now()->toDateString());
+            })
+            ->latest('starts_at');
+    }
+
     public function latestLicense()
     {
         return $this->hasOne(License::class)->latest();

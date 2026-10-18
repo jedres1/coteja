@@ -262,19 +262,20 @@ function CompanyForm({ company, modules, onSuccess }) {
     );
 }
 
-function LicenseForm({ company, plans, onSuccess, onCancel }) {
+function LicenseForm({ company, plans, initialLicense, onSuccess, onCancel }) {
     const today = new Date().toISOString().substring(0, 10);
+    const isRenewal = !!initialLicense;
 
     const form = useForm({
         company_id:   company.id,
-        plan_id:      '',
-        license_type: 'mensual',
+        plan_id:      initialLicense?.plan_id  ?? '',
+        license_type: initialLicense?.license_type ?? 'mensual',
         status:       'active',
         starts_at:    today,
         expires_at:   '',
-        max_users:    1,
-        max_devices:  1,
-        grace_days:   0,
+        max_users:    initialLicense?.max_users   ?? 1,
+        max_devices:  initialLicense?.max_devices ?? 1,
+        grace_days:   initialLicense?.grace_days  ?? 0,
     });
 
     const isPropietario = form.data.license_type === 'propietario';
@@ -286,9 +287,11 @@ function LicenseForm({ company, plans, onSuccess, onCancel }) {
 
     return (
         <form onSubmit={handleSubmit}>
-            <div style={{ marginBottom: 12, padding: '8px 12px', background: '#f0f9ff', borderRadius: 6, fontSize: 13, color: '#0369a1' }}>
-                Empresa: <strong>{company.business_name}</strong>
-            </div>
+            {isRenewal && (
+                <div style={{ marginBottom: 12, padding: '8px 12px', background: '#fefce8', borderRadius: 6, fontSize: 13, color: '#854d0e' }}>
+                    La licencia activa actual quedará como <strong>vencida</strong> y se creará una nueva.
+                </div>
+            )}
 
             <div className="form-grid">
                 <label className="full-width">
@@ -317,19 +320,6 @@ function LicenseForm({ company, plans, onSuccess, onCancel }) {
                         ))}
                     </select>
                     {form.errors.license_type && <p className="field-error">{form.errors.license_type}</p>}
-                </label>
-
-                <label>
-                    Estado
-                    <select
-                        value={form.data.status}
-                        onChange={(e) => form.setData('status', e.target.value)}
-                    >
-                        {Object.entries(licenseStatuses).map(([k, v]) => (
-                            <option key={k} value={k}>{v.label}</option>
-                        ))}
-                    </select>
-                    {form.errors.status && <p className="field-error">{form.errors.status}</p>}
                 </label>
 
                 <label>
@@ -392,10 +382,61 @@ function LicenseForm({ company, plans, onSuccess, onCancel }) {
             <div className="form-actions" style={{ marginTop: 20 }}>
                 <button type="button" className="btn secondary" onClick={onCancel}>Cancelar</button>
                 <button type="submit" className="btn" disabled={form.processing}>
-                    {form.processing ? 'Guardando…' : 'Asignar licencia'}
+                    {form.processing ? 'Guardando…' : isRenewal ? 'Renovar licencia' : 'Asignar licencia'}
                 </button>
             </div>
         </form>
+    );
+}
+
+function LicenseHistory({ licenses }) {
+    if (!licenses?.length) return null;
+
+    return (
+        <div style={{ marginTop: 24, borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
+            <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 600, color: '#374151' }}>
+                Historial de licencias
+            </p>
+            <div style={{ overflowX: 'auto' }}>
+                <table className="data-table" style={{ fontSize: 12 }}>
+                    <thead>
+                        <tr>
+                            <th>Tipo</th>
+                            <th>Plan</th>
+                            <th>Inicio</th>
+                            <th>Vencimiento</th>
+                            <th>Estado</th>
+                            <th>Clave</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {licenses.map((l) => {
+                            const st = licenseStatuses[l.status] ?? { label: l.status, bg: '#f3f4f6', color: '#374151' };
+                            return (
+                                <tr key={l.id}>
+                                    <td>{licenseTypes[l.license_type] ?? l.license_type}</td>
+                                    <td>{l.plan?.name ?? '—'}</td>
+                                    <td>{l.starts_at?.substring(0, 10) ?? '—'}</td>
+                                    <td>{l.expires_at?.substring(0, 10) ?? '—'}</td>
+                                    <td>
+                                        <span style={{
+                                            fontSize: 11, fontWeight: 600,
+                                            padding: '1px 6px', borderRadius: 8,
+                                            background: st.bg, color: st.color,
+                                        }}>
+                                            {st.label}
+                                        </span>
+                                    </td>
+                                    <td style={{ fontFamily: 'monospace', fontSize: 11, color: '#6b7280' }}>
+                                        {l.license_key}
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     );
 }
 
@@ -496,7 +537,7 @@ export default function CompaniesIndex({ companies, modules, plans }) {
                                     }
                                 </td>
                                 <td>
-                                    <LicenseBadge license={company.latest_license} />
+                                    <LicenseBadge license={company.active_license} />
                                 </td>
                                 <td>
                                     <span className={`badge ${company.environment}`}>
@@ -512,7 +553,7 @@ export default function CompaniesIndex({ companies, modules, plans }) {
                                             className="btn btn-sm secondary"
                                             onClick={() => setLicenseCompany(company)}
                                         >
-                                            + Licencia
+                                            {company.active_license ? 'Renovar' : '+ Licencia'}
                                         </button>
                                     </div>
                                 </td>
@@ -544,15 +585,19 @@ export default function CompaniesIndex({ companies, modules, plans }) {
 
             {licenseCompany && (
                 <Modal
-                    title={`Asignar licencia — ${licenseCompany.business_name}`}
+                    title={licenseCompany.active_license
+                        ? `Renovar licencia — ${licenseCompany.business_name}`
+                        : `Asignar licencia — ${licenseCompany.business_name}`}
                     onClose={() => setLicenseCompany(null)}
                 >
                     <LicenseForm
                         company={licenseCompany}
                         plans={plans}
+                        initialLicense={licenseCompany.active_license ?? null}
                         onSuccess={() => setLicenseCompany(null)}
                         onCancel={() => setLicenseCompany(null)}
                     />
+                    <LicenseHistory licenses={licenseCompany.licenses} />
                 </Modal>
             )}
         </AppLayout>

@@ -22,7 +22,7 @@ class CompanyController extends Controller
     public function index()
     {
         return Inertia::render('Admin/Companies/Index', [
-            'companies' => Company::with('latestLicense.plan')->latest()->paginate(15),
+            'companies' => Company::with(['activeLicense.plan', 'licenses.plan'])->latest()->paginate(15),
             'plans'     => Plan::where('is_active', true)->orderBy('name')->get(),
             'modules'   => self::MODULES,
         ]);

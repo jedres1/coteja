@@ -45,6 +45,10 @@ class LicenseController extends Controller
 
         $data['license_key'] = 'COT-' . strtoupper(Str::random(4)) . '-' . strtoupper(Str::random(4)) . '-' . strtoupper(Str::random(4));
 
+        License::where('company_id', $data['company_id'])
+            ->where('status', 'active')
+            ->update(['status' => 'expired']);
+
         License::create($data);
 
         $this->linkUsersToCompany($company);
