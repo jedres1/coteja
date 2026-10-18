@@ -138,14 +138,14 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
     const [saving, setSaving]           = useState(false);
     const [activities, setActivities]   = useState([]);
     const [geo, setGeo]                 = useState({ departamentos: [] });
-    const [testMsg, setTestMsg]         = useState(null);
     const [toast, setToast]             = useState(null);
+    const [testingHacienda, setTestingHacienda] = useState(false);
+    const [testingSigner, setTestingSigner] = useState(false);
 
     function showToast(msg, ok = true) {
         setToast({ msg, ok });
         setTimeout(() => setToast(null), 3500);
     }
-    const [testOk, setTestOk]         = useState(null);
     const logoInputRef                = useRef(null);
     const certInputRef                = useRef(null);
 
@@ -170,6 +170,28 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
     function setCorrelativo(code, value) {
         form.setData('correlativos', { ...form.data.correlativos, [code]: Number(value) || 1 });
     }
+
+    function csrfHeaders(json = false) {
+        const xsrfCookie = document.cookie
+            .split('; ')
+            .find((cookie) => cookie.startsWith('XSRF-TOKEN='))
+            ?.slice('XSRF-TOKEN='.length);
+        const headers = {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        };
+
+        if (json) headers['Content-Type'] = 'application/json';
+
+        if (xsrfCookie) {
+            headers['X-XSRF-TOKEN'] = decodeURIComponent(xsrfCookie);
+        } else {
+            headers['X-CSRF-TOKEN'] = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+        }
+
+        return headers;
+    }
+
     function toggleDoc(code) {
         const current = form.data.documentos;
         form.setData('documentos', current.includes(code) ? current.filter((c) => c !== code) : [...current, code]);
@@ -196,9 +218,12 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
         if (!file) return;
         const fd = new FormData();
         fd.append('logo', file);
-        fd.append('_token', document.querySelector('meta[name="csrf-token"]')?.content ?? '');
         try {
-            const res = await fetch(route('admin.factura-sv.logo.subir'), { method: 'POST', body: fd });
+            const res = await fetch(route('admin.factura-sv.logo.subir'), {
+                method: 'POST',
+                headers: csrfHeaders(),
+                body: fd,
+            });
             const data = await res.json();
             if (data.path) setE('logo_path', data.path);
         } catch { /* ignore */ }
@@ -209,9 +234,12 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
         if (!file) return;
         const fd = new FormData();
         fd.append('certificado', file);
-        fd.append('_token', document.querySelector('meta[name="csrf-token"]')?.content ?? '');
         try {
-            const res = await fetch(route('admin.factura-sv.certificado.subir'), { method: 'POST', body: fd });
+            const res = await fetch(route('admin.factura-sv.certificado.subir'), {
+                method: 'POST',
+                headers: csrfHeaders(),
+                body: fd,
+            });
             const data = await res.json();
             if (data.path) setF('certificado_path', data.path);
         } catch { /* ignore */ }
@@ -219,49 +247,92 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
 
     // Test signer
     async function testSigner() {
-        setTestMsg(null);
+        if (form.data.firma.tipo === 'local'
+            && (!form.data.firma.certificado_path || !form.data.firma.password)) {
+            showToast('Selecciona el certificado y escribe su contraseña.', false);
+            return;
+        }
+
+        if (form.data.firma.tipo !== 'local' && !form.data.firma.firmadorUrl.trim()) {
+            showToast('Ingresa la URL del firmador local.', false);
+            return;
+        }
+
+        setTestingSigner(true);
         try {
-            const token = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
             const res = await fetch(route('admin.factura-sv.firmador.estado'), {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token },
+                headers: csrfHeaders(true),
                 body: JSON.stringify({
+                    tipo: form.data.firma.tipo,
+                    firmadorUrl: form.data.firma.firmadorUrl.trim(),
                     certificadoPath: form.data.firma.certificado_path,
                     nit: form.data.firma.firmadorUsuario,
                     passwordPri: form.data.firma.password,
                 }),
             });
-            const data = await res.json();
-            setTestOk(data.success ?? false);
-            setTestMsg(data.message ?? JSON.stringify(data));
+            const contentType = res.headers.get('content-type') ?? '';
+            const data = contentType.includes('application/json') ? await res.json() : null;
+
+            if (!data) {
+                throw new Error(res.status === 419
+                    ? 'La sesión expiró. Recarga la página e inténtalo de nuevo.'
+                    : `El servidor respondió con un formato inesperado (HTTP ${res.status}).`);
+            }
+
+            if (!res.ok || !data.success) {
+                showToast(data.message ?? data.error ?? 'No se pudo validar el firmador.', false);
+                return;
+            }
+
+            showToast(data.message ?? 'Firmador local disponible.');
         } catch (err) {
-            setTestOk(false);
-            setTestMsg('Error: ' + err.message);
+            showToast(err.message || 'No se pudo validar el firmador.', false);
+        } finally {
+            setTestingSigner(false);
         }
     }
 
     // Test Hacienda
     async function testHacienda() {
-        setTestMsg(null);
+        const { ambiente, usuario, password } = form.data.hacienda;
+        if (!usuario.trim() || !password) {
+            showToast('Ingresa el usuario y la contraseña de Hacienda.', false);
+            return;
+        }
+
+        setTestingHacienda(true);
         try {
-            const token = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
             const res = await fetch(route('admin.factura-sv.autenticar'), {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token },
+                headers: csrfHeaders(true),
                 body: JSON.stringify({
                     config: {
-                        ambiente: form.data.hacienda.ambiente,
-                        usuario: form.data.hacienda.usuario,
-                        password: form.data.hacienda.password,
+                        ambiente,
+                        usuario: usuario.trim(),
+                        password,
                     },
                 }),
             });
-            const data = await res.json();
-            setTestOk(data.success ?? false);
-            setTestMsg(data.message ?? JSON.stringify(data));
+            const contentType = res.headers.get('content-type') ?? '';
+            const data = contentType.includes('application/json') ? await res.json() : null;
+
+            if (!data) {
+                throw new Error(res.status === 419
+                    ? 'La sesión expiró. Recarga la página e inténtalo de nuevo.'
+                    : `El servidor respondió con un formato inesperado (HTTP ${res.status}).`);
+            }
+
+            if (!res.ok || !data.success) {
+                showToast(data.message ?? data.error ?? 'Hacienda rechazó la autenticación.', false);
+                return;
+            }
+
+            showToast(data.message ?? 'Conexión con Hacienda establecida y credenciales autenticadas.');
         } catch (err) {
-            setTestOk(false);
-            setTestMsg('Error: ' + err.message);
+            showToast(err.message || 'No se pudo conectar con Hacienda.', false);
+        } finally {
+            setTestingHacienda(false);
         }
     }
 
@@ -680,20 +751,13 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
                     </div>
                 </div>
 
-                {/* Test result */}
-                {testMsg && (
-                    <div style={{ marginBottom: 12, padding: '8px 14px', borderRadius: 6, background: testOk ? '#f0fdf4' : '#fef2f2', color: testOk ? '#15803d' : '#dc2626', fontSize: 13, border: `1px solid ${testOk ? '#bbf7d0' : '#fca5a5'}` }}>
-                        {testMsg}
-                    </div>
-                )}
-
                 {/* Actions */}
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                    <button type="button" className="btn secondary" disabled={disabled} onClick={testSigner}>
-                        Probar firmador local
+                    <button type="button" className="btn secondary" disabled={disabled || testingSigner} onClick={testSigner}>
+                        {testingSigner ? 'Probando firmador…' : 'Probar firmador local'}
                     </button>
-                    <button type="button" className="btn secondary" disabled={disabled} onClick={testHacienda}>
-                        Probar Hacienda
+                    <button type="button" className="btn secondary" disabled={disabled || testingHacienda} onClick={testHacienda}>
+                        {testingHacienda ? 'Probando Hacienda…' : 'Probar Hacienda'}
                     </button>
                     <button type="submit" className="btn" disabled={disabled || saving}>
                         {saving ? 'Guardando…' : 'Guardar Configuración'}

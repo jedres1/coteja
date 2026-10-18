@@ -55,9 +55,25 @@ class HaciendaAPI {
 
       throw new Error('No se recibió token de autenticación');
     } catch (error) {
-      const errorMsg = error.response?.data?.mensaje || error.response?.data?.body?.mensaje || error.message;
+      const status = error.response?.status;
+      let errorMsg = error.response?.data?.mensaje
+        || error.response?.data?.body?.mensaje
+        || error.response?.data?.message;
+
+      if (status === 500) {
+        errorMsg = 'Hacienda respondió con error interno (HTTP 500). La conexión llegó al servicio, pero Hacienda no pudo procesar la autenticación. Intenta nuevamente más tarde.';
+      } else if (status === 401 || status === 403) {
+        errorMsg = 'Hacienda rechazó la autenticación. Verifica el usuario, la contraseña y el ambiente seleccionado.';
+      } else if (status === 503) {
+        errorMsg = 'El servicio de Hacienda no está disponible temporalmente. Intenta nuevamente más tarde.';
+      } else if (!status && error.code) {
+        errorMsg = `No se pudo establecer conexión con Hacienda (${error.code}). Verifica la conexión a internet del servidor.`;
+      }
+
+      errorMsg = errorMsg || error.message;
       const authError = new Error(`Error en autenticación: ${errorMsg}`);
       authError.code = error.code;
+      authError.status = status;
       authError.response = error.response;
       authError.originalError = error;
       throw authError;

@@ -24,9 +24,12 @@ use App\Services\Billing\InvoiceVoidService;
 use App\Services\DteEngine;
 use App\Models\BankAccount;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 
 class FacturaElectronicaSVController extends Controller
@@ -1007,24 +1010,130 @@ class FacturaElectronicaSVController extends Controller
 
     public function estadoFirmador(Request $request)
     {
-        $data = $request->validate([
-            'certificadoPath' => 'required|string',
-            'nit'             => 'required|string',
-            'passwordPri'     => 'required|string',
+        $validator = Validator::make($request->all(), [
+            'tipo'             => ['required', 'in:svfe,web,local'],
+            'firmadorUrl'      => ['required_if:tipo,svfe,web', 'nullable', 'url'],
+            'certificadoPath'  => ['required_if:tipo,local', 'nullable', 'string'],
+            'nit'              => ['nullable', 'string'],
+            'passwordPri'      => ['required_if:tipo,local', 'nullable', 'string'],
         ]);
 
-        return response()->json($this->engine->validateCertificate(
-            $data['nit'],
-            $data['passwordPri'],
-            $data['certificadoPath'],
-        ));
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => $validator->errors()->first(),
+            ], 422);
+        }
+
+        $data = $validator->validated();
+
+        if ($data['tipo'] !== 'local') {
+            $url = rtrim($data['firmadorUrl'], '/');
+            $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+
+            if (! in_array($host, ['localhost', '127.0.0.1', '::1'], true)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'La URL del firmador debe apuntar a este equipo (localhost).',
+                ], 422);
+            }
+
+            try {
+                $response = Http::acceptJson()->timeout(5)->get($url.'/firmardocumento/status');
+            } catch (ConnectionException $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se pudo conectar con el firmador local. Verifica que el servicio esté iniciado y que la URL y el puerto sean correctos.',
+                ], 502);
+            } catch (\Throwable $e) {
+                report($e);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ocurrió un error al consultar el firmador local.',
+                ], 502);
+            }
+
+            if (! $response->successful()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "El firmador respondió HTTP {$response->status()} en su ruta de estado.",
+                ], 502);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Conexión con el firmador local establecida.',
+            ]);
+        }
+
+        try {
+            $result = $this->engine->validateCertificate(
+                $data['nit'] ?? '',
+                $data['passwordPri'],
+                $data['certificadoPath'],
+            );
+
+            if (! ($result['valido'] ?? $result['success'] ?? false)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $result['error'] ?? 'El certificado no pudo validarse.',
+                ], 422);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'El certificado local es válido.',
+                'info' => $result['info'] ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'No se pudo validar el certificado. Comprueba la ruta, el formato y la contraseña.',
+            ], 422);
+        }
     }
 
     public function autenticar(Request $request)
     {
-        $data = $request->validate(['config' => 'required|array']);
+        $validator = Validator::make($request->all(), [
+            'config'           => ['required', 'array'],
+            'config.ambiente'  => ['required', 'in:00,01'],
+            'config.usuario'   => ['required', 'string'],
+            'config.password'  => ['required', 'string'],
+        ]);
 
-        return response()->json($this->engine->authenticate($data['config']));
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => $validator->errors()->first(),
+            ], 422);
+        }
+
+        try {
+            $result = $this->engine->authenticate($validator->validated()['config']);
+
+            if (! ($result['success'] ?? false)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $result['error'] ?? 'Hacienda no pudo autenticar las credenciales.',
+                ], 422);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Conexión con Hacienda establecida y credenciales autenticadas.',
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'No se pudo conectar con Hacienda. Verifica la conexión del servidor e inténtalo de nuevo.',
+            ], 502);
+        }
     }
 
     public function subirLogo(Request $request)

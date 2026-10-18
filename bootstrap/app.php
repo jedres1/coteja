@@ -36,7 +36,22 @@ return Application::configure(basePath: dirname(__DIR__))
         });
 
         $exceptions->render(function (\Throwable $e, $request) {
+            if ($request->routeIs('admin.factura-sv.autenticar', 'admin.factura-sv.firmador.estado')
+                && $e instanceof \Illuminate\Session\TokenMismatchException) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'La sesión expiró. Recarga la página e inténtalo de nuevo.',
+                ], 419);
+            }
+
             if ($request->expectsJson()) {
+                if ($request->routeIs('admin.factura-sv.autenticar', 'admin.factura-sv.firmador.estado')) {
+                    \Illuminate\Support\Facades\Log::error('Fallo inesperado en prueba de integración de facturación.', [
+                        'user_id' => $request->user()?->id,
+                        'exception' => $e,
+                    ]);
+                }
+
                 $status = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500;
                 return response()->json(['message' => 'Error interno del servidor.'], $status);
             }
