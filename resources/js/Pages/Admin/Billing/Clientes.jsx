@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useForm, router, usePage } from '@inertiajs/react';
+import { useState, useEffect } from 'react';
+import { useForm, router } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Modal from '@/Components/Modal';
@@ -10,16 +10,22 @@ const DTE_LABEL = {
     '07': 'Retención', '11': 'Exportación', '14': 'Sujeto Excluido',
 };
 
-const EMPTY_CLIENT = {
-    id: null, name: '', trade_name: '', document_type: '',
-    document_number: '', nrc: '', business_activity: '', activity_description: '',
-    email: '', phone: '', billing_email: '', billing_phone: '',
-    address_department: '', address_municipality: '', address: '',
-    preferred_dte_type: '01',
-};
-
 function ClientForm({ client, onSuccess, onCancel }) {
     const isEdit = !!client?.id;
+
+    const [activities, setActivities] = useState([]);
+    const [geography, setGeography]   = useState(null);
+
+    useEffect(() => {
+        fetch('/catalogs/actividades-economicas.json')
+            .then((r) => r.json())
+            .then((d) => setActivities(Array.isArray(d) ? d : []))
+            .catch(() => {});
+        fetch('/catalogs/division-geografica.json')
+            .then((r) => r.json())
+            .then((d) => setGeography(d ?? null))
+            .catch(() => {});
+    }, []);
 
     const { data, setData, post, processing, errors } = useForm({
         id:                    client?.id ?? null,
@@ -29,7 +35,6 @@ function ClientForm({ client, onSuccess, onCancel }) {
         document_number:       client?.documentNumber ?? '',
         nrc:                   client?.nrc ?? '',
         business_activity:     client?.businessActivity ?? '',
-        activity_description:  client?.activityDescription ?? '',
         email:                 client?.email ?? '',
         phone:                 client?.phone ?? '',
         billing_email:         client?.billingEmail ?? '',
@@ -39,6 +44,13 @@ function ClientForm({ client, onSuccess, onCancel }) {
         address:               client?.address ?? '',
         preferred_dte_type:    client?.preferredDteType ?? '01',
     });
+
+    const depts     = geography?.departamentos ?? [];
+    const munis     = data.address_department   ? (geography?.municipios?.[data.address_department]   ?? []) : [];
+
+    function handleDeptChange(e) {
+        setData({ ...data, address_department: e.target.value, address_municipality: '' });
+    }
 
     function handleSubmit(e) {
         e.preventDefault();
@@ -84,16 +96,53 @@ function ClientForm({ client, onSuccess, onCancel }) {
                     {errors.nrc && <p className="field-error">{errors.nrc}</p>}
                 </label>
 
-                <label>
-                    Código Actividad Económica
-                    <input value={data.business_activity} onChange={(e) => setData('business_activity', e.target.value)} placeholder="Ej: 47191" />
+                <label className="full-width">
+                    Actividad económica
+                    <input
+                        type="text"
+                        value={data.business_activity}
+                        onChange={(e) => setData('business_activity', e.target.value)}
+                        list="billing-client-activities-list"
+                        placeholder="Buscar por código o descripción…"
+                    />
+                    <datalist id="billing-client-activities-list">
+                        {activities.map((a) => (
+                            <option key={a.codigo} value={`${a.codigo} - ${a.descripcion}`} />
+                        ))}
+                    </datalist>
                     {errors.business_activity && <p className="field-error">{errors.business_activity}</p>}
                 </label>
 
+                <label>
+                    Departamento
+                    <select value={data.address_department} onChange={handleDeptChange}>
+                        <option value="">— Seleccionar departamento —</option>
+                        {depts.map((d) => (
+                            <option key={d.codigo} value={d.codigo}>{d.codigo} - {d.nombre}</option>
+                        ))}
+                    </select>
+                    {errors.address_department && <p className="field-error">{errors.address_department}</p>}
+                </label>
+
+                <label>
+                    Municipio
+                    <select
+                        value={data.address_municipality}
+                        onChange={(e) => setData('address_municipality', e.target.value)}
+                        disabled={!data.address_department}
+                    >
+                        <option value="">— Seleccionar municipio —</option>
+                        {munis.map((m) => (
+                            <option key={m.codigo} value={m.codigo}>{m.codigo} - {m.nombre}</option>
+                        ))}
+                    </select>
+                    {errors.address_municipality && <p className="field-error">{errors.address_municipality}</p>}
+                </label>
+
                 <label className="full-width">
-                    Descripción Actividad
-                    <input value={data.activity_description} onChange={(e) => setData('activity_description', e.target.value)} />
-                    {errors.activity_description && <p className="field-error">{errors.activity_description}</p>}
+                    Dirección
+                    <input value={data.address} onChange={(e) => setData('address', e.target.value)} />
+                    {errors.address && <p className="field-error">{errors.address}</p>}
                 </label>
 
                 <label>
@@ -118,24 +167,6 @@ function ClientForm({ client, onSuccess, onCancel }) {
                     Teléfono Facturación
                     <input value={data.billing_phone} onChange={(e) => setData('billing_phone', e.target.value)} />
                     {errors.billing_phone && <p className="field-error">{errors.billing_phone}</p>}
-                </label>
-
-                <label>
-                    Departamento
-                    <input value={data.address_department} onChange={(e) => setData('address_department', e.target.value)} />
-                    {errors.address_department && <p className="field-error">{errors.address_department}</p>}
-                </label>
-
-                <label>
-                    Municipio
-                    <input value={data.address_municipality} onChange={(e) => setData('address_municipality', e.target.value)} />
-                    {errors.address_municipality && <p className="field-error">{errors.address_municipality}</p>}
-                </label>
-
-                <label className="full-width">
-                    Dirección
-                    <input value={data.address} onChange={(e) => setData('address', e.target.value)} />
-                    {errors.address && <p className="field-error">{errors.address}</p>}
                 </label>
 
                 <label>
@@ -183,7 +214,6 @@ export default function Clientes({ clients }) {
 
     return (
         <AppLayout title="Clientes de Facturación">
-
             <div className="section-top">
                 <div>
                     <h1>Clientes de Facturación</h1>
@@ -234,11 +264,7 @@ export default function Clientes({ clients }) {
                                         : <span className="muted">—</span>}
                                 </td>
                                 <td>{client.nrc || <span className="muted">—</span>}</td>
-                                <td>
-                                    {client.businessActivity
-                                        ? <>{client.businessActivity}<br /><span className="muted" style={{ fontSize: 12 }}>{client.activityDescription}</span></>
-                                        : <span className="muted">—</span>}
-                                </td>
+                                <td>{client.businessActivity || <span className="muted">—</span>}</td>
                                 <td>
                                     {(client.billingEmail || client.email) && (
                                         <span style={{ display: 'block', fontSize: 13 }}>{client.billingEmail || client.email}</span>
