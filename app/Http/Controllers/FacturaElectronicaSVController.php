@@ -379,6 +379,7 @@ class FacturaElectronicaSVController extends Controller
             'billing_phone'        => 'nullable|string|max:30',
             'address_department'   => 'nullable|string|max:100',
             'address_municipality' => 'nullable|string|max:100',
+            'address_district'     => 'nullable|string|max:6',
             'address'              => 'nullable|string|max:500',
             'preferred_dte_type'   => 'nullable|string|max:5',
         ]);
@@ -427,6 +428,7 @@ class FacturaElectronicaSVController extends Controller
             'billingPhone'         => $c->billing_phone,
             'addressDepartment'    => $c->address_department,
             'addressMunicipality'  => $c->address_municipality,
+            'addressDistrict'      => $c->address_district,
             'address'              => $c->address,
             'preferredDteType'     => $c->preferred_dte_type,
             'isClientesVarios'     => (bool) $c->is_clients_varios,

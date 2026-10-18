@@ -41,15 +41,21 @@ function ClientForm({ client, onSuccess, onCancel }) {
         billing_phone:         client?.billingPhone ?? '',
         address_department:    client?.addressDepartment ?? '',
         address_municipality:  client?.addressMunicipality ?? '',
+        address_district:      client?.addressDistrict ?? '',
         address:               client?.address ?? '',
         preferred_dte_type:    client?.preferredDteType ?? '01',
     });
 
     const depts     = geography?.departamentos ?? [];
     const munis     = data.address_department   ? (geography?.municipios?.[data.address_department]   ?? []) : [];
+    const districts = data.address_municipality ? (geography?.distritos?.[data.address_municipality]  ?? []) : [];
 
     function handleDeptChange(e) {
-        setData({ ...data, address_department: e.target.value, address_municipality: '' });
+        setData({ ...data, address_department: e.target.value, address_municipality: '', address_district: '' });
+    }
+
+    function handleMuniChange(e) {
+        setData({ ...data, address_municipality: e.target.value, address_district: '' });
     }
 
     function handleSubmit(e) {
@@ -128,7 +134,7 @@ function ClientForm({ client, onSuccess, onCancel }) {
                     Municipio
                     <select
                         value={data.address_municipality}
-                        onChange={(e) => setData('address_municipality', e.target.value)}
+                        onChange={handleMuniChange}
                         disabled={!data.address_department}
                     >
                         <option value="">— Seleccionar municipio —</option>
@@ -137,6 +143,21 @@ function ClientForm({ client, onSuccess, onCancel }) {
                         ))}
                     </select>
                     {errors.address_municipality && <p className="field-error">{errors.address_municipality}</p>}
+                </label>
+
+                <label>
+                    Distrito
+                    <select
+                        value={data.address_district}
+                        onChange={(e) => setData('address_district', e.target.value)}
+                        disabled={!data.address_municipality}
+                    >
+                        <option value="">— Seleccionar distrito —</option>
+                        {districts.map((d) => (
+                            <option key={d.codigo} value={d.codigo}>{d.codigo} - {d.nombre}</option>
+                        ))}
+                    </select>
+                    {errors.address_district && <p className="field-error">{errors.address_district}</p>}
                 </label>
 
                 <label className="full-width">

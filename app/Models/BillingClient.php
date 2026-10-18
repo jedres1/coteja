@@ -22,6 +22,7 @@ class BillingClient extends Model
         'billing_phone',
         'address_department',
         'address_municipality',
+        'address_district',
         'address',
         'preferred_dte_type',
         'is_clients_varios',
