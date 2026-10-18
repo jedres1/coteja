@@ -19,8 +19,6 @@ const UNIT_OPTIONS = [
 const TYPE_OPTIONS = [
     { value: '1', label: 'Bien' },
     { value: '2', label: 'Servicio' },
-    { value: '3', label: 'Ambos', inventoryOnly: true },
-    { value: '4', label: 'Otros', inventoryOnly: true },
 ];
 
 const TYPE_LABEL = { '1': 'Bien', '2': 'Servicio', '3': 'Ambos', '4': 'Otros' };
@@ -46,7 +44,8 @@ function emptyForm(hasInventory) {
 
 function ProductForm({ initial, productTypes, hasInventory, onClose }) {
     const form = useForm(initial);
-    const showStock = ['1', '3'].includes(form.data.type) && hasInventory;
+    const isBien    = form.data.type === '1';
+    const showStock = isBien && hasInventory;
 
     function handleSubmit(e) {
         e.preventDefault();
@@ -82,9 +81,9 @@ function ProductForm({ initial, productTypes, hasInventory, onClose }) {
                 </div>
 
                 <div className="field" style={{ margin: 0 }}>
-                    <label>Tipo DTE <span style={{ color: '#ef4444' }}>*</span></label>
+                    <label>Tipo <span style={{ color: '#ef4444' }}>*</span></label>
                     <select value={form.data.type} onChange={(e) => form.setData('type', e.target.value)}>
-                        {TYPE_OPTIONS.filter((o) => !o.inventoryOnly || hasInventory).map((o) => (
+                        {TYPE_OPTIONS.map((o) => (
                             <option key={o.value} value={o.value}>{o.label}</option>
                         ))}
                     </select>
@@ -191,6 +190,12 @@ function ProductForm({ initial, productTypes, hasInventory, onClose }) {
                         </div>
                     </>
                 )}
+
+                {isBien && !hasInventory && (
+                    <div style={{ gridColumn: '1 / -1', padding: '8px 12px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 12, color: '#64748b' }}>
+                        Este bien no llevará control de inventario. Para habilitar entradas y salidas de stock, active el módulo de inventario en la empresa.
+                    </div>
+                )}
             </div>
 
             <div className="form-actions" style={{ marginTop: 16 }}>
@@ -241,16 +246,16 @@ export default function Productos({ products, productTypes, hasInventory }) {
         }
         : emptyForm(hasInventory);
 
-    const lowStock = (p) => hasInventory && ['1', '3'].includes(p.type)
+    const lowStock = (p) => hasInventory && p.type === '1'
         && p.stockQuantity != null && p.minStock != null
         && Number(p.stockQuantity) <= Number(p.minStock);
 
     return (
         <AppLayout>
-            <Head title="Productos / Servicios" />
+            <Head title="Bienes y Servicios" />
 
             <div className="top">
-                <h1>Productos / Servicios</h1>
+                <h1>Bienes y Servicios</h1>
                 <button type="button" className="btn" onClick={openCreate}>
                     Nuevo producto
                 </button>

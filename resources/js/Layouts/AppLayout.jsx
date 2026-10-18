@@ -177,7 +177,7 @@ export default function AppLayout({ title, children }) {
                                     <NavLink href={route('admin.factura-sv.billing.nueva-factura')} routePattern="admin.factura-sv.billing.nueva-factura">Nueva Factura</NavLink>
                                     <NavLink href={route('admin.factura-sv.billing.cuentas-por-cobrar')} routePattern="admin.factura-sv.billing.cuentas-por-cobrar">Cuentas por cobrar</NavLink>
                                     <NavLink href={route('admin.factura-sv.billing.clientes')} routePattern="admin.factura-sv.billing.clientes">Clientes</NavLink>
-                                    <NavLink href={route('admin.factura-sv.billing.productos')} routePattern="admin.factura-sv.billing.productos">Servicios</NavLink>
+                                    <NavLink href={route('admin.factura-sv.billing.productos')} routePattern="admin.factura-sv.billing.productos">Bienes y servicios</NavLink>
                                     {!isInquilino && (
                                         <NavLink href={route('admin.factura-sv.billing.configuracion')} routePattern="admin.factura-sv.billing.configuracion">Configuración</NavLink>
                                     )}
