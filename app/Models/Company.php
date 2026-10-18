@@ -16,6 +16,7 @@ class Company extends Model
         'trade_name',
         'nit_dui',
         'nrc',
+        'business_activity',
         'email',
         'phone',
         'environment',

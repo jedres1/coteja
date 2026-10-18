@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
@@ -23,11 +23,21 @@ const licenseTypes = {
 };
 
 function CompanyForm({ company, modules, onSuccess }) {
+    const [activities, setActivities] = useState([]);
+
+    useEffect(() => {
+        fetch('/catalogs/actividades-economicas.json')
+            .then((r) => r.json())
+            .then((d) => setActivities(Array.isArray(d) ? d : []))
+            .catch(() => {});
+    }, []);
+
     const form = useForm({
-        business_name:   company?.business_name ?? '',
-        trade_name:      company?.trade_name ?? '',
-        nit_dui:         company?.nit_dui ?? '',
-        nrc:             company?.nrc ?? '',
+        business_name:     company?.business_name     ?? '',
+        trade_name:        company?.trade_name        ?? '',
+        nit_dui:           company?.nit_dui           ?? '',
+        nrc:               company?.nrc               ?? '',
+        business_activity: company?.business_activity ?? '',
         email:           company?.email ?? '',
         phone:           company?.phone ?? '',
         environment:     company?.environment ?? 'production',
@@ -94,6 +104,23 @@ function CompanyForm({ company, modules, onSuccess }) {
                         onChange={(e) => form.setData('nrc', e.target.value)}
                     />
                     {form.errors.nrc && <p className="field-error">{form.errors.nrc}</p>}
+                </label>
+
+                <label className="full-width">
+                    Actividad económica
+                    <input
+                        type="text"
+                        value={form.data.business_activity}
+                        onChange={(e) => form.setData('business_activity', e.target.value)}
+                        list="company-activities-list"
+                        placeholder="Buscar por código o descripción…"
+                    />
+                    <datalist id="company-activities-list">
+                        {activities.map((a) => (
+                            <option key={a.codigo} value={`${a.codigo} - ${a.descripcion}`} />
+                        ))}
+                    </datalist>
+                    {form.errors.business_activity && <p className="field-error">{form.errors.business_activity}</p>}
                 </label>
 
                 <label>
