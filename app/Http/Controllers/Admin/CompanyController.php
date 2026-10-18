@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
-use App\Models\Customer;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -22,8 +21,7 @@ class CompanyController extends Controller
     public function index()
     {
         return Inertia::render('Admin/Companies/Index', [
-            'companies' => Company::with('customer')->latest()->paginate(15),
-            'customers' => Customer::orderBy('name')->get(['id', 'name']),
+            'companies' => Company::latest()->paginate(15),
             'modules'   => self::MODULES,
         ]);
     }
@@ -45,7 +43,6 @@ class CompanyController extends Controller
     private function validated(Request $request): array
     {
         return $request->validate([
-            'customer_id'     => ['nullable', 'exists:customers,id'],
             'business_name'   => ['required', 'string', 'max:255'],
             'trade_name'      => ['nullable', 'string', 'max:255'],
             'nit_dui'         => ['required', 'string', 'max:50'],
