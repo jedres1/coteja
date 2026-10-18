@@ -112,6 +112,10 @@ Route::middleware(['auth', 'role:admin,inquilino', 'module:accounting'])->prefix
         Route::get('libro-mayor', 'libroMayor')->name('libro-mayor');
         Route::get('balance-general', 'balanceGeneral')->name('balance-general');
         Route::get('estado-resultados', 'estadoResultados')->name('estado-resultados');
+
+        Route::get('reportes-fiscales', 'reportesFiscales')->name('reportes-fiscales');
+        Route::get('reportes-fiscales/ventas/exportar', 'exportLibroVentas')->name('reportes-fiscales.ventas.exportar');
+        Route::get('reportes-fiscales/compras/exportar', 'exportLibroCompras')->name('reportes-fiscales.compras.exportar');
     });
 
     // Diario

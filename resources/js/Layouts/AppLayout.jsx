@@ -164,6 +164,7 @@ export default function AppLayout({ title, children }) {
                                     <NavLink href={route('admin.accounting.libro-mayor')} routePattern="admin.accounting.libro-mayor">Libro Mayor</NavLink>
                                     <NavLink href={route('admin.accounting.balance-general')} routePattern="admin.accounting.balance-general">Balance General</NavLink>
                                     <NavLink href={route('admin.accounting.estado-resultados')} routePattern="admin.accounting.estado-resultados">Estado de Resultados</NavLink>
+                                    <NavLink href={route('admin.accounting.reportes-fiscales')} routePattern="admin.accounting.reportes-fiscales*">Reportes fiscales</NavLink>
                                     <NavLink href={route('admin.accounting.periodos')} routePattern="admin.accounting.periodos">Períodos contables</NavLink>
                                     {!isInquilino && (
                                         <NavLink href={route('admin.accounting.configuracion')} routePattern="admin.accounting.configuracion">Configuración</NavLink>

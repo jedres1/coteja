@@ -7,8 +7,11 @@ use App\Models\AccountingAccount;
 use App\Models\AccountingPackage;
 use App\Models\AccountingPeriod;
 use App\Models\AccountingYearPeriod;
+use App\Models\BillingInvoice;
 use App\Models\CostCenter;
+use App\Models\PurchaseInvoice;
 use App\Services\Accounting\AccountingPeriodService;
+use App\Traits\ExportsCsv;
 use App\Traits\HasAccountingTenant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +20,7 @@ use Inertia\Inertia;
 
 class AccountingController extends Controller
 {
-    use HasAccountingTenant;
+    use HasAccountingTenant, ExportsCsv;
 
     public function __construct(private readonly AccountingPeriodService $periods) {}
 
@@ -755,5 +758,150 @@ class AccountingController extends Controller
             'rows', 'bySection', 'sections', 'period', 'year', 'month',
             'acumulado', 'totalIngresos', 'totalGastos', 'utilidad', 'availableYears'
         ));
+    }
+
+    // ── Reportes Fiscales (F-07 / F-14) ────────────────────────────────────
+
+    public function reportesFiscales(Request $request)
+    {
+        $companyId = $this->requireTenant();
+        $year  = (int) $request->query('year',  now()->year);
+        $month = (int) $request->query('month', now()->month);
+
+        $ventas = BillingInvoice::where('company_id', $companyId)
+            ->whereYear('issued_at', $year)
+            ->whereMonth('issued_at', $month)
+            ->where('status', '!=', 'anulado')
+            ->orderBy('issued_at')->orderBy('id')
+            ->get()
+            ->values()
+            ->map(fn ($inv, $i) => array_merge(['correlativo' => $i + 1], $this->formatVenta($inv)));
+
+        $compras = PurchaseInvoice::with('supplier')
+            ->where('company_id', $companyId)
+            ->whereYear('purchase_date', $year)
+            ->whereMonth('purchase_date', $month)
+            ->whereNotIn('status', ['rechazado'])
+            ->orderBy('purchase_date')->orderBy('id')
+            ->get()
+            ->values()
+            ->map(fn ($inv, $i) => array_merge(['correlativo' => $i + 1], $this->formatCompra($inv)));
+
+        return Inertia::render('Admin/Accounting/ReportesFiscales', compact('ventas', 'compras', 'year', 'month'));
+    }
+
+    public function exportLibroVentas(Request $request)
+    {
+        $companyId = $this->requireTenant();
+        $year  = (int) $request->query('year',  now()->year);
+        $month = (int) $request->query('month', now()->month);
+
+        $ventas = BillingInvoice::where('company_id', $companyId)
+            ->whereYear('issued_at', $year)
+            ->whereMonth('issued_at', $month)
+            ->where('status', '!=', 'anulado')
+            ->orderBy('issued_at')->orderBy('id')
+            ->get();
+
+        $headers = ['N°', 'Fecha', 'Tipo DTE', 'N° Control', 'Nombre Receptor', 'NRC Receptor', 'NIT Receptor', 'Monto Exento', 'Monto No Sujeto', 'Monto Gravado', 'Débito Fiscal', 'Total'];
+
+        $rows = $ventas->values()->map(function ($inv, $i) {
+            $f = $this->formatVenta($inv);
+            return [
+                $i + 1,
+                $f['fecha'], $f['tipo_dte'], $f['numero_control'],
+                $f['receptor_nombre'], $f['receptor_nrc'], $f['receptor_nit'],
+                number_format($f['monto_exento'],  2, '.', ''),
+                number_format($f['monto_no_suj'],  2, '.', ''),
+                number_format($f['monto_gravado'], 2, '.', ''),
+                number_format($f['debito_fiscal'], 2, '.', ''),
+                number_format($f['total'],         2, '.', ''),
+            ];
+        });
+
+        $mes = now()->setDate($year, $month, 1)->locale('es')->monthName;
+        return $this->streamCsv("F07_LibroVentas_{$year}_{$month}.csv", $headers, $rows);
+    }
+
+    public function exportLibroCompras(Request $request)
+    {
+        $companyId = $this->requireTenant();
+        $year  = (int) $request->query('year',  now()->year);
+        $month = (int) $request->query('month', now()->month);
+
+        $compras = PurchaseInvoice::with('supplier')
+            ->where('company_id', $companyId)
+            ->whereYear('purchase_date', $year)
+            ->whereMonth('purchase_date', $month)
+            ->whereNotIn('status', ['rechazado'])
+            ->orderBy('purchase_date')->orderBy('id')
+            ->get();
+
+        $headers = ['N°', 'Fecha', 'Tipo DTE', 'N° Documento', 'Nombre Proveedor', 'NRC Proveedor', 'NIT Proveedor', 'Monto Exento', 'Monto No Sujeto', 'Monto Gravado', 'Crédito Fiscal', 'Total'];
+
+        $rows = $compras->values()->map(function ($inv, $i) {
+            $f = $this->formatCompra($inv);
+            return [
+                $i + 1,
+                $f['fecha'], $f['tipo_dte'], $f['numero_control'],
+                $f['proveedor_nombre'], $f['proveedor_nrc'], $f['proveedor_nit'],
+                number_format($f['monto_exento'],  2, '.', ''),
+                number_format($f['monto_no_suj'],  2, '.', ''),
+                number_format($f['monto_gravado'], 2, '.', ''),
+                number_format($f['credito_fiscal'],2, '.', ''),
+                number_format($f['total'],         2, '.', ''),
+            ];
+        });
+
+        return $this->streamCsv("F14_LibroCompras_{$year}_{$month}.csv", $headers, $rows);
+    }
+
+    private function formatVenta(BillingInvoice $inv): array
+    {
+        $dte     = is_array($inv->json_dte) ? $inv->json_dte : [];
+        $receptor = $dte['receptor'] ?? [];
+        $resumen  = $dte['resumen']  ?? [];
+
+        $exento  = (float) ($resumen['totalExenta'] ?? 0);
+        $noSuj   = (float) ($resumen['totalNoSuj']  ?? 0);
+        $gravado = (float) ($resumen['subTotalVentas'] ?? (($exento === 0.0 && $noSuj === 0.0) ? (float) $inv->subtotal : 0.0));
+        $iva     = (float) ($resumen['totalIva']    ?? $inv->iva);
+        $total   = (float) ($resumen['totalPagar']  ?? $inv->total);
+
+        return [
+            'fecha'           => $inv->issued_at?->format('d/m/Y'),
+            'tipo_dte'        => $inv->document_type,
+            'numero_control'  => $inv->number_control,
+            'receptor_nombre' => $receptor['nombre'] ?? $inv->customer_name,
+            'receptor_nrc'    => $receptor['nrc'] ?? null,
+            'receptor_nit'    => $receptor['numDocumento'] ?? null,
+            'monto_exento'    => $exento,
+            'monto_no_suj'    => $noSuj,
+            'monto_gravado'   => $gravado,
+            'debito_fiscal'   => $iva,
+            'total'           => $total,
+        ];
+    }
+
+    private function formatCompra(PurchaseInvoice $inv): array
+    {
+        $supplier = $inv->supplier;
+        $subtotal = (float) $inv->subtotal;
+        $iva      = (float) $inv->iva;
+        $total    = (float) $inv->total;
+
+        return [
+            'fecha'            => $inv->purchase_date?->format('d/m/Y'),
+            'tipo_dte'         => $inv->document_type,
+            'numero_control'   => $inv->invoice_number,
+            'proveedor_nombre' => $supplier?->name ?? '',
+            'proveedor_nrc'    => $supplier?->nrc ?? null,
+            'proveedor_nit'    => $supplier?->document_number ?? null,
+            'monto_exento'     => $iva == 0 ? $subtotal : 0.0,
+            'monto_no_suj'     => 0.0,
+            'monto_gravado'    => $iva > 0  ? $subtotal : 0.0,
+            'credito_fiscal'   => $iva,
+            'total'            => $total,
+        ];
     }
 }
