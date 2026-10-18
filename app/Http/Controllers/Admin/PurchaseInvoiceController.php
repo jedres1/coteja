@@ -306,9 +306,7 @@ class PurchaseInvoiceController extends Controller
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['required', 'integer', 'distinct', 'exists:purchase_invoices,id'],
             'bank_account_id' => ['required', 'integer', 'exists:bank_accounts,id'],
-            'payments' => ['required', 'array', 'min:1'],
-            'payments.*.invoice_id' => ['required', 'integer', 'distinct'],
-            'payments.*.reference' => ['required', 'string', 'max:200'],
+            'reference' => ['required', 'string', 'max:200'],
         ]);
 
         $companyIds = $this->accessibleCompanyIds($request);
@@ -318,11 +316,7 @@ class PurchaseInvoiceController extends Controller
             ->whereIn('payment_status', ['pending', 'partial'])
             ->whereNotIn('status', ['extracted', 'rejected'])
             ->get();
-        $payments = collect($data['payments'])->keyBy('invoice_id');
-
-        if ($invoices->count() !== count($data['ids'])
-            || $payments->keys()->diff($invoices->pluck('id'))->isNotEmpty()
-            || $invoices->pluck('id')->diff($payments->keys())->isNotEmpty()) {
+        if ($invoices->count() !== count($data['ids'])) {
             return back()->withErrors('Selecciona únicamente facturas pendientes o parciales incluidas en el lote de pago.');
         }
 
@@ -337,11 +331,11 @@ class PurchaseInvoiceController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($invoices, $payments, $data) {
+            DB::transaction(function () use ($invoices, $data) {
                 foreach ($invoices as $invoice) {
                     $this->recordInvoiceBankPayment($invoice, [
                         'bank_account_id' => $data['bank_account_id'],
-                        'reference' => $payments->get($invoice->id)['reference'],
+                        'reference' => $data['reference'],
                     ]);
                 }
             });
@@ -349,7 +343,16 @@ class PurchaseInvoiceController extends Controller
             return back()->withErrors($exception->getMessage());
         }
 
-        return back()->with('status', count($data['ids']).' pago(s) registrados en Bancos con fecha de factura.');
+        $invoiceDates = $invoices->pluck('purchase_date')
+            ->filter()
+            ->map(fn ($date) => $date->toDateString())
+            ->values();
+
+        return redirect()->route('admin.bank-transactions.transactions', [
+            'from' => $invoiceDates->min() ?? today()->toDateString(),
+            'to' => $invoiceDates->max() ?? today()->toDateString(),
+            'bank_account_id' => $data['bank_account_id'],
+        ])->with('status', count($data['ids']).' pago(s) registrados en Bancos con fecha de factura.');
     }
 
     public function pendingApproval(Request $request)
@@ -718,8 +721,27 @@ class PurchaseInvoiceController extends Controller
         $body = is_array($invoice->extracted_document_body)
             ? $invoice->extracted_document_body
             : json_decode($invoice->extracted_document_body ?? '', true);
+        $paymentMethods = [
+            '01' => 'Billetes y monedas',
+            '02' => 'Tarjeta débito',
+            '03' => 'Tarjeta crédito',
+            '04' => 'Cheque',
+            '05' => 'Transferencia bancaria',
+            '06' => 'Cupones',
+            '07' => 'Vales',
+            '08' => 'Otros',
+        ];
+
         return collect(data_get($body, 'resumen.pagos', []))
-            ->pluck('referencia')->filter(fn ($reference) => filled($reference))->unique()->values()->implode(' / ');
+            ->map(function ($payment) use ($paymentMethods) {
+                $reference = trim((string) ($payment['referencia'] ?? ''));
+                if ($reference === '') return null;
+
+                $methodCode = (string) ($payment['codigo'] ?? '');
+                $method = $paymentMethods[$methodCode] ?? $methodCode;
+                return $method !== '' ? $reference.' - '.$method : $reference;
+            })
+            ->filter()->unique()->values()->implode(' / ');
     }
 
     private function extractedPaymentAmount(PurchaseInvoice $invoice): ?float

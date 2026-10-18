@@ -116,9 +116,7 @@ export default function AccountsPayable({ invoices, totals, bankAccounts, search
     const [to, setTo]           = useState(toProp   || today);
     const [selectedIds, setSelectedIds] = useState([]);
     const [bulkBankAccountId, setBulkBankAccountId] = useState('');
-    const [references, setReferences] = useState(() => Object.fromEntries(
-        invoices.data.map((invoice) => [invoice.id, invoice.extracted_payment_reference ?? ''])
-    ));
+    const [bulkReference, setBulkReference] = useState('');
 
     const selectableInvoices = invoices.data.filter((invoice) => invoice.banking_enabled);
     const selectedInvoices = invoices.data.filter((invoice) => selectedIds.includes(invoice.id));
@@ -128,7 +126,24 @@ export default function AccountsPayable({ invoices, totals, bankAccounts, search
         : [];
 
     function toggleAll() {
-        setSelectedIds(selectedIds.length === selectableInvoices.length ? [] : selectableInvoices.map((invoice) => invoice.id));
+        if (selectedIds.length === selectableInvoices.length) {
+            setSelectedIds([]);
+            setBulkReference('');
+            return;
+        }
+        setSelectedIds(selectableInvoices.map((invoice) => invoice.id));
+        setBulkReference(selectableInvoices[0]?.extracted_payment_reference ?? '');
+    }
+
+    function toggleInvoice(invoice) {
+        if (selectedIds.includes(invoice.id)) {
+            const nextIds = selectedIds.filter((id) => id !== invoice.id);
+            setSelectedIds(nextIds);
+            if (!nextIds.length) setBulkReference('');
+            return;
+        }
+        if (!selectedIds.length) setBulkReference(invoice.extracted_payment_reference ?? '');
+        setSelectedIds([...selectedIds, invoice.id]);
     }
 
     function handleBulkPayment() {
@@ -141,19 +156,16 @@ export default function AccountsPayable({ invoices, totals, bankAccounts, search
             window.alert('Selecciona la cuenta bancaria para registrar los pagos.');
             return;
         }
-        const payments = selectedInvoices.map((invoice) => ({
-            invoice_id: invoice.id,
-            reference: (references[invoice.id] ?? '').trim(),
-        }));
-        if (payments.some((payment) => !payment.reference)) {
-            window.alert('Completa la referencia de pago de cada factura seleccionada.');
+        const reference = bulkReference.trim();
+        if (!reference) {
+            window.alert('Escribe la referencia de pago que se aplicará a todas las facturas seleccionadas.');
             return;
         }
         router.post(route('admin.purchase-invoices.pay-bulk'), {
             ids: selectedInvoices.map((invoice) => invoice.id),
             bank_account_id: bulkBankAccountId,
-            payments,
-        }, { onSuccess: () => { setSelectedIds([]); setBulkBankAccountId(''); } });
+            reference,
+        }, { onSuccess: () => { setSelectedIds([]); setBulkBankAccountId(''); setBulkReference(''); } });
     }
 
     function applyFilters(e) {
@@ -230,6 +242,10 @@ export default function AccountsPayable({ invoices, totals, bankAccounts, search
                 {selectedInvoices.length > 0 && (
                     <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap', padding: '12px 0' }}>
                         <span className="muted">{selectedInvoices.length} factura(s) seleccionada(s)</span>
+                        <label style={{ minWidth: 240, margin: 0, fontSize: 12 }}>
+                            Referencia para todas (referencia DTE + forma de pago) <span style={{ color: '#ef4444' }}>*</span>
+                            <input type="text" value={bulkReference} onChange={(e) => setBulkReference(e.target.value)} placeholder="Referencia DTE - forma de pago" maxLength={200} required />
+                        </label>
                         <label style={{ minWidth: 260, margin: 0, fontSize: 12 }}>
                             Cuenta bancaria para el lote <span style={{ color: '#ef4444' }}>*</span>
                             <select value={bulkBankAccountId} onChange={(e) => setBulkBankAccountId(e.target.value)} disabled={selectedCompanyIds.length !== 1}>
@@ -246,7 +262,7 @@ export default function AccountsPayable({ invoices, totals, bankAccounts, search
                         <button type="button" className="btn" onClick={handleBulkPayment} disabled={selectedCompanyIds.length !== 1 || bulkBankAccounts.length === 0}>
                             Registrar pagos seleccionados
                         </button>
-                        <button type="button" className="btn secondary" onClick={() => setSelectedIds([])}>Limpiar selección</button>
+                        <button type="button" className="btn secondary" onClick={() => { setSelectedIds([]); setBulkReference(''); setBulkBankAccountId(''); }}>Limpiar selección</button>
                     </div>
                 )}
                 <table>
@@ -260,21 +276,20 @@ export default function AccountsPayable({ invoices, totals, bankAccounts, search
                             <th>Pagado</th>
                             <th>Saldo</th>
                             <th>Estado</th>
-                            <th>Referencia de pago</th>
                             <th></th>
                         </tr>
                     </thead>
                     <tbody>
                         {invoices.data.length === 0 && (
                             <tr>
-                                <td colSpan={10} className="empty">Sin registros</td>
+                                <td colSpan={9} className="empty">Sin registros</td>
                             </tr>
                         )}
                         {invoices.data.map((invoice) => {
                             const balance = Number(invoice.total ?? 0) - Number(invoice.paid_amount ?? 0);
                             return (
                                 <tr key={invoice.id}>
-                                    <td><input type="checkbox" checked={selectedIds.includes(invoice.id)} disabled={!invoice.banking_enabled} onChange={() => setSelectedIds((current) => current.includes(invoice.id) ? current.filter((id) => id !== invoice.id) : [...current, invoice.id])} style={{ width: 'auto' }} title={invoice.banking_enabled ? 'Seleccionar para pago masivo' : 'La empresa no tiene el módulo Bancos habilitado'} /></td>
+                                    <td><input type="checkbox" checked={selectedIds.includes(invoice.id)} disabled={!invoice.banking_enabled} onChange={() => toggleInvoice(invoice)} style={{ width: 'auto' }} title={invoice.banking_enabled ? 'Seleccionar para pago masivo' : 'La empresa no tiene el módulo Bancos habilitado'} /></td>
                                     <td style={{ fontWeight: 600 }}>{invoice.supplier?.name}</td>
                                     <td className="muted">{invoice.invoice_number}</td>
                                     <td>
@@ -292,9 +307,6 @@ export default function AccountsPayable({ invoices, totals, bankAccounts, search
                                         <span className={`badge ${paymentBadge[invoice.payment_status] ?? ''}`}>
                                             {paymentLabel[invoice.payment_status] ?? invoice.payment_status}
                                         </span>
-                                    </td>
-                                    <td style={{ minWidth: 190 }}>
-                                        {invoice.banking_enabled ? <input type="text" value={references[invoice.id] ?? ''} onChange={(e) => setReferences((current) => ({ ...current, [invoice.id]: e.target.value }))} placeholder="Referencia del DTE" maxLength={200} /> : <span className="muted">—</span>}
                                     </td>
                                     <td>
                                         {invoice.payment_status !== 'paid' && (
