@@ -17,7 +17,6 @@ class StoreCustomerRequest extends FormRequest
             'nrc'                  => ['nullable', 'string', 'max:50'],
             'trade_name'           => ['nullable', 'string', 'max:255'],
             'business_activity'    => ['nullable', 'string', 'max:10'],
-            'activity_description' => ['nullable', 'string', 'max:255'],
             'address_department'   => ['required', 'string', 'size:2'],
             'address_municipality' => ['required', 'string', 'between:2,4'],
             'address_district'     => ['nullable', 'string', 'max:50'],

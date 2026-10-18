@@ -30,7 +30,6 @@ class CustomerController extends Controller
                             ->orWhere('document_number', 'like', "%{$search}%")
                             ->orWhere('nrc', 'like', "%{$search}%")
                             ->orWhere('business_activity', 'like', "%{$search}%")
-                            ->orWhere('activity_description', 'like', "%{$search}%")
                             ->orWhere('billing_email', 'like', "%{$search}%")
                             ->orWhere('billing_phone', 'like', "%{$search}%");
                     });
