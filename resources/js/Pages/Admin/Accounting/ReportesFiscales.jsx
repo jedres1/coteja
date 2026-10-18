@@ -4,39 +4,27 @@ import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import { IconDownload } from '@/Components/Icons';
 
-const MESES = [
-    'Enero','Febrero','Marzo','Abril','Mayo','Junio',
-    'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre',
-];
-
 const fmt = (n) => Number(n ?? 0).toLocaleString('es-SV', { minimumFractionDigits: 2 });
 
-function FilterBar({ year, month }) {
-    const [y, setY] = useState(year);
-    const [m, setM] = useState(month);
+function FilterBar({ from, to }) {
+    const [startDate, setStartDate] = useState(from);
+    const [endDate, setEndDate] = useState(to);
 
     function apply() {
-        router.get(route('admin.accounting.reportes-fiscales'), { year: y, month: m }, { preserveState: false });
+        router.get(route('admin.accounting.reportes-fiscales'), { from: startDate, to: endDate }, { preserveState: false });
     }
-
-    const currentYear = new Date().getFullYear();
-    const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
     return (
         <div className="card" style={{ marginBottom: 16, display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div className="field" style={{ margin: 0 }}>
-                <label>Año</label>
-                <select value={y} onChange={(e) => setY(Number(e.target.value))}>
-                    {years.map((yr) => <option key={yr} value={yr}>{yr}</option>)}
-                </select>
+                <label htmlFor="fiscal-from">Desde</label>
+                <input id="fiscal-from" type="date" value={startDate} max={endDate} onChange={(e) => setStartDate(e.target.value)} />
             </div>
             <div className="field" style={{ margin: 0 }}>
-                <label>Mes</label>
-                <select value={m} onChange={(e) => setM(Number(e.target.value))}>
-                    {MESES.map((nm, i) => <option key={i + 1} value={i + 1}>{nm}</option>)}
-                </select>
+                <label htmlFor="fiscal-to">Hasta</label>
+                <input id="fiscal-to" type="date" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} />
             </div>
-            <button type="button" className="btn" onClick={apply}>
+            <button type="button" className="btn" onClick={apply} disabled={!startDate || !endDate || startDate > endDate}>
                 Aplicar filtro
             </button>
         </div>
@@ -52,8 +40,8 @@ function DownloadBtn({ href }) {
     );
 }
 
-function LibroVentas({ ventas, year, month }) {
-    const exportUrl = route('admin.accounting.reportes-fiscales.ventas.exportar') + `?year=${year}&month=${month}`;
+function LibroVentas({ ventas, from, to }) {
+    const exportUrl = route('admin.accounting.reportes-fiscales.ventas.exportar') + `?from=${from}&to=${to}`;
 
     const totExento  = ventas.reduce((s, r) => s + Number(r.monto_exento),  0);
     const totNoSuj   = ventas.reduce((s, r) => s + Number(r.monto_no_suj),  0);
@@ -67,7 +55,7 @@ function LibroVentas({ ventas, year, month }) {
                 <div>
                     <strong>F-07 — Libro de Ventas</strong>
                     <span className="muted" style={{ marginLeft: 12, fontSize: 13 }}>
-                        {ventas.length} registro{ventas.length !== 1 ? 's' : ''} — {MESES[month - 1]} {year}
+                        {ventas.length} registro{ventas.length !== 1 ? 's' : ''} — {from} al {to}
                     </span>
                 </div>
                 <DownloadBtn href={exportUrl} />
@@ -130,8 +118,8 @@ function LibroVentas({ ventas, year, month }) {
     );
 }
 
-function LibroCompras({ compras, year, month }) {
-    const exportUrl = route('admin.accounting.reportes-fiscales.compras.exportar') + `?year=${year}&month=${month}`;
+function LibroCompras({ compras, from, to }) {
+    const exportUrl = route('admin.accounting.reportes-fiscales.compras.exportar') + `?from=${from}&to=${to}`;
 
     const totExento  = compras.reduce((s, r) => s + Number(r.monto_exento),  0);
     const totNoSuj   = compras.reduce((s, r) => s + Number(r.monto_no_suj),  0);
@@ -145,7 +133,7 @@ function LibroCompras({ compras, year, month }) {
                 <div>
                     <strong>F-14 — Libro de Compras</strong>
                     <span className="muted" style={{ marginLeft: 12, fontSize: 13 }}>
-                        {compras.length} registro{compras.length !== 1 ? 's' : ''} — {MESES[month - 1]} {year}
+                        {compras.length} registro{compras.length !== 1 ? 's' : ''} — {from} al {to}
                     </span>
                 </div>
                 <DownloadBtn href={exportUrl} />
@@ -208,7 +196,7 @@ function LibroCompras({ compras, year, month }) {
     );
 }
 
-export default function ReportesFiscales({ ventas, compras, year, month }) {
+export default function ReportesFiscales({ ventas, compras, from, to }) {
     const [tab, setTab] = useState('ventas');
 
     return (
@@ -219,7 +207,7 @@ export default function ReportesFiscales({ ventas, compras, year, month }) {
                 <h1>Reportes Fiscales</h1>
             </div>
 
-            <FilterBar year={year} month={month} />
+            <FilterBar from={from} to={to} />
 
             <div className="card" style={{ marginBottom: 12, display: 'flex', gap: 8 }}>
                 <button
@@ -239,8 +227,8 @@ export default function ReportesFiscales({ ventas, compras, year, month }) {
             </div>
 
             <div className="card">
-                {tab === 'ventas' && <LibroVentas ventas={ventas} year={year} month={month} />}
-                {tab === 'compras' && <LibroCompras compras={compras} year={year} month={month} />}
+                {tab === 'ventas' && <LibroVentas ventas={ventas} from={from} to={to} />}
+                {tab === 'compras' && <LibroCompras compras={compras} from={from} to={to} />}
             </div>
         </AppLayout>
     );

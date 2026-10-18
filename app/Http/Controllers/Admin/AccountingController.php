@@ -769,12 +769,16 @@ class AccountingController extends Controller
             return redirect()->route('admin.dashboard')
                 ->with('error', 'Seleccione una empresa activa para ver los reportes fiscales.');
         }
-        $year  = (int) $request->query('year',  now()->year);
-        $month = (int) $request->query('month', now()->month);
+        $filters = $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+        ]);
+        $from = $filters['from'] ?? now()->startOfMonth()->toDateString();
+        $to = $filters['to'] ?? now()->endOfMonth()->toDateString();
 
         $ventas = BillingInvoice::where('company_id', $companyId)
-            ->whereYear('issued_at', $year)
-            ->whereMonth('issued_at', $month)
+            ->whereDate('issued_at', '>=', $from)
+            ->whereDate('issued_at', '<=', $to)
             ->whereNotNull('reception_stamp')
             ->where('status', '!=', 'ANULADO')
             ->orderBy('issued_at')->orderBy('id')
@@ -784,15 +788,15 @@ class AccountingController extends Controller
 
         $compras = PurchaseInvoice::with('supplier')
             ->where('company_id', $companyId)
-            ->whereYear('purchase_date', $year)
-            ->whereMonth('purchase_date', $month)
+            ->whereDate('purchase_date', '>=', $from)
+            ->whereDate('purchase_date', '<=', $to)
             ->where('status', 'approved')
             ->orderBy('purchase_date')->orderBy('id')
             ->get()
             ->values()
             ->map(fn ($inv, $i) => array_merge(['correlativo' => $i + 1], $this->formatCompra($inv)));
 
-        return Inertia::render('Admin/Accounting/ReportesFiscales', compact('ventas', 'compras', 'year', 'month'));
+        return Inertia::render('Admin/Accounting/ReportesFiscales', compact('ventas', 'compras', 'from', 'to'));
     }
 
     public function exportLibroVentas(Request $request)
@@ -802,12 +806,16 @@ class AccountingController extends Controller
             return redirect()->route('admin.dashboard')
                 ->with('error', 'Seleccione una empresa activa para exportar el libro de ventas.');
         }
-        $year  = (int) $request->query('year',  now()->year);
-        $month = (int) $request->query('month', now()->month);
+        $filters = $request->validate([
+            'from' => ['required', 'date'],
+            'to' => ['required', 'date', 'after_or_equal:from'],
+        ]);
+        $from = $filters['from'];
+        $to = $filters['to'];
 
         $ventas = BillingInvoice::where('company_id', $companyId)
-            ->whereYear('issued_at', $year)
-            ->whereMonth('issued_at', $month)
+            ->whereDate('issued_at', '>=', $from)
+            ->whereDate('issued_at', '<=', $to)
             ->whereNotNull('reception_stamp')
             ->where('status', '!=', 'ANULADO')
             ->orderBy('issued_at')->orderBy('id')
@@ -829,8 +837,7 @@ class AccountingController extends Controller
             ];
         });
 
-        $mes = now()->setDate($year, $month, 1)->locale('es')->monthName;
-        return $this->streamCsv("F07_LibroVentas_{$year}_{$month}.csv", $headers, $rows);
+        return $this->streamCsv("F07_LibroVentas_{$from}_{$to}.csv", $headers, $rows);
     }
 
     public function exportLibroCompras(Request $request)
@@ -840,13 +847,17 @@ class AccountingController extends Controller
             return redirect()->route('admin.dashboard')
                 ->with('error', 'Seleccione una empresa activa para exportar el libro de compras.');
         }
-        $year  = (int) $request->query('year',  now()->year);
-        $month = (int) $request->query('month', now()->month);
+        $filters = $request->validate([
+            'from' => ['required', 'date'],
+            'to' => ['required', 'date', 'after_or_equal:from'],
+        ]);
+        $from = $filters['from'];
+        $to = $filters['to'];
 
         $compras = PurchaseInvoice::with('supplier')
             ->where('company_id', $companyId)
-            ->whereYear('purchase_date', $year)
-            ->whereMonth('purchase_date', $month)
+            ->whereDate('purchase_date', '>=', $from)
+            ->whereDate('purchase_date', '<=', $to)
             ->where('status', 'approved')
             ->orderBy('purchase_date')->orderBy('id')
             ->get();
@@ -867,7 +878,7 @@ class AccountingController extends Controller
             ];
         });
 
-        return $this->streamCsv("F14_LibroCompras_{$year}_{$month}.csv", $headers, $rows);
+        return $this->streamCsv("F14_LibroCompras_{$from}_{$to}.csv", $headers, $rows);
     }
 
     private function formatVenta(BillingInvoice $inv): array

@@ -22,7 +22,7 @@ class SupplierController extends Controller
 
         return Inertia::render('Admin/Suppliers/Index', [
             'suppliers' => Supplier::withCount('purchaseInvoices')
-                ->when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))
+                ->whereIn('company_id', $tenantId !== null ? [$tenantId] : [])
                 ->when($search !== '', function ($query) use ($search) {
                     $query->where(function ($query) use ($search) {
                         $query->where('name', 'like', "%{$search}%")
@@ -46,8 +46,11 @@ class SupplierController extends Controller
 
     public function store(SaveSupplierRequest $request)
     {
+        $tenantId = $this->tenantId();
+        abort_if($tenantId === null, 403, 'Selecciona una empresa antes de registrar proveedores.');
+
         Supplier::create(array_merge($request->validated(), [
-            'company_id' => $this->tenantId(),
+            'company_id' => $tenantId,
             'created_by' => $request->user()?->id,
             'updated_by' => $request->user()?->id,
         ]));
@@ -58,7 +61,7 @@ class SupplierController extends Controller
     public function update(SaveSupplierRequest $request, Supplier $supplier)
     {
         $tenantId = $this->tenantId();
-        if ($tenantId) abort_unless($supplier->company_id === $tenantId, 403);
+        abort_unless($tenantId !== null && $supplier->company_id === $tenantId, 403);
 
         $supplier->update(array_merge($request->validated(), [
             'updated_by' => $request->user()?->id,
@@ -70,7 +73,7 @@ class SupplierController extends Controller
     public function destroy(Supplier $supplier)
     {
         $tenantId = $this->tenantId();
-        if ($tenantId) abort_unless($supplier->company_id === $tenantId, 403);
+        abort_unless($tenantId !== null && $supplier->company_id === $tenantId, 403);
 
         if ($supplier->purchaseInvoices()->exists()) {
             return back()->withErrors('No se puede eliminar un proveedor con facturas de compra registradas.');
@@ -87,7 +90,7 @@ class SupplierController extends Controller
         $search   = trim((string) $request->query('search', ''));
 
         $rows = Supplier::withCount('purchaseInvoices')
-            ->when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))
+            ->whereIn('company_id', $tenantId !== null ? [$tenantId] : [])
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
                     $query->where('name', 'like', "%{$search}%")

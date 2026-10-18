@@ -10,6 +10,8 @@ use App\Models\Customer;
 use App\Models\AccountingAccount;
 use App\Models\AccountingPackage;
 use App\Models\BankAccount;
+use App\Models\BankTransaction;
+use App\Models\Company;
 use App\Models\CostCenter;
 use App\Models\JournalEntry;
 use App\Models\PurchaseInvoice;
@@ -191,11 +193,11 @@ class PurchaseInvoiceController extends Controller
         $search = trim((string) $request->query('search', ''));
         $from   = trim((string) $request->query('from', ''));
         $to     = trim((string) $request->query('to', ''));
-        $customerIds = $this->accessibleCustomerIds($request);
+        $companyIds = $this->accessibleCompanyIds($request);
 
         $baseQuery = fn () => PurchaseInvoice::whereIn('payment_status', ['pending', 'partial'])
             ->whereNotIn('status', ['extracted', 'rejected'])
-            ->when($customerIds !== null, fn ($q) => $q->whereIn('company_id', $customerIds))
+            ->whereIn('company_id', $companyIds)
             ->when($from !== '', fn ($q) => $q->whereDate('purchase_date', '>=', $from))
             ->when($to   !== '', fn ($q) => $q->whereDate('purchase_date', '<=', $to))
             ->when($search !== '', function ($q) use ($search) {
@@ -227,9 +229,18 @@ class PurchaseInvoiceController extends Controller
             return $invoice;
         });
 
-        $tenantId     = $this->activeTenantId($request);
-        $bankAccounts = BankAccount::when($tenantId !== null, fn ($q) => $q->forCompany($tenantId))
-            ->where('is_active', true)->orderBy('bank_name')->orderBy('name')->get();
+        $bankingCompanyIds = Company::whereIn('id', $companyIds)
+            ->get(['id', 'module_accesses'])
+            ->filter(fn (Company $company) => in_array('banking', $company->module_accesses ?? [], true))
+            ->pluck('id')->all();
+        $bankAccounts = BankAccount::whereIn('company_id', $bankingCompanyIds)
+            ->where('is_active', true)->orderBy('bank_name')->orderBy('name')
+            ->get(['id', 'company_id', 'bank_name', 'name', 'account_number']);
+        $invoices->getCollection()->transform(function (PurchaseInvoice $invoice) use ($bankingCompanyIds) {
+            $invoice->extracted_payment_reference = $this->extractedPaymentReference($invoice);
+            $invoice->banking_enabled = in_array($invoice->company_id, $bankingCompanyIds, true);
+            return $invoice;
+        });
 
         return Inertia::render('Admin/PurchaseInvoices/AccountsPayable', compact('invoices', 'totals', 'search', 'from', 'to', 'bankAccounts'));
     }
@@ -289,28 +300,81 @@ class PurchaseInvoiceController extends Controller
         return back()->with('status', 'Estado de pago actualizado.');
     }
 
+    public function markPaidBulk(Request $request)
+    {
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['required', 'integer', 'distinct', 'exists:purchase_invoices,id'],
+            'bank_account_id' => ['required', 'integer', 'exists:bank_accounts,id'],
+            'payments' => ['required', 'array', 'min:1'],
+            'payments.*.invoice_id' => ['required', 'integer', 'distinct'],
+            'payments.*.reference' => ['required', 'string', 'max:200'],
+        ]);
+
+        $companyIds = $this->accessibleCompanyIds($request);
+        $invoices = PurchaseInvoice::with(['supplier', 'bankTransactions'])
+            ->whereIn('id', $data['ids'])
+            ->whereIn('company_id', $companyIds)
+            ->whereIn('payment_status', ['pending', 'partial'])
+            ->whereNotIn('status', ['extracted', 'rejected'])
+            ->get();
+        $payments = collect($data['payments'])->keyBy('invoice_id');
+
+        if ($invoices->count() !== count($data['ids'])
+            || $payments->keys()->diff($invoices->pluck('id'))->isNotEmpty()
+            || $invoices->pluck('id')->diff($payments->keys())->isNotEmpty()) {
+            return back()->withErrors('Selecciona únicamente facturas pendientes o parciales incluidas en el lote de pago.');
+        }
+
+        $selectedCompanyIds = $invoices->pluck('company_id')->unique()->values();
+        if ($selectedCompanyIds->count() !== 1) {
+            return back()->withErrors('El pago masivo solo permite facturas de una misma empresa.');
+        }
+        $companyId = (int) $selectedCompanyIds->first();
+        if (! $this->bankingEnabledForCompany($companyId)
+            || ! BankAccount::whereKey($data['bank_account_id'])->where('company_id', $companyId)->where('is_active', true)->exists()) {
+            return back()->withErrors('Selecciona una cuenta bancaria activa de una empresa con el módulo Bancos habilitado.');
+        }
+
+        try {
+            DB::transaction(function () use ($invoices, $payments, $data) {
+                foreach ($invoices as $invoice) {
+                    $this->recordInvoiceBankPayment($invoice, [
+                        'bank_account_id' => $data['bank_account_id'],
+                        'reference' => $payments->get($invoice->id)['reference'],
+                    ]);
+                }
+            });
+        } catch (RuntimeException $exception) {
+            return back()->withErrors($exception->getMessage());
+        }
+
+        return back()->with('status', count($data['ids']).' pago(s) registrados en Bancos con fecha de factura.');
+    }
+
     public function pendingApproval(Request $request)
     {
         $showAll = $request->boolean('ver_todas');
-        $customerIds = $this->accessibleCustomerIds($request);
+        $companyIds = $this->accessibleCompanyIds($request);
 
         $invoices = PurchaseInvoice::with('supplier')
-            ->when($customerIds !== null, fn ($q) => $q->whereIn('company_id', $customerIds))
+            ->whereIn('company_id', $companyIds)
             ->when(!$showAll, fn ($q) => $q->where('status', 'extracted'))
             ->latest('purchase_date')
             ->latest()
             ->paginate(25)
             ->withQueryString();
 
-        $total = PurchaseInvoice::when($customerIds !== null, fn ($q) => $q->whereIn('customer_id', $customerIds))
+        $total = PurchaseInvoice::whereIn('company_id', $companyIds)
             ->where('status', 'extracted')->count();
 
         return Inertia::render('Admin/PurchaseInvoices/PendingApproval', compact('invoices', 'total', 'showAll'));
     }
 
-    public function approve(PurchaseInvoice $purchaseInvoice, Request $request, AccountingEntryService $accounting, AccountingPeriodService $periods)
+    public function approve(PurchaseInvoice $purchaseInvoice, Request $request, AccountingEntryService $accounting, AccountingPeriodService $periods, PurchaseInvoiceMailboxImporter $importer)
     {
         $this->authorize('approve', $purchaseInvoice);
+        abort_unless(in_array($purchaseInvoice->company_id, $this->accessibleCompanyIds($request), true), 403);
 
         if ($this->isAccountingConfigured()) {
             try {
@@ -320,7 +384,8 @@ class PurchaseInvoiceController extends Controller
             }
 
             try {
-                DB::transaction(function () use ($accounting, $purchaseInvoice, $request) {
+                DB::transaction(function () use ($accounting, $purchaseInvoice, $request, $importer) {
+                    $importer->registerSupplierForApprovedInvoice($purchaseInvoice);
                     $accounting->createFromPurchase($purchaseInvoice->load('supplier'), $request->user()?->id);
                     $purchaseInvoice->update(['status' => 'approved']);
                 });
@@ -328,7 +393,14 @@ class PurchaseInvoiceController extends Controller
                 return back()->withErrors($exception->getMessage());
             }
         } else {
-            $purchaseInvoice->update(['status' => 'approved']);
+            try {
+                DB::transaction(function () use ($purchaseInvoice, $importer) {
+                    $importer->registerSupplierForApprovedInvoice($purchaseInvoice);
+                    $purchaseInvoice->update(['status' => 'approved']);
+                });
+            } catch (RuntimeException $exception) {
+                return back()->withErrors($exception->getMessage());
+            }
         }
 
         return back()->with('status', 'Factura aprobada y enviada a Cuentas por pagar.');
@@ -340,15 +412,17 @@ class PurchaseInvoiceController extends Controller
         return back()->with('status', 'Factura rechazada.');
     }
 
-    public function approveBulk(Request $request, AccountingEntryService $accounting, AccountingPeriodService $periods)
+    public function approveBulk(Request $request, AccountingEntryService $accounting, AccountingPeriodService $periods, PurchaseInvoiceMailboxImporter $importer)
     {
-        $ids = $request->validate([
+        $validated = $request->validate([
             'ids'   => ['required', 'array'],
             'ids.*' => ['integer', 'exists:purchase_invoices,id'],
-        ])['ids'];
+        ]);
+        $ids = $validated['ids'];
 
         $invoices = PurchaseInvoice::with('supplier')
             ->whereIn('id', $ids)
+            ->whereIn('company_id', $this->accessibleCompanyIds($request))
             ->where('status', 'extracted')
             ->get();
 
@@ -367,7 +441,8 @@ class PurchaseInvoiceController extends Controller
                 }
 
                 try {
-                    DB::transaction(function () use ($accounting, $invoice, $request) {
+                    DB::transaction(function () use ($accounting, $invoice, $request, $importer) {
+                        $importer->registerSupplierForApprovedInvoice($invoice);
                         $accounting->createFromPurchase($invoice, $request->user()?->id);
                         $invoice->update(['status' => 'approved']);
                     });
@@ -376,14 +451,21 @@ class PurchaseInvoiceController extends Controller
                     $blocked++;
                 }
             } else {
-                $invoice->update(['status' => 'approved']);
-                $updated++;
+                try {
+                    DB::transaction(function () use ($invoice, $importer) {
+                        $importer->registerSupplierForApprovedInvoice($invoice);
+                        $invoice->update(['status' => 'approved']);
+                    });
+                    $updated++;
+                } catch (\Throwable) {
+                    $blocked++;
+                }
             }
         }
 
         $msg = "{$updated} factura(s) aprobada(s) y enviadas a Cuentas por pagar.";
         if ($blocked > 0) {
-            $msg .= " {$blocked} factura(s) no se aprobaron por período cerrado o configuración contable incompleta.";
+            $msg .= " {$blocked} factura(s) no se aprobaron: verifica el período contable y que el NIT receptor coincida con la empresa.";
         }
 
         return back()->with('status', $msg);
@@ -407,12 +489,12 @@ class PurchaseInvoiceController extends Controller
         $supplierId = $request->query('supplier_id');
         $from       = trim((string) $request->query('from', ''));
         $to         = trim((string) $request->query('to', ''));
-        $customerIds = $this->accessibleCustomerIds($request);
+        $companyIds = $this->accessibleCompanyIds($request);
 
         return Inertia::render('Admin/PurchaseInvoices/Index', [
             'invoices' => PurchaseInvoice::with(['supplier', 'customer'])
                 ->whereNotIn('status', ['extracted', 'rejected'])
-                ->when($customerIds !== null, fn ($q) => $q->whereIn('company_id', $customerIds))
+                ->whereIn('company_id', $companyIds)
                 ->when($supplierId, fn ($q) => $q->where('supplier_id', $supplierId))
                 ->when($from !== '', fn ($q) => $q->whereDate('purchase_date', '>=', $from))
                 ->when($to   !== '', fn ($q) => $q->whereDate('purchase_date', '<=', $to))
@@ -433,7 +515,7 @@ class PurchaseInvoiceController extends Controller
                 ->latest()
                 ->paginate(15)
                 ->withQueryString(),
-            'suppliers'   => Supplier::when($customerIds !== null, fn ($q) => $q->whereIn('customer_id', $customerIds))->orderBy('name')->get(),
+            'suppliers'   => Supplier::whereIn('company_id', $companyIds)->orderBy('name')->get(),
             'customers'   => Customer::with('companies')->orderBy('name')->get(),
             'search'      => $search,
             'supplierId'  => $supplierId,
@@ -535,11 +617,11 @@ class PurchaseInvoiceController extends Controller
     {
         $search = trim((string) $request->query('search', ''));
         $supplierId = $request->query('supplier_id');
-        $customerIds = $this->accessibleCustomerIds($request);
+        $companyIds = $this->accessibleCompanyIds($request);
 
         $rows = PurchaseInvoice::with(['supplier', 'customer'])
             ->whereNotIn('status', ['extracted', 'rejected'])
-            ->when($customerIds !== null, fn ($q) => $q->whereIn('company_id', $customerIds))
+            ->whereIn('company_id', $companyIds)
             ->when($supplierId, fn ($query) => $query->where('supplier_id', $supplierId))
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
@@ -588,15 +670,78 @@ class PurchaseInvoiceController extends Controller
         return $companyId ? (int) $companyId : null;
     }
 
-    /** Devuelve los company_ids accesibles para el usuario. Null significa sin restricción (admin sin tenant activo). */
-    private function accessibleCustomerIds(Request $request): ?array
+    private function bankingEnabledForCompany(int $companyId): bool
+    {
+        $modules = Company::whereKey($companyId)->value('module_accesses') ?? [];
+        if (is_string($modules)) $modules = json_decode($modules, true) ?: [];
+        return in_array('banking', $modules, true);
+    }
+
+    private function recordInvoiceBankPayment(PurchaseInvoice $invoice, array $payment): void
+    {
+        $bankAccount = BankAccount::whereKey($payment['bank_account_id'])
+            ->where('company_id', $invoice->company_id)
+            ->where('is_active', true)
+            ->firstOrFail();
+
+        if ($invoice->bankTransactions()->where('bank_transactions.reference', $payment['reference'])->exists()) {
+            throw new RuntimeException('Esta referencia de pago ya está registrada para la factura '.$invoice->invoice_number.'.');
+        }
+
+        $alreadyPaid = (float) $invoice->bankTransactions()->sum('bank_transaction_purchase_invoice.amount_applied');
+        $balance = max(0, (float) $invoice->total - $alreadyPaid);
+        if ($balance <= 0) {
+            throw new RuntimeException('La factura '.$invoice->invoice_number.' ya está pagada.');
+        }
+
+        $paymentAmount = min($this->extractedPaymentAmount($invoice) ?? $balance, $balance);
+        if ($paymentAmount <= 0) {
+            throw new RuntimeException('No se pudo determinar un monto válido para registrar el pago bancario.');
+        }
+
+        $transaction = BankTransaction::create([
+            'bank_account_id' => $bankAccount->id,
+            'type' => 'pago',
+            'transaction_date' => $invoice->purchase_date?->toDateString() ?? now()->toDateString(),
+            'bank_account' => trim($bankAccount->bank_name.' / '.$bankAccount->name.' '.($bankAccount->account_number ?? '')),
+            'amount' => $paymentAmount,
+            'reference' => $payment['reference'],
+            'notes' => 'Pago registrado desde factura de compra '.$invoice->invoice_number,
+        ]);
+
+        $transaction->purchaseInvoices()->attach($invoice->id, ['amount_applied' => $paymentAmount]);
+        $invoice->update(['payment_status' => $alreadyPaid + $paymentAmount >= (float) $invoice->total ? 'paid' : 'partial']);
+    }
+
+    private function extractedPaymentReference(PurchaseInvoice $invoice): string
+    {
+        $body = is_array($invoice->extracted_document_body)
+            ? $invoice->extracted_document_body
+            : json_decode($invoice->extracted_document_body ?? '', true);
+        return collect(data_get($body, 'resumen.pagos', []))
+            ->pluck('referencia')->filter(fn ($reference) => filled($reference))->unique()->values()->implode(' / ');
+    }
+
+    private function extractedPaymentAmount(PurchaseInvoice $invoice): ?float
+    {
+        $body = is_array($invoice->extracted_document_body)
+            ? $invoice->extracted_document_body
+            : json_decode($invoice->extracted_document_body ?? '', true);
+        $payments = collect(data_get($body, 'resumen.pagos', []))
+            ->filter(fn ($payment) => filled($payment['referencia'] ?? null) && is_numeric($payment['montoPago'] ?? null));
+
+        return $payments->isEmpty() ? null : (float) $payments->sum(fn ($payment) => (float) $payment['montoPago']);
+    }
+
+    /** Devuelve las empresas accesibles; sin empresa activa, el administrador no ve registros de compras. */
+    private function accessibleCompanyIds(Request $request): array
     {
         $user = $request->user();
-        if (! $user) return null;
+        if (! $user) return [];
 
         if ($user->isAdmin()) {
             $tenantId = $this->activeTenantId($request);
-            return $tenantId ? [$tenantId] : null;
+            return $tenantId ? [$tenantId] : [];
         }
 
         return $user->accessibleCompanies()->pluck('id')->unique()->filter()->values()->all();

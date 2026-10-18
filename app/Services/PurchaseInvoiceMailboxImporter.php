@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\BillingSetting;
+use App\Models\Company;
 use App\Models\PurchaseInvoice;
 use App\Models\Supplier;
 use Illuminate\Support\Facades\DB;
@@ -32,6 +33,10 @@ class PurchaseInvoiceMailboxImporter
 
     public function import(?string $from = null, ?string $to = null, ?int $companyId = null): array
     {
+        if (! $companyId || ! Company::whereKey($companyId)->exists()) {
+            throw new RuntimeException('Selecciona una empresa antes de extraer facturas.');
+        }
+
         $config = $this->resolveConfig();
 
         if (blank($config['username']) || blank($config['password'])) {
@@ -204,6 +209,53 @@ class PurchaseInvoiceMailboxImporter
             ->exists();
     }
 
+    private function hasDuplicateGenerationCode(?string $codigoGeneracion, ?int $companyId = null): bool
+    {
+        if (blank($codigoGeneracion)) {
+            return false;
+        }
+
+        return PurchaseInvoice::query()
+            ->when($companyId !== null, fn ($query) => $query->where('company_id', $companyId))
+            ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(extracted_document_body, '$.identificacion.codigoGeneracion')) = ?", [$codigoGeneracion])
+            ->exists();
+    }
+
+    public function registerSupplierForApprovedInvoice(PurchaseInvoice $invoice): Supplier
+    {
+        $invoice->loadMissing('company');
+        $company = $invoice->company;
+        $data = is_array($invoice->extracted_document_body)
+            ? $invoice->extracted_document_body
+            : json_decode($invoice->extracted_document_body ?? '', true);
+
+        if (! $company || ! is_array($data)) {
+            throw new RuntimeException('No se pudo validar el emisor y receptor de la factura extraída.');
+        }
+
+        $recipientNit = $this->normalizeDocument($data['receptor']['nit'] ?? $data['receptor']['numDocumento'] ?? null);
+        $companyNit = $this->normalizeDocument($company->nit_dui);
+        if (blank($recipientNit) || blank($companyNit) || $recipientNit !== $companyNit) {
+            throw new RuntimeException('No se puede aprobar: el NIT del receptor de la factura no coincide con el de la empresa.');
+        }
+
+        $issuer = $data['emisor'] ?? [];
+        if (! is_array($issuer) || blank($issuer['nombre'] ?? null) || blank($this->normalizeDocument($issuer['nit'] ?? null))) {
+            throw new RuntimeException('La factura debe incluir el nombre y NIT del emisor para registrar al proveedor.');
+        }
+
+        $supplier = $this->supplierFromIssuer($issuer, $company->id);
+        $invoice->supplier()->associate($supplier);
+        $invoice->save();
+
+        return $supplier;
+    }
+
+    private function normalizeDocument(mixed $document): string
+    {
+        return preg_replace('/\\D+/', '', (string) $document) ?? '';
+    }
+
 
     private function inspectJson(string $content, string $filename, array &$details): void
     {
@@ -217,21 +269,19 @@ class PurchaseInvoiceMailboxImporter
             $invoiceNumber = $numeroControl ?? $codigoGeneracion ?? null;
             $supplierName = $issuer['nombre'] ?? null;
 
-            if (blank($invoiceNumber) || blank($supplierName)) {
+            if (blank($invoiceNumber) || blank($codigoGeneracion) || blank($supplierName)) {
                 $details['files'][] = [
                     'filename' => $filename,
                     'supplier' => $supplierName ?? 'DESCONOCIDO',
                     'numeroControl' => $numeroControl,
                     'codigoGeneracion' => $codigoGeneracion,
                     'status' => 'error',
-                    'message' => 'Falta numeroControl o nombre de emisor',
+                    'message' => 'Falta codigoGeneracion, numeroControl o nombre de emisor',
                 ];
                 return;
             }
 
-            $isDuplicate = $this->hasDuplicateInvoice(null, $invoiceNumber, $codigoGeneracion);
-            $supplier = $isDuplicate ? null : $this->supplierFromIssuer($issuer);
-            $isDuplicate = $isDuplicate || $this->hasDuplicateInvoice($supplier?->id, $invoiceNumber, $codigoGeneracion);
+            $isDuplicate = $this->hasDuplicateGenerationCode($codigoGeneracion);
 
             $details['files'][] = [
                 'filename' => $filename,
@@ -265,11 +315,28 @@ class PurchaseInvoiceMailboxImporter
         $invoiceNumber = $numeroControl ?? $codigoGeneracion ?? null;
         $supplierName = $issuer['nombre'] ?? null;
 
-        if (blank($invoiceNumber) || blank($supplierName)) {
-            throw new RuntimeException("El adjunto {$filename} no contiene identificacion.numeroControl o emisor.nombre.");
+        if (blank($invoiceNumber) || blank($supplierName) || blank($codigoGeneracion)) {
+            throw new RuntimeException("El adjunto {$filename} debe contener identificacion.codigoGeneracion, numeroControl y emisor.nombre.");
         }
 
-        if ($this->hasDuplicateInvoice(null, $invoiceNumber, $codigoGeneracion, $companyId)) {
+        $company = Company::find($companyId);
+        $recipient = $data['receptor'] ?? [];
+        $recipientNit = $this->normalizeDocument($recipient['nit'] ?? $recipient['numDocumento'] ?? null);
+        $companyNit = $this->normalizeDocument($company?->nit_dui);
+
+        if (blank($recipientNit) || blank($companyNit) || $recipientNit !== $companyNit) {
+            $summary['details'][] = [
+                'filename' => $filename,
+                'supplier' => $supplierName,
+                'numeroControl' => $numeroControl,
+                'codigoGeneracion' => $codigoGeneracion,
+                'status' => 'FILTRADA',
+                'razon' => 'El NIT del receptor no coincide con el NIT de la empresa seleccionada.',
+            ];
+            return 'filtered';
+        }
+
+        if ($this->hasDuplicateGenerationCode($codigoGeneracion, $companyId)) {
             $summary['details'][] = [
                 'filename' => $filename,
                 'supplier' => $supplierName,
@@ -282,24 +349,10 @@ class PurchaseInvoiceMailboxImporter
             return 'duplicates';
         }
 
-        return DB::transaction(function () use ($data, $identification, $issuer, $summary_data, $invoiceNumber, $numeroControl, $codigoGeneracion, $supplierName, $filename, $uid, &$summary, $companyId) {
-            $supplier = $this->supplierFromIssuer($issuer, $companyId);
-
-            if ($this->hasDuplicateInvoice($supplier->id, $invoiceNumber, $codigoGeneracion, $companyId)) {
-                $summary['details'][] = [
-                    'filename' => $filename,
-                    'supplier' => $supplierName,
-                    'numeroControl' => $numeroControl,
-                    'codigoGeneracion' => $codigoGeneracion,
-                    'status' => 'DUPLICADA',
-                    'razon' => "Ya existe en el sistema (ID proveedor: {$supplier->id})"
-                ];
-                return 'duplicates';
-            }
-
+        return DB::transaction(function () use ($data, $identification, $summary_data, $invoiceNumber, $numeroControl, $codigoGeneracion, $supplierName, $filename, $uid, &$summary, $companyId) {
             try {
                 PurchaseInvoice::create([
-                    'supplier_id' => $supplier->id,
+                    'supplier_id' => null,
                     'company_id' => $companyId,
                     'document_type' => $this->documentType($identification['tipoDte'] ?? null),
                     'invoice_number' => $invoiceNumber,
@@ -360,17 +413,15 @@ class PurchaseInvoiceMailboxImporter
 
     private function supplierFromIssuer(array $issuer, ?int $companyId = null): Supplier
     {
-        $documentNumber = $issuer['nit'] ?? $issuer['numDocumento'] ?? $issuer['nrc'] ?? null;
-
-        $supplier = null;
-
-        if (! blank($documentNumber)) {
-            $supplier = Supplier::when($companyId, fn ($q) => $q->where('company_id', $companyId))
-                ->where('document_number', $documentNumber)->first();
-        } elseif (! blank($issuer['correo'] ?? null)) {
-            $supplier = Supplier::when($companyId, fn ($q) => $q->where('company_id', $companyId))
-                ->where('email', $issuer['correo'])->first();
+        $documentNumber = $this->normalizeDocument($issuer['nit'] ?? null);
+        if (blank($documentNumber)) {
+            throw new RuntimeException('El emisor no tiene un NIT válido; no se puede registrar el proveedor.');
         }
+
+        // Compara NIT normalizados para tratar igual documentos con o sin guiones.
+        $supplier = Supplier::where('company_id', $companyId)
+            ->get()
+            ->first(fn (Supplier $candidate) => $this->normalizeDocument($candidate->document_number) === $documentNumber);
 
         $address = $issuer['direccion'] ?? [];
 
@@ -379,8 +430,8 @@ class PurchaseInvoiceMailboxImporter
             'name' => $issuer['nombre'] ?? 'Proveedor sin nombre',
             'email' => $issuer['correo'] ?? null,
             'phone' => $issuer['telefono'] ?? null,
-            'document_type' => ($issuer['nit'] ?? null) ? '36' : '13',
-            'document_number' => $documentNumber ?: 'SIN-DOCUMENTO-'.substr(md5($issuer['nombre'] ?? microtime()), 0, 10),
+            'document_type' => '36',
+            'document_number' => $documentNumber,
             'nrc' => $issuer['nrc'] ?? null,
             'trade_name' => $issuer['nombreComercial'] ?? $issuer['nombre'] ?? null,
             'business_activity' => $issuer['codActividad'] ?? null,

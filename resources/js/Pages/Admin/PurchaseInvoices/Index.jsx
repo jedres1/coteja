@@ -5,6 +5,7 @@ import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
 import Modal from '@/Components/Modal';
 import { IconEye, IconTrash } from '@/Components/Icons';
+import { formatDate } from '@/utils';
 
 const DOC_LABELS = {
     ccf: 'CCF',
@@ -223,8 +224,8 @@ function DteDetailView({ invoice }) {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px' }}>
                         <div><span style={{ color: '#6b7280', fontSize: 12 }}>Proveedor</span><br /><strong>{invoice.supplier?.name ?? '—'}</strong></div>
                         <div><span style={{ color: '#6b7280', fontSize: 12 }}>NIT / NRC</span><br />{invoice.supplier?.document_number ?? '—'}</div>
-                        <div><span style={{ color: '#6b7280', fontSize: 12 }}>Fecha de compra</span><br />{invoice.purchase_date ?? '—'}</div>
-                        <div><span style={{ color: '#6b7280', fontSize: 12 }}>Vencimiento</span><br />{invoice.due_date ?? '—'}</div>
+                        <div><span style={{ color: '#6b7280', fontSize: 12 }}>Fecha de compra</span><br />{formatDate(invoice.purchase_date)}</div>
+                        <div><span style={{ color: '#6b7280', fontSize: 12 }}>Vencimiento</span><br />{formatDate(invoice.due_date)}</div>
                         <div><span style={{ color: '#6b7280', fontSize: 12 }}>Tipo</span><br />{TIPOS_DTE[invoice.document_type] ?? invoice.document_type ?? '—'}</div>
                         <div><span style={{ color: '#6b7280', fontSize: 12 }}>Método de pago</span><br />{invoice.payment_method ?? '—'}</div>
                         <div><span style={{ color: '#6b7280', fontSize: 12 }}>Subtotal</span><br /><span style={{ fontFamily: 'monospace' }}>{fmt(invoice.subtotal)}</span></div>
@@ -496,9 +497,9 @@ export default function PurchaseInvoicesIndex({ invoices, search, supplierId, su
                         {invoices.data.map((inv) => (
                             <tr key={inv.id}>
                                 <td>
-                                    <div style={{ fontSize: 13 }}>{inv.purchase_date ?? '—'}</div>
+                                    <div style={{ fontSize: 13 }}>{formatDate(inv.purchase_date)}</div>
                                     {inv.due_date && (
-                                        <div style={{ fontSize: 11, color: '#6b7280' }}>Vence: {inv.due_date}</div>
+                                        <div style={{ fontSize: 11, color: '#6b7280' }}>Vence: {formatDate(inv.due_date)}</div>
                                     )}
                                 </td>
                                 <td>

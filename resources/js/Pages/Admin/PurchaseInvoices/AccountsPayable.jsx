@@ -4,6 +4,7 @@ import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
 import Modal from '@/Components/Modal';
+import { formatDate } from '@/utils';
 
 // ─── PayForm ──────────────────────────────────────────────────────────────────
 
@@ -113,6 +114,47 @@ export default function AccountsPayable({ invoices, totals, bankAccounts, search
     const [search, setSearch]   = useState(searchProp);
     const [from, setFrom]       = useState(fromProp || firstOfMonth);
     const [to, setTo]           = useState(toProp   || today);
+    const [selectedIds, setSelectedIds] = useState([]);
+    const [bulkBankAccountId, setBulkBankAccountId] = useState('');
+    const [references, setReferences] = useState(() => Object.fromEntries(
+        invoices.data.map((invoice) => [invoice.id, invoice.extracted_payment_reference ?? ''])
+    ));
+
+    const selectableInvoices = invoices.data.filter((invoice) => invoice.banking_enabled);
+    const selectedInvoices = invoices.data.filter((invoice) => selectedIds.includes(invoice.id));
+    const selectedCompanyIds = [...new Set(selectedInvoices.map((invoice) => Number(invoice.company_id)))];
+    const bulkBankAccounts = selectedCompanyIds.length === 1
+        ? (bankAccounts ?? []).filter((account) => Number(account.company_id) === selectedCompanyIds[0])
+        : [];
+
+    function toggleAll() {
+        setSelectedIds(selectedIds.length === selectableInvoices.length ? [] : selectableInvoices.map((invoice) => invoice.id));
+    }
+
+    function handleBulkPayment() {
+        if (!selectedInvoices.length) return;
+        if (selectedCompanyIds.length !== 1) {
+            window.alert('Selecciona facturas de una sola empresa para registrar el pago masivo.');
+            return;
+        }
+        if (!bulkBankAccountId) {
+            window.alert('Selecciona la cuenta bancaria para registrar los pagos.');
+            return;
+        }
+        const payments = selectedInvoices.map((invoice) => ({
+            invoice_id: invoice.id,
+            reference: (references[invoice.id] ?? '').trim(),
+        }));
+        if (payments.some((payment) => !payment.reference)) {
+            window.alert('Completa la referencia de pago de cada factura seleccionada.');
+            return;
+        }
+        router.post(route('admin.purchase-invoices.pay-bulk'), {
+            ids: selectedInvoices.map((invoice) => invoice.id),
+            bank_account_id: bulkBankAccountId,
+            payments,
+        }, { onSuccess: () => { setSelectedIds([]); setBulkBankAccountId(''); } });
+    }
 
     function applyFilters(e) {
         e.preventDefault();
@@ -185,9 +227,32 @@ export default function AccountsPayable({ invoices, totals, bankAccounts, search
             </div>
 
             <div className="card table-scroll">
+                {selectedInvoices.length > 0 && (
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap', padding: '12px 0' }}>
+                        <span className="muted">{selectedInvoices.length} factura(s) seleccionada(s)</span>
+                        <label style={{ minWidth: 260, margin: 0, fontSize: 12 }}>
+                            Cuenta bancaria para el lote <span style={{ color: '#ef4444' }}>*</span>
+                            <select value={bulkBankAccountId} onChange={(e) => setBulkBankAccountId(e.target.value)} disabled={selectedCompanyIds.length !== 1}>
+                                <option value="">Seleccionar cuenta bancaria</option>
+                                {bulkBankAccounts.map((account) => (
+                                    <option key={account.id} value={account.id}>
+                                        {account.bank_name} / {account.name}{account.account_number ? ` (${account.account_number})` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                            {selectedCompanyIds.length > 1 && <span className="field-error">El lote debe ser de una sola empresa.</span>}
+                            {selectedCompanyIds.length === 1 && bulkBankAccounts.length === 0 && <span className="field-error">No hay cuentas bancarias activas para esta empresa.</span>}
+                        </label>
+                        <button type="button" className="btn" onClick={handleBulkPayment} disabled={selectedCompanyIds.length !== 1 || bulkBankAccounts.length === 0}>
+                            Registrar pagos seleccionados
+                        </button>
+                        <button type="button" className="btn secondary" onClick={() => setSelectedIds([])}>Limpiar selección</button>
+                    </div>
+                )}
                 <table>
                     <thead>
                         <tr>
+                            <th><input type="checkbox" checked={selectableInvoices.length > 0 && selectableInvoices.every((invoice) => selectedIds.includes(invoice.id))} onChange={toggleAll} style={{ width: 'auto' }} title="Seleccionar todas las facturas con Bancos habilitado" /></th>
                             <th>Proveedor</th>
                             <th>Factura</th>
                             <th>Fecha / Vence</th>
@@ -195,25 +260,27 @@ export default function AccountsPayable({ invoices, totals, bankAccounts, search
                             <th>Pagado</th>
                             <th>Saldo</th>
                             <th>Estado</th>
+                            <th>Referencia de pago</th>
                             <th></th>
                         </tr>
                     </thead>
                     <tbody>
                         {invoices.data.length === 0 && (
                             <tr>
-                                <td colSpan={8} className="empty">Sin registros</td>
+                                <td colSpan={10} className="empty">Sin registros</td>
                             </tr>
                         )}
                         {invoices.data.map((invoice) => {
                             const balance = Number(invoice.total ?? 0) - Number(invoice.paid_amount ?? 0);
                             return (
                                 <tr key={invoice.id}>
+                                    <td><input type="checkbox" checked={selectedIds.includes(invoice.id)} disabled={!invoice.banking_enabled} onChange={() => setSelectedIds((current) => current.includes(invoice.id) ? current.filter((id) => id !== invoice.id) : [...current, invoice.id])} style={{ width: 'auto' }} title={invoice.banking_enabled ? 'Seleccionar para pago masivo' : 'La empresa no tiene el módulo Bancos habilitado'} /></td>
                                     <td style={{ fontWeight: 600 }}>{invoice.supplier?.name}</td>
                                     <td className="muted">{invoice.invoice_number}</td>
                                     <td>
-                                        <span>{invoice.purchase_date}</span>
+                                        <span>{formatDate(invoice.purchase_date)}</span>
                                         {invoice.due_date && (
-                                            <><br /><span className="muted" style={{ fontSize: 12 }}>Vence: {invoice.due_date}</span></>
+                                            <><br /><span className="muted" style={{ fontSize: 12 }}>Vence: {formatDate(invoice.due_date)}</span></>
                                         )}
                                     </td>
                                     <td style={{ fontWeight: 600 }}>{fmt(invoice.total)}</td>
@@ -225,6 +292,9 @@ export default function AccountsPayable({ invoices, totals, bankAccounts, search
                                         <span className={`badge ${paymentBadge[invoice.payment_status] ?? ''}`}>
                                             {paymentLabel[invoice.payment_status] ?? invoice.payment_status}
                                         </span>
+                                    </td>
+                                    <td style={{ minWidth: 190 }}>
+                                        {invoice.banking_enabled ? <input type="text" value={references[invoice.id] ?? ''} onChange={(e) => setReferences((current) => ({ ...current, [invoice.id]: e.target.value }))} placeholder="Referencia del DTE" maxLength={200} /> : <span className="muted">—</span>}
                                     </td>
                                     <td>
                                         {invoice.payment_status !== 'paid' && (

@@ -16,6 +16,15 @@ export function showToast(msg, ok) {
     t._coteja_timer = setTimeout(() => (t.style.display = 'none'), 4000);
 }
 
+export function formatDate(value) {
+    if (!value) return '—';
+
+    const [year, month, day] = String(value).slice(0, 10).split('-').map(Number);
+    if (!year || !month || !day) return value;
+
+    return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+}
+
 export async function postJson(url, payload = {}, onOk = null) {
     try {
         const res = await window.axios.post(url, payload);

@@ -5,6 +5,7 @@ import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
 import Modal from '@/Components/Modal';
 import { IconEye } from '@/Components/Icons';
+import { formatDate } from '@/utils';
 
 // ─── DteDetailView ────────────────────────────────────────────────────────────
 
@@ -71,7 +72,7 @@ function DteDetailView({ invoice }) {
                 <Section title="Factura">
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px' }}>
                         <Row label="Proveedor" value={invoice.supplier?.name} />
-                        <Row label="Fecha" value={invoice.purchase_date} />
+                        <Row label="Fecha" value={formatDate(invoice.purchase_date)} />
                         <Row label="Número" value={invoice.invoice_number} mono />
                         <Row label="Subtotal" value={fmt(invoice.subtotal)} mono />
                         <Row label="IVA" value={fmt(invoice.iva)} mono />
@@ -271,6 +272,7 @@ const documentTypes = {
 
 const statusLabels = {
     pending:  'Pendiente',
+    extracted: 'Pendiente',
     approved: 'Aprobado',
     rejected: 'Rechazado',
 };
@@ -295,9 +297,11 @@ export default function PendingApproval({ invoices, total, showAll }) {
     }
 
     function toggleRow(id) {
-        setSelectedIds((prev) =>
-            prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-        );
+        if (selectedIds.includes(id)) {
+            setSelectedIds((prev) => prev.filter((x) => x !== id));
+        } else {
+            setSelectedIds((prev) => [...prev, id]);
+        }
     }
 
     useEffect(() => {
@@ -336,6 +340,7 @@ export default function PendingApproval({ invoices, total, showAll }) {
         approved: 'active',
         rejected: 'danger',
     };
+
 
     return (
         <AppLayout>
@@ -419,7 +424,7 @@ export default function PendingApproval({ invoices, total, showAll }) {
                                         style={{ width: 'auto' }}
                                     />
                                 </td>
-                                <td className="muted">{invoice.purchase_date}</td>
+                                <td className="muted">{formatDate(invoice.purchase_date)}</td>
                                 <td style={{ fontWeight: 600 }}>{invoice.supplier?.name}</td>
                                 <td>
                                     {invoice.receptor_name
@@ -463,7 +468,7 @@ export default function PendingApproval({ invoices, total, showAll }) {
                                         >
                                             <IconEye />
                                         </button>
-                                        {invoice.status === 'pending' && (
+                                        {invoice.status === 'extracted' && (
                                             <>
                                                 <button
                                                     type="button"

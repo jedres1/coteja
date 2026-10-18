@@ -57,6 +57,7 @@ Route::middleware(['auth', 'role:admin,inquilino', 'module:purchases'])->prefix(
     Route::post('purchase-invoices/{purchaseInvoice}/aprobar', [PurchaseInvoiceController::class, 'approve'])->name('purchase-invoices.approve');
     Route::post('purchase-invoices/{purchaseInvoice}/rechazar', [PurchaseInvoiceController::class, 'reject'])->name('purchase-invoices.reject');
     Route::get('cuentas-por-pagar', [PurchaseInvoiceController::class, 'accountsPayable'])->name('purchase-invoices.accounts-payable');
+    Route::post('cuentas-por-pagar/pagos-masivos', [PurchaseInvoiceController::class, 'markPaidBulk'])->name('purchase-invoices.pay-bulk');
     Route::post('purchase-invoices/{purchaseInvoice}/pay', [PurchaseInvoiceController::class, 'markPaid'])->name('purchase-invoices.pay');
     Route::get('purchase-invoices/export', [PurchaseInvoiceController::class, 'export'])->name('purchase-invoices.export');
     Route::resource('purchase-invoices', PurchaseInvoiceController::class)->only(['index', 'store', 'update', 'destroy']);
