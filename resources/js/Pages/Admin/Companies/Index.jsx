@@ -24,25 +24,45 @@ const licenseTypes = {
 
 function CompanyForm({ company, modules, onSuccess }) {
     const [activities, setActivities] = useState([]);
+    const [geography, setGeography]   = useState(null);
 
     useEffect(() => {
         fetch('/catalogs/actividades-economicas.json')
             .then((r) => r.json())
             .then((d) => setActivities(Array.isArray(d) ? d : []))
             .catch(() => {});
+        fetch('/catalogs/division-geografica.json')
+            .then((r) => r.json())
+            .then((d) => setGeography(d ?? null))
+            .catch(() => {});
     }, []);
 
     const form = useForm({
-        business_name:     company?.business_name     ?? '',
-        trade_name:        company?.trade_name        ?? '',
-        nit_dui:           company?.nit_dui           ?? '',
-        nrc:               company?.nrc               ?? '',
-        business_activity: company?.business_activity ?? '',
+        business_name:        company?.business_name        ?? '',
+        trade_name:           company?.trade_name           ?? '',
+        nit_dui:              company?.nit_dui              ?? '',
+        nrc:                  company?.nrc                  ?? '',
+        business_activity:    company?.business_activity    ?? '',
+        address_department:   company?.address_department   ?? '',
+        address_municipality: company?.address_municipality ?? '',
+        address_district:     company?.address_district     ?? '',
+        address:              company?.address              ?? '',
         email:           company?.email ?? '',
         phone:           company?.phone ?? '',
         environment:     company?.environment ?? 'production',
         module_accesses: company?.module_accesses ?? [],
     });
+
+    const depts     = geography?.departamentos ?? [];
+    const munis     = form.data.address_department   ? (geography?.municipios?.[form.data.address_department]   ?? []) : [];
+    const districts = form.data.address_municipality ? (geography?.distritos?.[form.data.address_municipality]  ?? []) : [];
+
+    function handleDeptChange(e) {
+        form.setData({ ...form.data, address_department: e.target.value, address_municipality: '', address_district: '' });
+    }
+    function handleMuniChange(e) {
+        form.setData({ ...form.data, address_municipality: e.target.value, address_district: '' });
+    }
 
     function toggleModule(key) {
         const current = form.data.module_accesses;
@@ -121,6 +141,62 @@ function CompanyForm({ company, modules, onSuccess }) {
                         ))}
                     </datalist>
                     {form.errors.business_activity && <p className="field-error">{form.errors.business_activity}</p>}
+                </label>
+
+                <label>
+                    Departamento
+                    <select
+                        value={form.data.address_department}
+                        onChange={handleDeptChange}
+                    >
+                        <option value="">— Seleccionar departamento —</option>
+                        {depts.map((d) => (
+                            <option key={d.codigo} value={d.codigo}>{d.codigo} - {d.nombre}</option>
+                        ))}
+                    </select>
+                    {form.errors.address_department && <p className="field-error">{form.errors.address_department}</p>}
+                </label>
+
+                <label>
+                    Municipio
+                    <select
+                        value={form.data.address_municipality}
+                        onChange={handleMuniChange}
+                        disabled={!form.data.address_department}
+                    >
+                        <option value="">— Seleccionar municipio —</option>
+                        {munis.map((m) => (
+                            <option key={m.codigo} value={m.codigo}>{m.codigo} - {m.nombre}</option>
+                        ))}
+                    </select>
+                    {form.errors.address_municipality && <p className="field-error">{form.errors.address_municipality}</p>}
+                </label>
+
+                <label>
+                    Distrito
+                    <select
+                        value={form.data.address_district}
+                        onChange={(e) => form.setData('address_district', e.target.value)}
+                        disabled={!form.data.address_municipality}
+                    >
+                        <option value="">— Seleccionar distrito —</option>
+                        {districts.map((d) => (
+                            <option key={d.codigo} value={d.codigo}>{d.codigo} - {d.nombre}</option>
+                        ))}
+                    </select>
+                    {form.errors.address_district && <p className="field-error">{form.errors.address_district}</p>}
+                </label>
+
+                <label className="full-width">
+                    Dirección complementaria
+                    <input
+                        type="text"
+                        value={form.data.address}
+                        onChange={(e) => form.setData('address', e.target.value)}
+                        placeholder="Calle, colonia, número…"
+                        maxLength={500}
+                    />
+                    {form.errors.address && <p className="field-error">{form.errors.address}</p>}
                 </label>
 
                 <label>
