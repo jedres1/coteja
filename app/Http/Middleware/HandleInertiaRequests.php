@@ -41,6 +41,7 @@ class HandleInertiaRequests extends Middleware
             ],
             'flash' => [
                 'status' => fn () => $request->session()->get('status'),
+                'error'  => fn () => $request->session()->get('error'),
             ],
             'activeCompany' => function () use ($request, $user) {
                 if (! $user || ! $user->canAccessAdmin()) return null;
