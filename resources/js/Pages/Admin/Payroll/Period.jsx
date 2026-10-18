@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Head, router, useForm } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
+import { IconEdit } from '@/Components/Icons';
 
 const fmt = (x) => Number(x ?? 0).toLocaleString('es-SV', { minimumFractionDigits: 2 });
 
@@ -215,11 +216,11 @@ export default function Period({ period, settings }) {
                                             {editingLineId !== line.id ? (
                                                 <button
                                                     type="button"
-                                                    className="btn secondary"
-                                                    style={{ fontSize: 12, padding: '3px 10px' }}
+                                                    className="btn secondary btn-icon"
+                                                    title="Editar"
                                                     onClick={() => setEditingLineId(line.id)}
                                                 >
-                                                    Editar
+                                                    <IconEdit />
                                                 </button>
                                             ) : (
                                                 <button

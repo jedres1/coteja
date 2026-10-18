@@ -4,6 +4,7 @@ import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
 import Modal from '@/Components/Modal';
+import { IconEdit, IconTrash } from '@/Components/Icons';
 // ─── CustomerForm ─────────────────────────────────────────────────────────────
 
 function CustomerForm({ customer, geography, documentTypes, dteTypes, statuses, modules, onSuccess, onCancel }) {
@@ -451,19 +452,19 @@ export default function CustomersIndex({ customers, search, geography, documentT
                                     <div style={{ display: 'flex', gap: 6 }}>
                                         <button
                                             type="button"
-                                            className="btn btn-sm secondary"
-                                            style={{ fontSize: 13, padding: '6px 10px' }}
+                                            className="btn secondary btn-icon"
+                                            title="Editar"
                                             onClick={() => setEditItem(customer)}
                                         >
-                                            Editar
+                                            <IconEdit />
                                         </button>
                                         <button
                                             type="button"
-                                            className="btn btn-sm danger"
-                                            style={{ fontSize: 13, padding: '6px 10px' }}
+                                            className="btn danger btn-icon"
+                                            title="Eliminar"
                                             onClick={() => handleDelete(customer)}
                                         >
-                                            Eliminar
+                                            <IconTrash />
                                         </button>
                                     </div>
                                 </td>

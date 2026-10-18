@@ -3,6 +3,7 @@ import { Head, useForm, router } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Modal from '@/Components/Modal';
+import { IconEdit, IconTrash } from '@/Components/Icons';
 
 const ACCOUNT_TYPES = { activo: 'Activo', pasivo: 'Pasivo', patrimonio: 'Patrimonio', gasto: 'Gasto', ingreso: 'Ingreso' };
 const NATURE_TYPES  = { deudora: 'Deudora', acreedora: 'Acreedora' };
@@ -182,18 +183,19 @@ export default function Catalogo({ accounts, parents, stats, filter, search }) {
                                         <div style={{ display: 'flex', gap: 6 }}>
                                             <button
                                                 type="button"
-                                                className="btn secondary"
-                                                style={{ fontSize: 12, padding: '3px 10px' }}
+                                                className="btn secondary btn-icon"
+                                                title="Editar"
                                                 onClick={() => setEditItem(acc)}
                                             >
-                                                Editar
+                                                <IconEdit />
                                             </button>
                                             <button
                                                 type="button"
-                                                style={{ fontSize: 12, padding: '3px 10px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 6, cursor: 'pointer' }}
+                                                className="btn danger btn-icon"
+                                                title="Eliminar"
                                                 onClick={() => handleDelete(acc)}
                                             >
-                                                Eliminar
+                                                <IconTrash />
                                             </button>
                                         </div>
                                     </td>

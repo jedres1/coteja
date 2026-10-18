@@ -3,6 +3,7 @@ import { Head, router, Link } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
+import { IconTrash } from '@/Components/Icons';
 
 const fmt = (x) => Number(x ?? 0).toLocaleString('es-SV', { minimumFractionDigits: 2 });
 
@@ -149,10 +150,11 @@ export default function Diario({ entries, stats, search, status, from, to }) {
                                                 </Link>
                                                 <button
                                                     type="button"
-                                                    style={{ fontSize: 12, padding: '3px 10px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 6, cursor: 'pointer' }}
+                                                    className="btn danger btn-icon"
+                                                    title="Eliminar"
                                                     onClick={() => handleDelete(entry)}
                                                 >
-                                                    Eliminar
+                                                    <IconTrash />
                                                 </button>
                                             </>
                                         )}

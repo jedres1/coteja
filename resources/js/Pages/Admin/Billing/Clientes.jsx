@@ -3,6 +3,7 @@ import { useForm, router } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Modal from '@/Components/Modal';
+import { IconEdit, IconTrash } from '@/Components/Icons';
 
 const DTE_LABEL = {
     '01': 'Factura', '03': 'CCF', '04': 'Nota de Remisión',
@@ -306,20 +307,20 @@ export default function Clientes({ clients }) {
                                     <div style={{ display: 'flex', gap: 6 }}>
                                         <button
                                             type="button"
-                                            className="btn btn-sm secondary"
-                                            style={{ fontSize: 13, padding: '6px 10px' }}
+                                            className="btn secondary btn-icon"
+                                            title="Editar"
                                             onClick={() => setEditItem(client)}
                                         >
-                                            Editar
+                                            <IconEdit />
                                         </button>
                                         {!client.isClientesVarios && (
                                             <button
                                                 type="button"
-                                                className="btn btn-sm danger"
-                                                style={{ fontSize: 13, padding: '6px 10px' }}
+                                                className="btn danger btn-icon"
+                                                title="Eliminar"
                                                 onClick={() => handleDelete(client)}
                                             >
-                                                Eliminar
+                                                <IconTrash />
                                             </button>
                                         )}
                                     </div>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Head, useForm, router, usePage } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
+import { IconEdit, IconTrash } from '@/Components/Icons';
 
 const TYPE_LABELS = { beneficio: 'Beneficio', deduccion: 'Deducción' };
 const TYPE_COLORS = {
@@ -273,18 +274,19 @@ export default function Concepts({ concepts, accounts, legalConcepts }) {
                                     <div style={{ display: 'flex', gap: 6 }}>
                                         <button
                                             type="button"
-                                            className="btn secondary"
-                                            style={{ fontSize: 12, padding: '3px 10px' }}
+                                            className="btn secondary btn-icon"
+                                            title="Editar"
                                             onClick={() => handleEdit(concept)}
                                         >
-                                            Editar
+                                            <IconEdit />
                                         </button>
                                         <button
                                             type="button"
-                                            style={{ fontSize: 12, padding: '3px 10px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 6, cursor: 'pointer' }}
+                                            className="btn danger btn-icon"
+                                            title="Eliminar"
                                             onClick={() => handleDelete(concept.id)}
                                         >
-                                            Eliminar
+                                            <IconTrash />
                                         </button>
                                     </div>
                                 </td>

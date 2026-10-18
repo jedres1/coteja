@@ -3,6 +3,7 @@ import { Head, useForm, router } from '@inertiajs/react';
 import AppLayout from '@/Layouts/AppLayout';
 import Modal from '@/Components/Modal';
 import { route } from 'ziggy-js';
+import { IconTrash } from '@/Components/Icons';
 
 const platforms = {
     windows: 'Windows',
@@ -162,10 +163,11 @@ export default function ReleasesIndex({ releases }) {
                                 </td>
                                 <td>
                                     <button
-                                        className="btn btn-sm btn-danger"
+                                        className="btn danger btn-icon"
+                                        title="Eliminar"
                                         onClick={() => handleDelete(rel.id)}
                                     >
-                                        Eliminar
+                                        <IconTrash />
                                     </button>
                                 </td>
                             </tr>

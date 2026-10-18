@@ -4,6 +4,7 @@ import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
 import Modal from '@/Components/Modal';
 import { route } from 'ziggy-js';
+import { IconEdit } from '@/Components/Icons';
 
 const periods = {
     monthly: 'Mensual',
@@ -205,10 +206,11 @@ export default function PaymentsIndex({ payments, licenses }) {
                                 </td>
                                 <td>
                                     <button
-                                        className="btn btn-sm"
+                                        className="btn btn-icon"
+                                        title="Editar"
                                         onClick={() => setEditItem(payment)}
                                     >
-                                        Editar
+                                        <IconEdit />
                                     </button>
                                 </td>
                             </tr>

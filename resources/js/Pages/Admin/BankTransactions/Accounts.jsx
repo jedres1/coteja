@@ -3,6 +3,7 @@ import { Head, useForm, router, Link } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Modal from '@/Components/Modal';
+import { IconEdit, IconTrash } from '@/Components/Icons';
 
 // ─── AccountForm ──────────────────────────────────────────────────────────────
 
@@ -192,19 +193,19 @@ export default function Accounts({ accounts }) {
                                     <div style={{ display: 'flex', gap: 6 }}>
                                         <button
                                             type="button"
-                                            className="btn btn-sm secondary"
-                                            style={{ fontSize: 13, padding: '6px 10px' }}
+                                            className="btn secondary btn-icon"
+                                            title="Editar"
                                             onClick={() => setEditItem(account)}
                                         >
-                                            Editar
+                                            <IconEdit />
                                         </button>
                                         <button
                                             type="button"
-                                            className="btn btn-sm danger"
-                                            style={{ fontSize: 13, padding: '6px 10px' }}
+                                            className="btn danger btn-icon"
+                                            title="Eliminar"
                                             onClick={() => handleDelete(account)}
                                         >
-                                            Eliminar
+                                            <IconTrash />
                                         </button>
                                     </div>
                                 </td>

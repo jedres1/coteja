@@ -21,20 +21,23 @@ body.dark-mode .side { background: #020617; }
 .brand img { width: 136px; max-width: 100%; max-height: 136px; height: auto; display: block; object-fit: contain; }
 
 /* Nav */
-.nav { display: grid; gap: 6px; align-items: stretch; }
-.nav a, .logout-btn { width: 100%; min-height: 40px; display: flex; align-items: center; justify-content: flex-start; padding: 10px 12px; border-radius: 8px; color: #d1d5db; background: transparent; border: 0; text-align: left; font: inherit; line-height: 1.2; cursor: pointer; }
+.nav { display: grid; gap: 2px; align-items: stretch; }
+.nav a, .logout-btn { width: 100%; min-height: 38px; display: flex; align-items: center; gap: 9px; padding: 8px 12px; border-radius: 8px; color: #d1d5db; background: transparent; border: 0; text-align: left; font: inherit; font-size: 13px; line-height: 1.2; cursor: pointer; }
 .nav a:hover, .logout-btn:hover { background: #1f2937; color: #fff; }
 .nav a.active-link { background: #2563eb; color: #fff; }
 .nav form { margin: 0; }
-.nav-group { display: grid; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgb(255 255 255 / .12); }
-.nav-toggle { width: 100%; min-height: 40px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 0; border-radius: 8px; background: transparent; color: #9ca3af; font: inherit; line-height: 1.2; cursor: pointer; }
+.nav-group { display: grid; gap: 2px; margin-top: 6px; padding-top: 6px; border-top: 1px solid rgb(255 255 255 / .10); }
+.nav-toggle { width: 100%; min-height: 38px; display: flex; align-items: center; gap: 9px; padding: 8px 12px; border: 0; border-radius: 8px; background: transparent; color: #9ca3af; font: inherit; font-size: 13px; line-height: 1.2; cursor: pointer; }
 .nav-toggle:hover { background: #1f2937; color: #fff; }
-.nav-label { flex: 1; min-width: 0; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
-.nav-caret { flex: 0 0 auto; display: grid; place-items: center; width: 16px; height: 16px; transition: transform .18s ease; font-size: 12px; line-height: 1; }
+.nav-label { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; text-transform: none; letter-spacing: 0; }
+.nav-caret { flex: 0 0 auto; display: grid; place-items: center; width: 16px; height: 16px; transition: transform .18s ease; font-size: 14px; line-height: 1; color: #6b7280; }
 .nav-group.open .nav-caret { transform: rotate(90deg); }
+.nav-group.open .nav-toggle { color: #f9fafb; }
 .nav-group:not(.open) .nav-sub { display: none; }
-.nav-sub { display: grid; gap: 4px; }
-.nav-sub a { min-height: 36px; padding-left: 24px; font-size: 13px; }
+.nav-sub { display: grid; gap: 2px; padding-left: 8px; border-left: 2px solid rgb(255 255 255 / .08); margin-left: 10px; }
+.nav-sub a { min-height: 34px; padding: 6px 12px; font-size: 13px; color: #9ca3af; }
+.nav-sub a:hover { color: #fff; }
+.nav-sub a.active-link { background: rgba(37 99 235 / .25); color: #93c5fd; }
 
 /* Main content */
 .main { padding: 24px; }
@@ -67,10 +70,11 @@ body.dark-mode input, body.dark-mode select, body.dark-mode textarea { backgroun
 textarea { min-height: 80px; }
 
 /* Buttons */
-.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 38px; padding: 9px 13px; border-radius: 8px; border: 0; background: var(--brand); color: #fff; font-weight: 700; cursor: pointer; font: inherit; font-size: 14px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 38px; padding: 9px 13px; border-radius: 8px; border: 0; background: var(--brand); color: #fff; font-weight: 700; cursor: pointer; font: inherit; font-size: 14px; }
 .btn.secondary { background: #4b5563; }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 .btn.danger { background: var(--bad); }
+.btn-icon { padding: 6px 8px; min-height: 30px; min-width: 30px; font-size: 13px; font-weight: 400; }
 
 /* Badges */
 .badge { display: inline-flex; padding: 4px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #e5e7eb; }

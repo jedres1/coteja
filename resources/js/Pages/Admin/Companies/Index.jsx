@@ -4,6 +4,7 @@ import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
 import Modal from '@/Components/Modal';
 import { route } from 'ziggy-js';
+import { IconEdit } from '@/Components/Icons';
 
 const environments = {
     production: 'Produccion',
@@ -546,8 +547,8 @@ export default function CompaniesIndex({ companies, modules, plans }) {
                                 </td>
                                 <td>
                                     <div style={{ display: 'flex', gap: 6, flexDirection: 'column', alignItems: 'flex-start' }}>
-                                        <button className="btn btn-sm" onClick={() => setEditItem(company)}>
-                                            Editar
+                                        <button className="btn btn-icon" title="Editar" onClick={() => setEditItem(company)}>
+                                            <IconEdit />
                                         </button>
                                         <button
                                             className="btn btn-sm secondary"

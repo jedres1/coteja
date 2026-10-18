@@ -4,6 +4,7 @@ import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
 import Modal from '@/Components/Modal';
+import { IconEdit, IconTrash } from '@/Components/Icons';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const DOCUMENT_TYPES = {
@@ -423,19 +424,19 @@ export default function SuppliersIndex({ suppliers, search, geography }) {
                                     <div style={{ display: 'flex', gap: 6 }}>
                                         <button
                                             type="button"
-                                            className="btn btn-sm secondary"
-                                            style={{ fontSize: 13, padding: '6px 10px' }}
+                                            className="btn secondary btn-icon"
+                                            title="Editar"
                                             onClick={() => setEditItem(supplier)}
                                         >
-                                            Editar
+                                            <IconEdit />
                                         </button>
                                         <button
                                             type="button"
-                                            className="btn btn-sm danger"
-                                            style={{ fontSize: 13, padding: '6px 10px' }}
+                                            className="btn danger btn-icon"
+                                            title="Eliminar"
                                             onClick={() => handleDelete(supplier)}
                                         >
-                                            Eliminar
+                                            <IconTrash />
                                         </button>
                                     </div>
                                 </td>

@@ -4,6 +4,7 @@ import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
 import Modal from '@/Components/Modal';
 import { route } from 'ziggy-js';
+import { IconEdit } from '@/Components/Icons';
 
 const licenseStatuses = {
     active:    'Activa',
@@ -251,11 +252,11 @@ export default function LicensesIndex({ licenses, companies, plans }) {
                                     </td>
                                     <td>
                                         <button
-                                            className="btn btn-sm secondary"
-                                            style={{ fontSize: 13, padding: '6px 10px' }}
+                                            className="btn secondary btn-icon"
+                                            title="Editar"
                                             onClick={() => setEditItem(lic)}
                                         >
-                                            Editar
+                                            <IconEdit />
                                         </button>
                                     </td>
                                 </tr>

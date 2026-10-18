@@ -3,6 +3,7 @@ import { Head, useForm, router } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Modal from '@/Components/Modal';
+import { IconEdit, IconTrash } from '@/Components/Icons';
 
 const UNIT_OPTIONS = [
     { code: '59', label: 'Unidad' },
@@ -338,19 +339,19 @@ export default function Productos({ products, productTypes, hasInventory }) {
                                     <div style={{ display: 'flex', gap: 4 }}>
                                         <button
                                             type="button"
-                                            className="btn secondary"
-                                            style={{ fontSize: 12, padding: '3px 10px' }}
+                                            className="btn secondary btn-icon"
+                                            title="Editar"
                                             onClick={() => openEdit(p)}
                                         >
-                                            Editar
+                                            <IconEdit />
                                         </button>
                                         <button
                                             type="button"
-                                            className="btn danger"
-                                            style={{ fontSize: 12, padding: '3px 10px' }}
+                                            className="btn danger btn-icon"
+                                            title="Eliminar"
                                             onClick={() => handleDelete(p)}
                                         >
-                                            Eliminar
+                                            <IconTrash />
                                         </button>
                                     </div>
                                 </td>

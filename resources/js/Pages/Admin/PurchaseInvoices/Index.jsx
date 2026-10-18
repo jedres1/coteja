@@ -4,6 +4,7 @@ import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
 import Modal from '@/Components/Modal';
+import { IconTrash } from '@/Components/Icons';
 
 const DOC_LABELS = {
     ccf: 'CCF',
@@ -541,10 +542,11 @@ export default function PurchaseInvoicesIndex({ invoices, search, supplierId, su
                                         </button>
                                         <button
                                             type="button"
-                                            style={{ fontSize: 12, padding: '3px 10px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 6, cursor: 'pointer' }}
+                                            className="btn danger btn-icon"
+                                            title="Eliminar"
                                             onClick={() => handleDelete(inv)}
                                         >
-                                            Eliminar
+                                            <IconTrash />
                                         </button>
                                     </div>
                                 </td>

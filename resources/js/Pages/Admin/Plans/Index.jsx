@@ -3,6 +3,7 @@ import { Head, useForm, router } from '@inertiajs/react';
 import AppLayout from '@/Layouts/AppLayout';
 import Modal from '@/Components/Modal';
 import { route } from 'ziggy-js';
+import { IconEdit, IconTrash } from '@/Components/Icons';
 
 function PlanForm({ plan, onSuccess }) {
     const form = useForm({
@@ -232,17 +233,19 @@ export default function PlansIndex({ plans }) {
                                 </td>
                                 <td>
                                     <button
-                                        className="btn btn-sm"
+                                        className="btn btn-icon"
+                                        title="Editar"
                                         onClick={() => setEditItem(plan)}
                                     >
-                                        Editar
+                                        <IconEdit />
                                     </button>
                                     {' '}
                                     <button
-                                        className="btn btn-sm btn-danger"
+                                        className="btn danger btn-icon"
+                                        title="Eliminar"
                                         onClick={() => handleDelete(plan.id)}
                                     >
-                                        Eliminar
+                                        <IconTrash />
                                     </button>
                                 </td>
                             </tr>
