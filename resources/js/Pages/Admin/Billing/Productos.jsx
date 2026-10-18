@@ -64,7 +64,8 @@ function ProductForm({ initial, productTypes, hasInventory, nextProductCodes, on
             minStock: showStock && form.data.minStock !== '' ? form.data.minStock : null,
             productTypeId: form.data.productTypeId || null,
         };
-        form.transform(() => payload).post(route('admin.factura-sv.productos.guardar'), {
+        form.transform(() => payload);
+        form.post(route('admin.factura-sv.productos.guardar'), {
             onSuccess: onClose,
             onHttpException: () => setSubmitError('El servidor no pudo guardar el producto. Revisa los datos e inténtalo de nuevo.'),
             onNetworkError: () => setSubmitError('No se pudo conectar con el servidor. Verifica tu conexión e inténtalo de nuevo.'),
