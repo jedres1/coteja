@@ -26,10 +26,10 @@ const TYPE_LABEL = { '1': 'Bien', '2': 'Servicio', '3': 'Ambos', '4': 'Otros' };
 
 const fmt = (n) => Number(n ?? 0).toLocaleString('es-SV', { minimumFractionDigits: 2 });
 
-function emptyForm(hasInventory) {
+function emptyForm(hasInventory, nextProductCodes) {
     return {
         id: null,
-        code: '',
+        code: nextProductCodes?.['2'] ?? 'SERV-00001',
         description: '',
         type: '2',
         price: '',
@@ -43,16 +43,17 @@ function emptyForm(hasInventory) {
     };
 }
 
-function ProductForm({ initial, productTypes, hasInventory, onClose }) {
+function ProductForm({ initial, productTypes, hasInventory, nextProductCodes, onClose }) {
     const form = useForm(initial);
+    const [submitError, setSubmitError] = useState('');
     const isBien    = form.data.type === '1';
     const showStock = isBien && hasInventory;
 
     function handleSubmit(e) {
         e.preventDefault();
+        setSubmitError('');
         const payload = {
             id: form.data.id || undefined,
-            code: form.data.code,
             description: form.data.description,
             type: form.data.type,
             price: form.data.price,
@@ -63,27 +64,45 @@ function ProductForm({ initial, productTypes, hasInventory, onClose }) {
             minStock: showStock && form.data.minStock !== '' ? form.data.minStock : null,
             productTypeId: form.data.productTypeId || null,
         };
-        form.transform(() => payload).post(route('admin.factura-sv.productos.guardar'), { onSuccess: onClose });
+        form.transform(() => payload).post(route('admin.factura-sv.productos.guardar'), {
+            onSuccess: onClose,
+            onHttpException: () => setSubmitError('El servidor no pudo guardar el producto. Revisa los datos e inténtalo de nuevo.'),
+            onNetworkError: () => setSubmitError('No se pudo conectar con el servidor. Verifica tu conexión e inténtalo de nuevo.'),
+            onError: (errors) => {
+                if (Object.keys(errors).length === 0) {
+                    setSubmitError('No se pudo guardar el producto. Revisa los datos e inténtalo de nuevo.');
+                }
+            },
+        });
     }
 
     return (
         <form onSubmit={handleSubmit}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div className="field" style={{ margin: 0 }}>
-                    <label>Código <span style={{ color: '#ef4444' }}>*</span></label>
+                    <label>Código</label>
                     <input
                         type="text"
                         value={form.data.code}
-                        onChange={(e) => form.setData('code', e.target.value)}
-                        placeholder="PROD-001"
-                        required
+                        readOnly
+                        aria-readonly="true"
                     />
-                    {form.errors.code && <p className="field-error">{form.errors.code}</p>}
+                    <small style={{ color: '#6b7280', fontSize: 11 }}>Código consecutivo automático; no se puede editar.</small>
                 </div>
 
                 <div className="field" style={{ margin: 0 }}>
                     <label>Tipo <span style={{ color: '#ef4444' }}>*</span></label>
-                    <select value={form.data.type} onChange={(e) => form.setData('type', e.target.value)}>
+                    <select
+                        value={form.data.type}
+                        onChange={(e) => {
+                            const type = e.target.value;
+                            form.setData({
+                                ...form.data,
+                                type,
+                                code: initial.id ? form.data.code : (nextProductCodes?.[type] ?? form.data.code),
+                            });
+                        }}
+                    >
                         {TYPE_OPTIONS.map((o) => (
                             <option key={o.value} value={o.value}>{o.label}</option>
                         ))}
@@ -199,6 +218,12 @@ function ProductForm({ initial, productTypes, hasInventory, onClose }) {
                 )}
             </div>
 
+            {submitError && (
+                <p role="alert" style={{ color: '#b91c1c', fontSize: 13, margin: '12px 0 0' }}>
+                    {submitError}
+                </p>
+            )}
+
             <div className="form-actions" style={{ marginTop: 16 }}>
                 <button type="button" className="btn secondary" onClick={onClose}>Cancelar</button>
                 <button type="submit" className="btn" disabled={form.processing}>
@@ -209,7 +234,7 @@ function ProductForm({ initial, productTypes, hasInventory, onClose }) {
     );
 }
 
-export default function Productos({ products, productTypes, hasInventory }) {
+export default function Productos({ products, productTypes, hasInventory, nextProductCodes }) {
     const [search, setSearch]       = useState('');
     const [modal, setModal]         = useState(null); // null | { mode: 'create' | 'edit', product?: {} }
 
@@ -245,7 +270,7 @@ export default function Productos({ products, productTypes, hasInventory }) {
             minStock: modal.product.minStock ?? '',
             productTypeId: modal.product.productTypeId ? String(modal.product.productTypeId) : '',
         }
-        : emptyForm(hasInventory);
+        : emptyForm(hasInventory, nextProductCodes);
 
     const lowStock = (p) => hasInventory && p.type === '1'
         && p.stockQuantity != null && p.minStock != null
@@ -372,6 +397,7 @@ export default function Productos({ products, productTypes, hasInventory }) {
                         initial={formInitial}
                         productTypes={productTypes}
                         hasInventory={hasInventory}
+                        nextProductCodes={nextProductCodes}
                         onClose={() => setModal(null)}
                     />
                 </Modal>

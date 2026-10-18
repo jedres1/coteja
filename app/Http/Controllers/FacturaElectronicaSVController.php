@@ -11,6 +11,7 @@ use App\Models\Customer;
 use App\Models\BillingInvoicePayment;
 use App\Models\BillingProduct;
 use App\Models\BillingSetting;
+use App\Models\Company;
 use App\Models\InventoryMovement;
 use App\Models\ProductType;
 use App\Services\Accounting\AccountingEntryService;
@@ -272,16 +273,9 @@ class FacturaElectronicaSVController extends Controller
     {
         $tenantId     = $this->activeTenantId($request);
         $hasInventory = $request->user()?->hasModuleAccess('inventory') ?? false;
-        $productId    = $request->input('id');
-
-        $codeRule = \Illuminate\Validation\Rule::unique('billing_products', 'code')->ignore($productId);
-        if ($tenantId !== null) {
-            $codeRule->where('company_id', $tenantId);
-        }
 
         $data = $request->validate([
             'id'             => 'nullable|integer|exists:billing_products,id',
-            'code'           => ['required', 'string', 'max:100', $codeRule],
             'description'    => 'required|string|max:255',
             'type'           => ['required', 'string', $hasInventory ? 'in:1,2,3,4' : 'in:1,2'],
             'price'          => 'required|numeric|min:0',
@@ -305,7 +299,7 @@ class FacturaElectronicaSVController extends Controller
 
         $existingId = $data['id'] ?? null;
         $attributes = [
-            'code'            => $data['code'],
+            'company_id'      => $tenantId,
             'description'     => $data['description'],
             'type'            => $data['type'],
             'price'           => $data['price'],
@@ -320,9 +314,18 @@ class FacturaElectronicaSVController extends Controller
         if ($existingId) {
             $product = BillingProduct::findOrFail($existingId);
             if ($tenantId) abort_unless($product->company_id === $tenantId, 403);
+            $attributes['code'] = $product->code;
             $product->update($attributes);
         } else {
-            $product = BillingProduct::create(array_merge($attributes, ['company_id' => $tenantId]));
+            $product = DB::transaction(function () use ($tenantId, $data, $attributes) {
+                if ($tenantId !== null) {
+                    Company::query()->whereKey($tenantId)->lockForUpdate()->firstOrFail();
+                }
+
+                $attributes['code'] = $this->nextProductCode($tenantId, $data['type']);
+
+                return BillingProduct::create($attributes);
+            });
         }
 
         $product->load('productType');
@@ -1309,6 +1312,10 @@ class FacturaElectronicaSVController extends Controller
         $tenantId = $this->activeTenantId($request);
         return [
             'hasInventory' => $request->user()?->hasModuleAccess('inventory') ?? false,
+            'nextProductCodes' => [
+                '1' => $this->nextProductCode($tenantId, '1'),
+                '2' => $this->nextProductCode($tenantId, '2'),
+            ],
             'productTypes' => ProductType::when($tenantId !== null, fn ($q) => $q->forCustomer($tenantId))
                 ->orderBy('name')->get()
                 ->map(fn (ProductType $t) => ['id' => $t->id, 'name' => $t->name, 'controlsInventory' => $t->controls_inventory]),
@@ -1320,6 +1327,26 @@ class FacturaElectronicaSVController extends Controller
                     'invoiceItem' => $p->toInvoiceItem(),
                 ]),
         ];
+    }
+
+    private function nextProductCode(?int $tenantId, string $type): string
+    {
+        $prefix = $type === '1' ? 'PROD' : 'SERV';
+        $codes = BillingProduct::query()
+            ->when($tenantId !== null, fn ($query) => $query->where('company_id', $tenantId), fn ($query) => $query->whereNull('company_id'))
+            ->where('type', $type)
+            ->where('code', 'like', $prefix . '-%')
+            ->pluck('code');
+
+        $lastNumber = $codes->reduce(function (int $highest, string $code) use ($prefix) {
+            if (preg_match('/^' . $prefix . '-(\d+)$/', $code, $matches)) {
+                return max($highest, (int) $matches[1]);
+            }
+
+            return $highest;
+        }, 0);
+
+        return sprintf('%s-%05d', $prefix, $lastNumber + 1);
     }
 
     private function formatProduct(BillingProduct $product): array
