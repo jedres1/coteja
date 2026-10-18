@@ -588,7 +588,9 @@ class PurchaseInvoiceController extends Controller
         if (! $companyId) return null;
 
         $company = \App\Models\Company::find($companyId, ['customer_id']);
-        return $company?->customer_id ? (int) $company->customer_id : null;
+        if (!$company) return null;
+
+        return $company->customer_id ? (int) $company->customer_id : -1;
     }
 
     /** Devuelve los customer_ids accesibles para el usuario. Null significa sin restricción (admin sin tenant activo). */

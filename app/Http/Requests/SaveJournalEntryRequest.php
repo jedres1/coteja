@@ -17,7 +17,9 @@ class SaveJournalEntryRequest extends FormRequest
         if (!$companyId) return null;
 
         $company = \App\Models\Company::find($companyId, ['customer_id']);
-        return $company?->customer_id ? (int) $company->customer_id : null;
+        if (!$company) return null;
+
+        return $company->customer_id ? (int) $company->customer_id : -1;
     }
 
     public function rules(): array

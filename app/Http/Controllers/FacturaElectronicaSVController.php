@@ -1074,7 +1074,9 @@ class FacturaElectronicaSVController extends Controller
         if (! $companyId) return null;
 
         $company = \App\Models\Company::find($companyId, ['customer_id']);
-        return $company?->customer_id ? (int) $company->customer_id : null;
+        if (!$company) return null;
+
+        return $company->customer_id ? (int) $company->customer_id : -1;
     }
 
     private function availableCustomersForUser(Request $request): array
