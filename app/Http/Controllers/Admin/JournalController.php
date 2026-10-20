@@ -76,7 +76,7 @@ class JournalController extends Controller
             ->get(['id', 'code', 'name', 'type', 'nature']);
 
         $cgPackage   = AccountingPackage::forCompany($companyId)->where('code', 'CG')->first();
-        $costCenters = CostCenter::forCompany($companyId)->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
+        $costCenters = CostCenter::forCompany($companyId)->leafCenters()->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
 
         return Inertia::render('Admin/Accounting/DiarioNuevo', [
             'accounts'    => $accounts,
@@ -168,7 +168,7 @@ class JournalController extends Controller
 
         $accounts    = AccountingAccount::forCompany($companyId)->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name', 'type', 'nature']);
         $cgPackage   = AccountingPackage::forCompany($companyId)->where('code', 'CG')->first();
-        $costCenters = CostCenter::forCompany($companyId)->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
+        $costCenters = CostCenter::forCompany($companyId)->leafCenters()->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
         $entry->load('lines');
 
         return Inertia::render('Admin/Accounting/DiarioNuevo', [

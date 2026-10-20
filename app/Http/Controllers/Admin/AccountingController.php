@@ -158,9 +158,17 @@ class AccountingController extends Controller
             ->map(fn($a) => ['id' => $a->id, 'label' => $a->code . ' — ' . $a->name, 'type' => $a->type])
             ->values();
 
-        $costCenters = CostCenter::forCompany($companyId)->orderBy('code')->get();
+        $costCenters = CostCenter::forCompany($companyId)
+            ->orderBy('level')->orderBy('code')
+            ->get(['id', 'code', 'name', 'description', 'is_active', 'parent_id', 'level']);
 
-        return Inertia::render('Admin/Accounting/Configuracion', compact('packages', 'accounts', 'costCenters'));
+        $leafCostCenters = CostCenter::forCompany($companyId)
+            ->leafCenters()
+            ->where('is_active', true)
+            ->orderBy('code')
+            ->get(['id', 'code', 'name']);
+
+        return Inertia::render('Admin/Accounting/Configuracion', compact('packages', 'accounts', 'costCenters', 'leafCostCenters'));
     }
 
     public function storePackage(Request $request)
@@ -181,11 +189,15 @@ class AccountingController extends Controller
             'is_active'                   => 'boolean',
         ]);
 
+        if (!empty($data['cost_center_id']) && ! CostCenter::where('id', $data['cost_center_id'])->leafCenters()->exists()) {
+            return back()->withErrors(['cost_center_id' => 'El centro de costo seleccionado tiene sub-centros y no puede asignarse a un paquete.']);
+        }
+
         $data['code']       = strtoupper($data['code']);
         $data['company_id'] = $companyId;
-        $package = AccountingPackage::create($data);
+        AccountingPackage::create($data);
 
-        return response()->json(['success' => true, 'message' => 'Paquete creado.', 'package' => $package]);
+        return back()->with('status', 'Paquete creado.');
     }
 
     public function updatePackage(Request $request, AccountingPackage $package)
@@ -205,9 +217,13 @@ class AccountingController extends Controller
             'is_active'                   => 'boolean',
         ]);
 
+        if (!empty($data['cost_center_id']) && ! CostCenter::where('id', $data['cost_center_id'])->leafCenters()->exists()) {
+            return back()->withErrors(['cost_center_id' => 'El centro de costo seleccionado tiene sub-centros y no puede asignarse a un paquete.']);
+        }
+
         $package->update($data);
 
-        return response()->json(['success' => true, 'message' => 'Paquete actualizado.', 'package' => $package->fresh()]);
+        return back()->with('status', 'Paquete actualizado.');
     }
 
     public function destroyPackage(AccountingPackage $package)
@@ -216,12 +232,12 @@ class AccountingController extends Controller
         abort_unless($package->company_id === $companyId, 403);
 
         if ($package->journalEntries()->exists()) {
-            return response()->json(['success' => false, 'message' => 'No se puede eliminar un paquete que tiene asientos contables registrados.'], 422);
+            return back()->with('error', 'No se puede eliminar un paquete que tiene asientos contables registrados.');
         }
 
         $package->delete();
 
-        return response()->json(['success' => true, 'message' => 'Paquete eliminado.']);
+        return back()->with('status', 'Paquete eliminado.');
     }
 
     // ── Centros de costo ────────────────────────────────────────────────────
@@ -231,6 +247,7 @@ class AccountingController extends Controller
         $companyId = $this->requireTenant();
 
         $data = $request->validate([
+            'parent_id'   => ['nullable', Rule::exists('cost_centers', 'id')->where('company_id', $companyId)],
             'code'        => ['required', 'string', 'max:20',
                 Rule::unique('cost_centers', 'code')->where('company_id', $companyId)],
             'name'        => 'required|string|max:120',
@@ -238,11 +255,13 @@ class AccountingController extends Controller
             'is_active'   => 'boolean',
         ]);
 
+        $parent = $data['parent_id'] ? CostCenter::find($data['parent_id']) : null;
+        $data['level']      = $parent ? $parent->level + 1 : 1;
         $data['code']       = strtoupper($data['code']);
         $data['company_id'] = $companyId;
-        $center = CostCenter::create($data);
+        CostCenter::create($data);
 
-        return response()->json(['success' => true, 'message' => 'Centro de costo creado.', 'cost_center' => $center]);
+        return back()->with('status', 'Centro de costo creado.');
     }
 
     public function updateCostCenter(Request $request, CostCenter $costCenter)
@@ -251,6 +270,7 @@ class AccountingController extends Controller
         abort_unless($costCenter->company_id === $companyId, 403);
 
         $data = $request->validate([
+            'parent_id'   => ['nullable', Rule::exists('cost_centers', 'id')->where('company_id', $companyId)],
             'code'        => ['required', 'string', 'max:20',
                 Rule::unique('cost_centers', 'code')->where('company_id', $companyId)->ignore($costCenter->id)],
             'name'        => 'required|string|max:120',
@@ -258,10 +278,16 @@ class AccountingController extends Controller
             'is_active'   => 'boolean',
         ]);
 
-        $data['code'] = strtoupper($data['code']);
+        if ($data['parent_id'] && (int) $data['parent_id'] === $costCenter->id) {
+            return back()->withErrors(['parent_id' => 'Un centro de costo no puede ser su propio padre.']);
+        }
+
+        $parent        = $data['parent_id'] ? CostCenter::find($data['parent_id']) : null;
+        $data['level'] = $parent ? $parent->level + 1 : 1;
+        $data['code']  = strtoupper($data['code']);
         $costCenter->update($data);
 
-        return response()->json(['success' => true, 'message' => 'Centro de costo actualizado.', 'cost_center' => $costCenter->fresh()]);
+        return back()->with('status', 'Centro de costo actualizado.');
     }
 
     public function destroyCostCenter(CostCenter $costCenter)
@@ -269,13 +295,17 @@ class AccountingController extends Controller
         $companyId = $this->requireTenant();
         abort_unless($costCenter->company_id === $companyId, 403);
 
+        if ($costCenter->children()->exists()) {
+            return back()->with('error', 'No se puede eliminar un centro que tiene sub-centros. Elimine primero los hijos.');
+        }
+
         if ($costCenter->accountingPackages()->exists() || $costCenter->journalEntryLines()->exists()) {
-            return response()->json(['success' => false, 'message' => 'No se puede eliminar un centro de costo en uso. Puede desactivarlo.'], 422);
+            return back()->with('error', 'No se puede eliminar un centro de costo en uso. Puede desactivarlo.');
         }
 
         $costCenter->delete();
 
-        return response()->json(['success' => true, 'message' => 'Centro de costo eliminado.']);
+        return back()->with('status', 'Centro de costo eliminado.');
     }
 
     // ── Períodos Contables ──────────────────────────────────────────────────

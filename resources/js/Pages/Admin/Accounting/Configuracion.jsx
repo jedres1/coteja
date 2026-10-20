@@ -37,10 +37,11 @@ function PackageForm({ pkg, accounts, costCenters, onCancel }) {
 
     function handleSubmit(e) {
         e.preventDefault();
+        const opts = { onSuccess: onCancel };
         if (isEdit) {
-            put(route('admin.accounting.paquetes.update', pkg.id));
+            put(route('admin.accounting.paquetes.update', pkg.id), opts);
         } else {
-            post(route('admin.accounting.paquetes.store'));
+            post(route('admin.accounting.paquetes.store'), opts);
         }
     }
 
@@ -142,9 +143,16 @@ function PackageForm({ pkg, accounts, costCenters, onCancel }) {
     );
 }
 
-function CostCenterForm({ cc, onCancel }) {
+function flattenTree(nodes, parentId = null, depth = 0) {
+    return (nodes ?? [])
+        .filter((n) => (n.parent_id ?? null) === parentId)
+        .flatMap((n) => [{ ...n, _depth: depth }, ...flattenTree(nodes, n.id, depth + 1)]);
+}
+
+function CostCenterForm({ cc, allCenters, onCancel }) {
     const isEdit = !!cc;
     const { data, setData, post, put, processing, errors } = useForm({
+        parent_id:   cc?.parent_id ? String(cc.parent_id) : '',
         name:        cc?.name ?? '',
         code:        cc?.code ?? '',
         description: cc?.description ?? '',
@@ -153,12 +161,15 @@ function CostCenterForm({ cc, onCancel }) {
 
     function handleSubmit(e) {
         e.preventDefault();
+        const opts = { onSuccess: onCancel };
         if (isEdit) {
-            put(route('admin.accounting.centros-costo.update', cc.id));
+            put(route('admin.accounting.centros-costo.update', cc.id), opts);
         } else {
-            post(route('admin.accounting.centros-costo.store'));
+            post(route('admin.accounting.centros-costo.store'), opts);
         }
     }
+
+    const parentOptions = flattenTree(allCenters ?? []).filter((c) => !cc || c.id !== cc.id);
 
     return (
         <form onSubmit={handleSubmit}>
@@ -172,6 +183,18 @@ function CostCenterForm({ cc, onCancel }) {
                     Código <span style={{ color: '#ef4444' }}>*</span>
                     <input type="text" value={data.code} onChange={(e) => setData('code', e.target.value.toUpperCase())} required />
                     {errors.code && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.code}</span>}
+                </label>
+                <label style={{ margin: 0 }}>
+                    Centro padre
+                    <select value={data.parent_id} onChange={(e) => setData('parent_id', e.target.value)}>
+                        <option value="">— Sin padre (raíz) —</option>
+                        {parentOptions.map((c) => (
+                            <option key={c.id} value={String(c.id)}>
+                                {'· '.repeat(c._depth)}{c.code} — {c.name}
+                            </option>
+                        ))}
+                    </select>
+                    {errors.parent_id && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.parent_id}</span>}
                 </label>
                 <label style={{ margin: 0 }}>
                     Estado
@@ -207,7 +230,7 @@ function AccountLabel({ account }) {
     return <span style={{ fontSize: 13 }}>{account.code} — {account.name}</span>;
 }
 
-export default function Configuracion({ packages, accounts, costCenters }) {
+export default function Configuracion({ packages, accounts, costCenters, leafCostCenters }) {
     const { auth, activeCompany } = usePage().props;
     const tenantModules = activeCompany?.modules ?? null;
     const hasAccounting = tenantModules
@@ -377,47 +400,61 @@ export default function Configuracion({ packages, accounts, costCenters }) {
                             <tr>
                                 <th>Código</th>
                                 <th>Nombre</th>
+                                <th>Tipo</th>
                                 <th>Estado</th>
                                 <th></th>
                             </tr>
                         </thead>
                         <tbody>
                             {(costCenters ?? []).length === 0 && (
-                                <tr><td colSpan={4} className="empty">Sin centros de costo</td></tr>
+                                <tr><td colSpan={5} className="empty">Sin centros de costo</td></tr>
                             )}
-                            {(costCenters ?? []).map((cc) => (
-                                <tr key={cc.id}>
-                                    <td style={{ fontFamily: 'monospace' }}>{cc.code}</td>
-                                    <td>{cc.name}</td>
-                                    <td>
-                                        <span className={`badge ${cc.is_active ? 'active' : 'suspended'}`}>
-                                            {cc.is_active ? 'Activo' : 'Inactivo'}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div style={{ display: 'flex', gap: 6 }}>
-                                            <button
-                                                type="button"
-                                                className="btn secondary btn-icon"
-                                                title="Editar"
-                                                disabled={!hasAccounting || !unlocked}
-                                                onClick={() => setEditCC(cc)}
-                                            >
-                                                <IconEdit />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="btn danger btn-icon"
-                                                title="Eliminar"
-                                                disabled={!hasAccounting || !unlocked}
-                                                onClick={() => handleDeleteCC(cc)}
-                                            >
-                                                <IconTrash />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
+                            {flattenTree(costCenters ?? []).map((cc) => {
+                                const isParent = (costCenters ?? []).some((c) => c.parent_id === cc.id);
+                                return (
+                                    <tr key={cc.id}>
+                                        <td style={{ fontFamily: 'monospace', paddingLeft: 8 + cc._depth * 20 }}>
+                                            {cc.code}
+                                        </td>
+                                        <td style={{ paddingLeft: cc._depth * 20 }}>
+                                            {cc._depth > 0 && <span style={{ color: '#9ca3af', marginRight: 4 }}>└</span>}
+                                            {cc.name}
+                                        </td>
+                                        <td>
+                                            <span style={{ fontSize: 12, color: isParent ? '#6b7280' : '#059669' }}>
+                                                {isParent ? 'Agrupador' : 'Hoja'}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span className={`badge ${cc.is_active ? 'active' : 'suspended'}`}>
+                                                {cc.is_active ? 'Activo' : 'Inactivo'}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div style={{ display: 'flex', gap: 6 }}>
+                                                <button
+                                                    type="button"
+                                                    className="btn secondary btn-icon"
+                                                    title="Editar"
+                                                    disabled={!hasAccounting || !unlocked}
+                                                    onClick={() => setEditCC(cc)}
+                                                >
+                                                    <IconEdit />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="btn danger btn-icon"
+                                                    title="Eliminar"
+                                                    disabled={!hasAccounting || !unlocked}
+                                                    onClick={() => handleDeleteCC(cc)}
+                                                >
+                                                    <IconTrash />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>
@@ -428,7 +465,7 @@ export default function Configuracion({ packages, accounts, costCenters }) {
                 <Modal title="Nuevo paquete contable" onClose={() => setShowCreatePkg(false)} maxWidth={640}>
                     <PackageForm
                         accounts={accounts ?? []}
-                        costCenters={costCenters ?? []}
+                        costCenters={leafCostCenters ?? []}
                         onCancel={() => setShowCreatePkg(false)}
                     />
                 </Modal>
@@ -439,7 +476,7 @@ export default function Configuracion({ packages, accounts, costCenters }) {
                     <PackageForm
                         pkg={editPkg}
                         accounts={accounts ?? []}
-                        costCenters={costCenters ?? []}
+                        costCenters={leafCostCenters ?? []}
                         onCancel={() => setEditPkg(null)}
                     />
                 </Modal>
@@ -448,13 +485,13 @@ export default function Configuracion({ packages, accounts, costCenters }) {
             {/* Modales centros de costo */}
             {showCreateCC && (
                 <Modal title="Nuevo centro de costo" onClose={() => setShowCreateCC(false)} maxWidth={640}>
-                    <CostCenterForm onCancel={() => setShowCreateCC(false)} />
+                    <CostCenterForm allCenters={costCenters ?? []} onCancel={() => setShowCreateCC(false)} />
                 </Modal>
             )}
 
             {editCC && (
                 <Modal title={`Editar centro — ${editCC.name}`} onClose={() => setEditCC(null)} maxWidth={640}>
-                    <CostCenterForm cc={editCC} onCancel={() => setEditCC(null)} />
+                    <CostCenterForm cc={editCC} allCenters={costCenters ?? []} onCancel={() => setEditCC(null)} />
                 </Modal>
             )}
         </AppLayout>

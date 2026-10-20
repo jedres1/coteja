@@ -5,6 +5,7 @@ namespace App\Traits;
 use App\Models\AccountingAccount;
 use App\Models\AccountingPackage;
 use App\Models\CostCenter;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 trait HasAccountingTenant
 {
@@ -19,11 +20,12 @@ trait HasAccountingTenant
     {
         $id = $this->tenantId();
 
-        abort_if(
-            $id === null,
-            422,
-            'Seleccione un inquilino activo para acceder al módulo contable.'
-        );
+        if ($id === null) {
+            throw new HttpResponseException(
+                redirect()->route('admin.dashboard')
+                    ->with('error', 'Selecciona una empresa en el selector de la barra superior para acceder al módulo contable.')
+            );
+        }
 
         // Inicializar catálogos en la primera visita (orden: cuentas → centros → paquetes)
         if (!AccountingAccount::companyHasCatalog($id)) {
