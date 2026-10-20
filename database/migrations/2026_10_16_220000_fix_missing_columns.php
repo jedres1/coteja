@@ -24,8 +24,10 @@ return new class extends Migration
             $table->string('email', 150)->nullable()->after('name');
         });
 
-        // Make employees.code nullable so it can be auto-generated post-insert
-        DB::statement('ALTER TABLE employees MODIFY code VARCHAR(20) NULL');
+        // Make employees.code nullable so it can be auto-generated post-insert (MySQL only)
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('ALTER TABLE employees MODIFY code VARCHAR(20) NULL');
+        }
     }
 
     public function down(): void

@@ -7,6 +7,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Cache;
 
 class User extends Authenticatable
 {
@@ -83,19 +84,34 @@ class User extends Authenticatable
         if ($this->isAdmin()) return true;
 
         $companyId = session('active_company_id');
+
         if ($companyId) {
-            $company = $this->accessibleCompanies()
-                ->where('companies.id', $companyId)
-                ->first();
-            return $company && in_array($module, $company->module_accesses ?? [], true);
+            $modules = Cache::remember(
+                "user_modules:{$this->id}:{$companyId}",
+                3600,
+                function () use ($companyId) {
+                    $company = $this->accessibleCompanies()
+                        ->where('companies.id', $companyId)
+                        ->first();
+                    return $company ? ($company->module_accesses ?? []) : [];
+                }
+            );
+            return in_array($module, $modules, true);
         }
 
-        // No active company: show union so nav reflects all possible modules
-        return $this->accessibleCompanies
-            ->pluck('module_accesses')
-            ->flatten()
-            ->filter()
-            ->unique()
-            ->contains($module);
+        // No active company: union of all accessible modules for nav visibility
+        $modules = Cache::remember(
+            "user_all_modules:{$this->id}",
+            3600,
+            fn () => $this->accessibleCompanies()
+                ->get()
+                ->pluck('module_accesses')
+                ->flatten()
+                ->filter()
+                ->unique()
+                ->values()
+                ->all()
+        );
+        return in_array($module, $modules, true);
     }
 }

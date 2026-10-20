@@ -126,6 +126,7 @@ class FacturaElectronicaSVController extends Controller
                 ->tap($scope)
                 ->whereNotNull('signed_dte')
                 ->orderBy('issued_at')
+                ->select(['id', 'number_control', 'generation_code', 'document_type', 'customer_name', 'issued_at'])
                 ->get()
                 ->map(fn (BillingInvoice $inv) => [
                     'id'             => $inv->id,

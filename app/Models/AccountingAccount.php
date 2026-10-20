@@ -45,6 +45,13 @@ class AccountingAccount extends Model
         return $query->where('company_id', $companyId);
     }
 
+    public function scopeLeafAccounts(Builder $query): Builder
+    {
+        return $query->whereNotExists(fn ($q) => $q->select(DB::raw(1))
+            ->from('accounting_accounts as ch')
+            ->whereColumn('ch.parent_id', 'accounting_accounts.id'));
+    }
+
     public function typeLabel(): string
     {
         return match ($this->type) {

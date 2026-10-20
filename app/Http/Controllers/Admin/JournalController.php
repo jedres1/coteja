@@ -13,6 +13,7 @@ use App\Models\CostCenter;
 use App\Models\JournalEntry;
 use App\Models\JournalEntryLine;
 use App\Services\Accounting\AccountingPeriodService;
+use App\Services\Accounting\AccountingReportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -21,7 +22,10 @@ class JournalController extends Controller
 {
     use ExportsCsv, HasAccountingTenant;
 
-    public function __construct(private readonly AccountingPeriodService $periods) {}
+    public function __construct(
+        private readonly AccountingPeriodService $periods,
+        private readonly AccountingReportService $reports,
+    ) {}
 
     public function index(Request $request)
     {
@@ -48,11 +52,15 @@ class JournalController extends Controller
 
         $entries = $query->paginate(20)->withQueryString();
 
+        $countByStatus = JournalEntry::forCompany($companyId)
+            ->groupBy('status')
+            ->selectRaw('status, COUNT(*) as total')
+            ->pluck('total', 'status');
         $stats = [
-            'borrador' => JournalEntry::forCompany($companyId)->where('status', 'borrador')->count(),
-            'aprobado' => JournalEntry::forCompany($companyId)->where('status', 'aprobado')->count(),
-            'anulado'  => JournalEntry::forCompany($companyId)->where('status', 'anulado')->count(),
-            'total'    => JournalEntry::forCompany($companyId)->count(),
+            'borrador' => (int) $countByStatus->get('borrador', 0),
+            'aprobado' => (int) $countByStatus->get('aprobado', 0),
+            'anulado'  => (int) $countByStatus->get('anulado', 0),
+            'total'    => (int) $countByStatus->sum(),
         ];
 
         return Inertia::render('Admin/Accounting/Diario', compact('entries', 'stats', 'search', 'status', 'from', 'to'));
@@ -127,6 +135,10 @@ class JournalController extends Controller
 
             return $entry;
         });
+
+        if ($data['action'] === 'aprobado') {
+            $this->reports->invalidateCompany($companyId);
+        }
 
         return response()->json([
             'success'  => true,
@@ -214,6 +226,10 @@ class JournalController extends Controller
             }
         });
 
+        if ($data['action'] === 'aprobado') {
+            $this->reports->invalidateCompany($companyId);
+        }
+
         return response()->json([
             'success'  => true,
             'message'  => $data['action'] === 'aprobado' ? 'Asiento aprobado.' : 'Borrador actualizado.',
@@ -237,6 +253,8 @@ class JournalController extends Controller
             'approved_by' => $request->user()?->id,
             'approved_at' => now(),
         ]);
+
+        $this->reports->invalidateCompany($companyId);
 
         return response()->json(['success' => true, 'message' => 'Asiento aprobado y publicado en el diario.']);
     }
@@ -294,6 +312,8 @@ class JournalController extends Controller
                 ]);
             }
         });
+
+        $this->reports->invalidateCompany($companyId);
 
         return response()->json(['success' => true, 'message' => 'Asiento anulado. Se generó el asiento de reversión automáticamente.']);
     }

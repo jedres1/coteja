@@ -114,45 +114,45 @@ class PurchaseInvoiceController extends Controller
         $payableEntries  = 0;
         $failures        = 0;
 
-        $invoices = PurchaseInvoice::with('supplier')
+        PurchaseInvoice::with('supplier')
             ->when($tenantId !== null, fn ($q) => $q->where('company_id', $tenantId))
             ->where('status', 'approved')
             ->whereDoesntHave('journalEntry')
-            ->get();
-
-        foreach ($invoices as $invoice) {
-            try {
-                $periods->validateDateOrFail($invoice->purchase_date ?? now());
-                if ($accounting->createFromPurchase($invoice, $request->user()?->id)) {
-                    $purchaseEntries++;
+            ->chunk(50, function ($invoices) use (&$purchaseEntries, &$failures, $accounting, $periods, $request) {
+                foreach ($invoices as $invoice) {
+                    try {
+                        $periods->validateDateOrFail($invoice->purchase_date ?? now());
+                        if ($accounting->createFromPurchase($invoice, $request->user()?->id)) {
+                            $purchaseEntries++;
+                        }
+                    } catch (\Throwable) {
+                        $failures++;
+                    }
                 }
-            } catch (\Throwable) {
-                $failures++;
-            }
-        }
+            });
 
-        $paidInvoices = PurchaseInvoice::with(['supplier', 'bankTransactions'])
+        PurchaseInvoice::with(['supplier', 'bankTransactions'])
             ->when($tenantId !== null, fn ($q) => $q->where('company_id', $tenantId))
             ->where('payment_status', 'paid')
             ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('journal_entries')
                 ->whereColumn('journal_entries.source_id', 'purchase_invoices.id')
                 ->where('journal_entries.source_type', 'purchase_payment'))
-            ->get();
-
-        foreach ($paidInvoices as $invoice) {
-            try {
-                $paymentTransaction = $invoice->bankTransactions->sortByDesc('transaction_date')->first();
-                $accounting->createFromPurchasePayment(
-                    $invoice,
-                    $request->user()?->id,
-                    $paymentTransaction?->transaction_date?->toDateString() ?? $invoice->purchase_date?->toDateString(),
-                    $paymentTransaction?->reference,
-                );
-                $payableEntries++;
-            } catch (\Throwable) {
-                $failures++;
-            }
-        }
+            ->chunk(50, function ($paidInvoices) use (&$payableEntries, &$failures, $accounting, $request) {
+                foreach ($paidInvoices as $invoice) {
+                    try {
+                        $paymentTransaction = $invoice->bankTransactions->sortByDesc('transaction_date')->first();
+                        $accounting->createFromPurchasePayment(
+                            $invoice,
+                            $request->user()?->id,
+                            $paymentTransaction?->transaction_date?->toDateString() ?? $invoice->purchase_date?->toDateString(),
+                            $paymentTransaction?->reference,
+                        );
+                        $payableEntries++;
+                    } catch (\Throwable) {
+                        $failures++;
+                    }
+                }
+            });
 
         $message = "Asientos generados: {$purchaseEntries} de compras y {$payableEntries} de pagos.";
         if ($failures > 0) {
@@ -368,6 +368,8 @@ class PurchaseInvoiceController extends Controller
             ->paginate(25)
             ->withQueryString();
 
+        $invoices->getCollection()->each->append('receptor_name');
+
         $total = PurchaseInvoice::whereIn('company_id', $companyIds)
             ->where('status', 'extracted')->count();
 
@@ -431,38 +433,29 @@ class PurchaseInvoiceController extends Controller
 
         $blocked = 0;
         $updated = 0;
-
         $accountingOn = $this->isAccountingConfigured();
 
         foreach ($invoices as $invoice) {
             if ($accountingOn) {
                 try {
                     $periods->validateDateOrFail($invoice->purchase_date ?? now());
-                } catch (AccountingPeriodException $e) {
+                } catch (AccountingPeriodException) {
                     $blocked++;
                     continue;
                 }
+            }
 
-                try {
-                    DB::transaction(function () use ($accounting, $invoice, $request, $importer) {
-                        $importer->registerSupplierForApprovedInvoice($invoice);
+            try {
+                DB::transaction(function () use ($accounting, $invoice, $request, $importer, $accountingOn) {
+                    $importer->registerSupplierForApprovedInvoice($invoice);
+                    if ($accountingOn) {
                         $accounting->createFromPurchase($invoice, $request->user()?->id);
-                        $invoice->update(['status' => 'approved']);
-                    });
-                    $updated++;
-                } catch (\Throwable) {
-                    $blocked++;
-                }
-            } else {
-                try {
-                    DB::transaction(function () use ($invoice, $importer) {
-                        $importer->registerSupplierForApprovedInvoice($invoice);
-                        $invoice->update(['status' => 'approved']);
-                    });
-                    $updated++;
-                } catch (\Throwable) {
-                    $blocked++;
-                }
+                    }
+                    $invoice->update(['status' => 'approved']);
+                });
+                $updated++;
+            } catch (\Throwable) {
+                $blocked++;
             }
         }
 
@@ -494,30 +487,34 @@ class PurchaseInvoiceController extends Controller
         $to         = trim((string) $request->query('to', ''));
         $companyIds = $this->accessibleCompanyIds($request);
 
+        $invoices = PurchaseInvoice::with(['supplier', 'customer'])
+            ->whereNotIn('status', ['extracted', 'rejected'])
+            ->whereIn('company_id', $companyIds)
+            ->when($supplierId, fn ($q) => $q->where('supplier_id', $supplierId))
+            ->when($from !== '', fn ($q) => $q->whereDate('purchase_date', '>=', $from))
+            ->when($to   !== '', fn ($q) => $q->whereDate('purchase_date', '<=', $to))
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($query) use ($search) {
+                    $query->where('invoice_number', 'like', "%{$search}%")
+                        ->orWhere('payment_method', 'like', "%{$search}%")
+                        ->orWhere('notes', 'like', "%{$search}%")
+                        ->orWhereHas('supplier', function ($query) use ($search) {
+                            $query->where('name', 'like', "%{$search}%")
+                                ->orWhere('trade_name', 'like', "%{$search}%")
+                                ->orWhere('document_number', 'like', "%{$search}%")
+                                ->orWhere('nrc', 'like', "%{$search}%");
+                        });
+                });
+            })
+            ->latest('purchase_date')
+            ->latest()
+            ->paginate(15)
+            ->withQueryString();
+
+        $invoices->getCollection()->each->append('receptor_name');
+
         return Inertia::render('Admin/PurchaseInvoices/Index', [
-            'invoices' => PurchaseInvoice::with(['supplier', 'customer'])
-                ->whereNotIn('status', ['extracted', 'rejected'])
-                ->whereIn('company_id', $companyIds)
-                ->when($supplierId, fn ($q) => $q->where('supplier_id', $supplierId))
-                ->when($from !== '', fn ($q) => $q->whereDate('purchase_date', '>=', $from))
-                ->when($to   !== '', fn ($q) => $q->whereDate('purchase_date', '<=', $to))
-                ->when($search !== '', function ($query) use ($search) {
-                    $query->where(function ($query) use ($search) {
-                        $query->where('invoice_number', 'like', "%{$search}%")
-                            ->orWhere('payment_method', 'like', "%{$search}%")
-                            ->orWhere('notes', 'like', "%{$search}%")
-                            ->orWhereHas('supplier', function ($query) use ($search) {
-                                $query->where('name', 'like', "%{$search}%")
-                                    ->orWhere('trade_name', 'like', "%{$search}%")
-                                    ->orWhere('document_number', 'like', "%{$search}%")
-                                    ->orWhere('nrc', 'like', "%{$search}%");
-                            });
-                    });
-                })
-                ->latest('purchase_date')
-                ->latest()
-                ->paginate(15)
-                ->withQueryString(),
+            'invoices' => $invoices,
             'suppliers'   => Supplier::whereIn('company_id', $companyIds)->orderBy('name')->get(),
             'customers'   => Customer::with('companies')->orderBy('name')->get(),
             'search'      => $search,

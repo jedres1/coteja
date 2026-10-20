@@ -7,6 +7,25 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            // SQLite doesn't support UPDATE with JOIN subqueries; run per-row instead
+            $rows = DB::table('purchase_invoices')
+                ->select('supplier_id', DB::raw('MIN(company_id) as company_id'))
+                ->whereNotNull('company_id')
+                ->whereNotNull('supplier_id')
+                ->groupBy('supplier_id')
+                ->havingRaw('COUNT(DISTINCT company_id) = 1')
+                ->get();
+
+            foreach ($rows as $row) {
+                DB::table('suppliers')
+                    ->where('id', $row->supplier_id)
+                    ->whereNull('company_id')
+                    ->update(['company_id' => $row->company_id]);
+            }
+            return;
+        }
+
         $supplierCompanies = DB::table('purchase_invoices')
             ->select('supplier_id', DB::raw('MIN(company_id) as company_id'))
             ->whereNotNull('company_id')

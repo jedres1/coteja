@@ -32,8 +32,6 @@ class PurchaseInvoice extends Model
         'extracted_document_body',
     ];
 
-    protected $appends = ['receptor_name'];
-
     protected $casts = [
         'purchase_date' => 'date',
         'due_date' => 'date',
