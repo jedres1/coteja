@@ -763,7 +763,7 @@ class PurchaseInvoiceController extends Controller
             return $tenantId ? [$tenantId] : [];
         }
 
-        return $user->accessibleCompanies()->pluck('id')->unique()->filter()->values()->all();
+        return $user->accessibleCompanies()->pluck('companies.id')->unique()->filter()->values()->all();
     }
 
     private function validatedData(Request $request, ?PurchaseInvoice $purchaseInvoice = null): array

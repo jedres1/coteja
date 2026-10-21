@@ -327,7 +327,7 @@ export default function PendingApproval({ invoices, total, showAll }) {
     }
 
     function handleToggleShowAll() {
-        router.get(route('admin.purchase-invoices.pending-approval'), { show_all: !showAll });
+        router.get(route('admin.purchase-invoices.pending-approval'), { ver_todas: showAll ? 0 : 1 });
     }
 
     const fmt = (n) =>
