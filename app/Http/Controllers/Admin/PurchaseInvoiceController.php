@@ -752,18 +752,14 @@ class PurchaseInvoiceController extends Controller
         return $payments->isEmpty() ? null : (float) $payments->sum(fn ($payment) => (float) $payment['montoPago']);
     }
 
-    /** Devuelve las empresas accesibles; sin empresa activa, el administrador no ve registros de compras. */
+    /** Devuelve el ID de la empresa activa en sesión. Sin empresa seleccionada no se devuelven registros. */
     private function accessibleCompanyIds(Request $request): array
     {
         $user = $request->user();
         if (! $user) return [];
 
-        if ($user->isAdmin()) {
-            $tenantId = $this->activeTenantId($request);
-            return $tenantId ? [$tenantId] : [];
-        }
-
-        return $user->accessibleCompanies()->pluck('companies.id')->unique()->filter()->values()->all();
+        $tenantId = $this->activeTenantId($request);
+        return $tenantId ? [$tenantId] : [];
     }
 
     private function validatedData(Request $request, ?PurchaseInvoice $purchaseInvoice = null): array

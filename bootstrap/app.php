@@ -16,8 +16,9 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\HandleInertiaRequests::class,
         ]);
         $middleware->alias([
-            'role' => \App\Http\Middleware\EnsureRole::class,
-            'module' => \App\Http\Middleware\EnsureModuleAccess::class,
+            'role'           => \App\Http\Middleware\EnsureRole::class,
+            'module'         => \App\Http\Middleware\EnsureModuleAccess::class,
+            'ensure-company' => \App\Http\Middleware\EnsureCompanySelected::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

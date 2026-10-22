@@ -17,6 +17,11 @@ class CompanySwitcherController extends Controller
             $request->session()->put('active_company_id', $companyId);
         }
 
+        // If redirected here from a forced company-selection (url.intended is stored), go there
+        if ($request->session()->has('url.intended')) {
+            return redirect()->intended(route('admin.dashboard'))->with('status', 'Empresa activa actualizada.');
+        }
+
         return back()->with('status', 'Empresa activa actualizada.');
     }
 

@@ -13,6 +13,8 @@ class DashboardController extends Controller
 {
     public function __invoke()
     {
+        abort_unless(auth()->user()?->isAdmin(), 403);
+
         return Inertia::render('Admin/Dashboard', [
             'companiesCount' => Company::count(),
             'activeLicensesCount' => License::where('status', 'active')->count(),
