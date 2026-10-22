@@ -244,7 +244,7 @@ class InventoryController extends Controller
         }
 
         try {
-            app(AccountingPeriodService::class)->validateDateOrFail(now());
+            app(AccountingPeriodService::class)->validateDateOrFail(now(), $tenantId);
         } catch (AccountingPeriodException $e) {
             return back()->withErrors($e->getMessage());
         }

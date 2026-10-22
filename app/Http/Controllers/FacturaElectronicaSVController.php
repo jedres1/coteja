@@ -582,7 +582,7 @@ class FacturaElectronicaSVController extends Controller
         $tenantId = $this->activeTenantId($request);
 
         try {
-            app(AccountingPeriodService::class)->validateDateOrFail(now());
+            app(AccountingPeriodService::class)->validateDateOrFail(now(), $tenantId);
         } catch (AccountingPeriodException $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }

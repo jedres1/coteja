@@ -9,8 +9,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class AccountingYearPeriod extends Model
 {
     protected $fillable = [
-        'year', 'name', 'status', 'opened_at', 'closed_at', 'closed_by', 'notes',
+        'company_id', 'year', 'name', 'status', 'opened_at', 'closed_at', 'closed_by', 'notes',
     ];
+
+    protected $appends = ['is_open'];
 
     protected $casts = [
         'year' => 'integer',
@@ -18,14 +20,26 @@ class AccountingYearPeriod extends Model
         'closed_at' => 'datetime',
     ];
 
+    public function scopeForCompany($query, int $companyId)
+    {
+        return $query->where('company_id', $companyId);
+    }
+
     public function months(): HasMany
     {
-        return $this->hasMany(AccountingPeriod::class, 'year', 'year')->orderBy('month');
+        return $this->hasMany(AccountingPeriod::class, 'year', 'year')
+            ->where('company_id', $this->company_id)
+            ->orderBy('month');
     }
 
     public function closedByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'closed_by');
+    }
+
+    public function getIsOpenAttribute(): bool
+    {
+        return $this->status === 'abierto';
     }
 
     public function isOpen(): bool

@@ -15,11 +15,20 @@ class AccountingPeriodService
         'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
     ];
 
-    public function validateDateOrFail(\DateTimeInterface|string $date): void
+    public function validateDateOrFail(\DateTimeInterface|string $date, ?int $companyId = null): void
     {
-        $d      = Carbon::parse($date);
-        $yearPeriod = AccountingYearPeriod::where('year', $d->year)->first();
-        $period = AccountingPeriod::where('year', $d->year)->where('month', $d->month)->first();
+        $d = Carbon::parse($date);
+
+        $yearQuery   = AccountingYearPeriod::where('year', $d->year);
+        $periodQuery = AccountingPeriod::where('year', $d->year)->where('month', $d->month);
+
+        if ($companyId !== null) {
+            $yearQuery->where('company_id', $companyId);
+            $periodQuery->where('company_id', $companyId);
+        }
+
+        $yearPeriod = $yearQuery->first();
+        $period     = $periodQuery->first();
 
         if (! $yearPeriod || ! $yearPeriod->isOpen() || ! $period || $period->status !== 'abierto') {
             $label = (self::$months[$d->month] ?? "Mes {$d->month}") . ' ' . $d->year;
@@ -32,33 +41,48 @@ class AccountingPeriodService
         }
     }
 
-    public function isDateOpen(\DateTimeInterface|string $date): bool
+    public function isDateOpen(\DateTimeInterface|string $date, ?int $companyId = null): bool
     {
         $d = Carbon::parse($date);
-        $yearPeriod = AccountingYearPeriod::where('year', $d->year)->first();
-        $period = AccountingPeriod::where('year', $d->year)->where('month', $d->month)->first();
+
+        $yearQuery   = AccountingYearPeriod::where('year', $d->year);
+        $periodQuery = AccountingPeriod::where('year', $d->year)->where('month', $d->month);
+
+        if ($companyId !== null) {
+            $yearQuery->where('company_id', $companyId);
+            $periodQuery->where('company_id', $companyId);
+        }
+
+        $yearPeriod = $yearQuery->first();
+        $period     = $periodQuery->first();
+
         return $yearPeriod && $yearPeriod->isOpen() && $period && $period->status === 'abierto';
     }
 
-    public function findOrNull(int $year, int $month): ?AccountingPeriod
+    public function findOrNull(int $year, int $month, ?int $companyId = null): ?AccountingPeriod
     {
-        return AccountingPeriod::where('year', $year)->where('month', $month)->first();
+        $query = AccountingPeriod::where('year', $year)->where('month', $month);
+        if ($companyId !== null) {
+            $query->where('company_id', $companyId);
+        }
+        return $query->first();
     }
 
-    public function createYearPeriods(int $year): int
+    public function createYearPeriods(int $year, ?int $companyId = null): int
     {
-        return DB::transaction(function () use ($year) {
-            AccountingYearPeriod::firstOrCreate(
-                ['year' => $year],
-                ['name' => 'Ejercicio contable '.$year, 'status' => 'cerrado']
-            );
+        return DB::transaction(function () use ($year, $companyId) {
+            $yearKey    = $companyId !== null ? ['company_id' => $companyId, 'year' => $year] : ['company_id' => null, 'year' => $year];
+            $yearDefaults = ['name' => 'Ejercicio contable ' . $year, 'status' => 'cerrado', 'company_id' => $companyId];
+
+            AccountingYearPeriod::firstOrCreate($yearKey, $yearDefaults);
 
             $created = 0;
             for ($m = 1; $m <= 12; $m++) {
-                $name = AccountingPeriod::labelFor($year, $m);
-                $new  = AccountingPeriod::firstOrCreate(
-                    ['year' => $year, 'month' => $m],
-                    ['name' => $name, 'status' => 'cerrado']
+                $name       = AccountingPeriod::labelFor($year, $m);
+                $periodKey  = $companyId !== null ? ['company_id' => $companyId, 'year' => $year, 'month' => $m] : ['company_id' => null, 'year' => $year, 'month' => $m];
+                $new        = AccountingPeriod::firstOrCreate(
+                    $periodKey,
+                    ['name' => $name, 'status' => 'cerrado', 'company_id' => $companyId]
                 );
                 if ($new->wasRecentlyCreated) {
                     $created++;
@@ -88,15 +112,17 @@ class AccountingPeriodService
                 'notes' => $notes ?? $yearPeriod->notes,
             ]);
 
-            AccountingPeriod::where('year', $yearPeriod->year)
-                ->where('status', 'abierto')
-                ->update([
-                    'status' => 'cerrado',
-                    'closed_at' => now(),
-                    'closed_by' => $userId,
-                    'notes' => $notes,
-                    'updated_at' => now(),
-                ]);
+            $query = AccountingPeriod::where('year', $yearPeriod->year)->where('status', 'abierto');
+            if ($yearPeriod->company_id !== null) {
+                $query->where('company_id', $yearPeriod->company_id);
+            }
+            $query->update([
+                'status' => 'cerrado',
+                'closed_at' => now(),
+                'closed_by' => $userId,
+                'notes' => $notes,
+                'updated_at' => now(),
+            ]);
         });
     }
 

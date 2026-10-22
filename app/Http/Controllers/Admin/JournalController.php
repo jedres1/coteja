@@ -94,7 +94,7 @@ class JournalController extends Controller
         $data = $request->validated();
 
         try {
-            $this->periods->validateDateOrFail($data['entry_date']);
+            $this->periods->validateDateOrFail($data['entry_date'], $companyId);
         } catch (AccountingPeriodException $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
@@ -194,7 +194,7 @@ class JournalController extends Controller
         $data = $request->validated();
 
         try {
-            $this->periods->validateDateOrFail($data['entry_date']);
+            $this->periods->validateDateOrFail($data['entry_date'], $companyId);
         } catch (AccountingPeriodException $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }

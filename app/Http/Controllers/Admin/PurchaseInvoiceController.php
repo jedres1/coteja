@@ -118,10 +118,10 @@ class PurchaseInvoiceController extends Controller
             ->when($tenantId !== null, fn ($q) => $q->where('company_id', $tenantId))
             ->where('status', 'approved')
             ->whereDoesntHave('journalEntry')
-            ->chunk(50, function ($invoices) use (&$purchaseEntries, &$failures, $accounting, $periods, $request) {
+            ->chunk(50, function ($invoices) use (&$purchaseEntries, &$failures, $accounting, $periods, $request, $tenantId) {
                 foreach ($invoices as $invoice) {
                     try {
-                        $periods->validateDateOrFail($invoice->purchase_date ?? now());
+                        $periods->validateDateOrFail($invoice->purchase_date ?? now(), $tenantId);
                         if ($accounting->createFromPurchase($invoice, $request->user()?->id)) {
                             $purchaseEntries++;
                         }
@@ -383,7 +383,7 @@ class PurchaseInvoiceController extends Controller
 
         if ($this->isAccountingConfigured()) {
             try {
-                $periods->validateDateOrFail($purchaseInvoice->purchase_date ?? now());
+                $periods->validateDateOrFail($purchaseInvoice->purchase_date ?? now(), $purchaseInvoice->company_id);
             } catch (AccountingPeriodException $e) {
                 return back()->withErrors($e->getMessage());
             }
@@ -438,7 +438,7 @@ class PurchaseInvoiceController extends Controller
         foreach ($invoices as $invoice) {
             if ($accountingOn) {
                 try {
-                    $periods->validateDateOrFail($invoice->purchase_date ?? now());
+                    $periods->validateDateOrFail($invoice->purchase_date ?? now(), $invoice->company_id);
                 } catch (AccountingPeriodException) {
                     $blocked++;
                     continue;

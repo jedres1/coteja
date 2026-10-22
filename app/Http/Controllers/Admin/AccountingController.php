@@ -312,14 +312,15 @@ class AccountingController extends Controller
 
     public function periodos(Request $request)
     {
-        $year = (int) $request->query('year', now()->year);
+        $companyId = $this->requireTenant();
+        $year      = (int) $request->query('year', now()->year);
 
-        $yearPeriod = AccountingYearPeriod::where('year', $year)->first();
-        $periods    = AccountingPeriod::where('year', $year)->orderBy('month')->get();
+        $yearPeriod = AccountingYearPeriod::forCompany($companyId)->where('year', $year)->first();
+        $periods    = AccountingPeriod::forCompany($companyId)->where('year', $year)->orderBy('month')->get();
 
-        $availableYears = AccountingYearPeriod::distinct()->orderByDesc('year')->pluck('year')->toArray();
+        $availableYears = AccountingYearPeriod::forCompany($companyId)->distinct()->orderByDesc('year')->pluck('year')->toArray();
 
-        foreach (AccountingPeriod::distinct()->pluck('year')->toArray() as $y) {
+        foreach (AccountingPeriod::forCompany($companyId)->distinct()->pluck('year')->toArray() as $y) {
             if (!in_array($y, $availableYears)) $availableYears[] = $y;
         }
 
@@ -332,66 +333,78 @@ class AccountingController extends Controller
 
     public function generarPeriodos(Request $request)
     {
-        $data    = $request->validate(['year' => 'required|integer|min:2020|max:2099']);
-        $created = $this->periods->createYearPeriods((int) $data['year']);
+        $companyId = $this->requireTenant();
+        $data      = $request->validate(['year' => 'required|integer|min:2020|max:2099']);
+        $created   = $this->periods->createYearPeriods((int) $data['year'], $companyId);
 
-        return response()->json([
-            'success' => true,
-            'message' => $created > 0
-                ? "Ejercicio {$data['year']} creado con {$created} mes(es)."
-                : "El ejercicio {$data['year']} y sus 12 meses ya existen.",
-        ]);
+        $msg = $created > 0
+            ? "Ejercicio {$data['year']} creado con {$created} mes(es)."
+            : "El ejercicio {$data['year']} y sus 12 meses ya existen.";
+
+        return back()->with('status', $msg);
     }
 
     public function abrirAnioPeriodo(Request $request, AccountingYearPeriod $yearPeriod)
     {
+        $companyId = $this->requireTenant();
+        abort_unless((int) $yearPeriod->company_id === $companyId, 403);
+
         if ($yearPeriod->isOpen()) {
-            return response()->json(['success' => false, 'message' => 'El año contable ya está abierto.'], 422);
+            return back()->with('error', 'El año contable ya está abierto.');
         }
 
         $this->periods->openYear($yearPeriod);
 
-        return response()->json(['success' => true, 'message' => "Ejercicio {$yearPeriod->year} abierto."]);
+        return back()->with('status', "Ejercicio {$yearPeriod->year} abierto.");
     }
 
     public function cerrarAnioPeriodo(Request $request, AccountingYearPeriod $yearPeriod)
     {
+        $companyId = $this->requireTenant();
+        abort_unless((int) $yearPeriod->company_id === $companyId, 403);
+
         if (!$yearPeriod->isOpen()) {
-            return response()->json(['success' => false, 'message' => 'El año contable ya está cerrado.'], 422);
+            return back()->with('error', 'El año contable ya está cerrado.');
         }
 
         $data = $request->validate(['notes' => 'nullable|string|max:500']);
         $this->periods->closeYear($yearPeriod, $request->user()->id, $data['notes'] ?? null);
 
-        return response()->json(['success' => true, 'message' => "Ejercicio {$yearPeriod->year} cerrado junto con sus meses abiertos."]);
+        return back()->with('status', "Ejercicio {$yearPeriod->year} cerrado junto con sus meses abiertos.");
     }
 
     public function abrirPeriodo(Request $request, AccountingPeriod $period)
     {
-        $yearPeriod = AccountingYearPeriod::where('year', $period->year)->first();
+        $companyId  = $this->requireTenant();
+        abort_unless((int) $period->company_id === $companyId, 403);
+
+        $yearPeriod = AccountingYearPeriod::forCompany($companyId)->where('year', $period->year)->first();
         if (!$yearPeriod || !$yearPeriod->isOpen()) {
-            return response()->json(['success' => false, 'message' => 'Abra primero el año contable antes de abrir meses.'], 422);
+            return back()->with('error', 'Abra primero el año contable antes de abrir meses.');
         }
 
         if ($period->isOpen()) {
-            return response()->json(['success' => false, 'message' => 'El período ya está abierto.'], 422);
+            return back()->with('error', 'El período ya está abierto.');
         }
 
         $this->periods->openPeriod($period);
 
-        return response()->json(['success' => true, 'message' => "Período {$period->full_name} abierto."]);
+        return back()->with('status', "Período {$period->full_name} abierto.");
     }
 
     public function cerrarPeriodo(Request $request, AccountingPeriod $period)
     {
+        $companyId = $this->requireTenant();
+        abort_unless((int) $period->company_id === $companyId, 403);
+
         if (!$period->isOpen()) {
-            return response()->json(['success' => false, 'message' => 'El período ya está cerrado.'], 422);
+            return back()->with('error', 'El período ya está cerrado.');
         }
 
         $data = $request->validate(['notes' => 'nullable|string|max:500']);
         $this->periods->closePeriod($period, $request->user()->id, $data['notes'] ?? null);
 
-        return response()->json(['success' => true, 'message' => "Período {$period->full_name} cerrado."]);
+        return back()->with('status', "Período {$period->full_name} cerrado.");
     }
 
     // ── Saldos por período ──────────────────────────────────────────────────
@@ -407,9 +420,9 @@ class AccountingController extends Controller
         ['balances' => $balances, 'summaryByType' => $summaryByType] =
             $this->reports->saldos($companyId, $year, $month, $accountId, $acumulado);
 
-        $period     = AccountingPeriod::where('year', $year)->where('month', $month)->first();
+        $period     = AccountingPeriod::forCompany($companyId)->where('year', $year)->where('month', $month)->first();
         $accounts   = AccountingAccount::forCompany($companyId)->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
-        $allPeriods = AccountingPeriod::where('year', $year)->orderBy('month')->get();
+        $allPeriods = AccountingPeriod::forCompany($companyId)->where('year', $year)->orderBy('month')->get();
 
         return Inertia::render('Admin/Accounting/Saldos', compact(
             'balances', 'summaryByType', 'accounts',
@@ -436,8 +449,8 @@ class AccountingController extends Controller
             'totalSaldoAcreedor' => $totalSaldoAcreedor,
         ] = $this->reports->balanza($companyId, $year, $month, $acumulado, $tipo, $soloConMovimiento);
 
-        $period         = AccountingPeriod::where('year', $year)->where('month', $month)->first();
-        $availableYears = $this->reports->availableYears();
+        $period         = AccountingPeriod::forCompany($companyId)->where('year', $year)->where('month', $month)->first();
+        $availableYears = $this->reports->availableYears($companyId);
 
         return Inertia::render('Admin/Accounting/BalanzaComprobacion', compact(
             'rows', 'period', 'year', 'month', 'acumulado', 'tipo', 'soloConMovimiento',
@@ -463,8 +476,8 @@ class AccountingController extends Controller
             'endDate'     => $endDate,
         ] = $this->reports->libroMayor($companyId, $year, $month, $accountId, $acumulado);
 
-        $period         = AccountingPeriod::where('year', $year)->where('month', $month)->first();
-        $availableYears = $this->reports->availableYears();
+        $period         = AccountingPeriod::forCompany($companyId)->where('year', $year)->where('month', $month)->first();
+        $availableYears = $this->reports->availableYears($companyId);
 
         return Inertia::render('Admin/Accounting/LibroMayor', compact(
             'ledger', 'allAccounts', 'period',
@@ -484,8 +497,8 @@ class AccountingController extends Controller
         ['rows' => $rows, 'bySection' => $bySection, 'sections' => $sections] =
             $this->reports->balanceGeneral($companyId, $year, $month);
 
-        $period         = AccountingPeriod::where('year', $year)->where('month', $month)->first();
-        $availableYears = $this->reports->availableYears();
+        $period         = AccountingPeriod::forCompany($companyId)->where('year', $year)->where('month', $month)->first();
+        $availableYears = $this->reports->availableYears($companyId);
 
         return Inertia::render('Admin/Accounting/BalanceGeneral', compact(
             'rows', 'bySection', 'sections', 'period', 'year', 'month', 'availableYears'
@@ -510,8 +523,8 @@ class AccountingController extends Controller
             'utilidad'       => $utilidad,
         ] = $this->reports->estadoResultados($companyId, $year, $month, $acumulado);
 
-        $period         = AccountingPeriod::where('year', $year)->where('month', $month)->first();
-        $availableYears = $this->reports->availableYears();
+        $period         = AccountingPeriod::forCompany($companyId)->where('year', $year)->where('month', $month)->first();
+        $availableYears = $this->reports->availableYears($companyId);
 
         return Inertia::render('Admin/Accounting/EstadoResultados', compact(
             'rows', 'bySection', 'sections', 'period', 'year', 'month',

@@ -69,8 +69,8 @@ Route::middleware(['auth', 'role:admin,inquilino', 'ensure-company', 'module:pur
     Route::resource('purchase-invoices', PurchaseInvoiceController::class)->only(['index', 'store', 'update', 'destroy']);
 });
 
-// ── Módulo Compras: parámetros (solo admin) ───────────────────────────────────
-Route::middleware(['auth', 'role:admin', 'ensure-company', 'module:purchases'])->prefix('admin')->name('admin.')->group(function () {
+// ── Módulo Compras: parámetros (admin + inquilino) ───────────────────────────
+Route::middleware(['auth', 'role:admin,inquilino', 'ensure-company', 'module:purchases'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('purchase-invoices/settings', [PurchaseInvoiceController::class, 'settingsIndex'])->name('purchase-invoices.settings');
     Route::post('purchase-invoices/settings', [PurchaseInvoiceController::class, 'settingsUpdate'])->name('purchase-invoices.settings.update');
     Route::post('purchase-invoices/settings/accounting', [PurchaseInvoiceController::class, 'accountingSettingsUpdate'])->name('purchase-invoices.settings.accounting');
@@ -140,8 +140,8 @@ Route::middleware(['auth', 'role:admin,inquilino', 'ensure-company', 'module:acc
     });
 });
 
-// ── Módulo Contabilidad: parámetros (solo admin) ──────────────────────────────
-Route::middleware(['auth', 'role:admin', 'ensure-company', 'module:accounting'])->prefix('admin')->name('admin.')->group(function () {
+// ── Módulo Contabilidad: parámetros (admin + inquilino) ──────────────────────
+Route::middleware(['auth', 'role:admin,inquilino', 'ensure-company', 'module:accounting'])->prefix('admin')->name('admin.')->group(function () {
     Route::prefix('contabilidad')->name('accounting.')->controller(AccountingController::class)->group(function () {
         Route::get('configuracion', 'configuracion')->name('configuracion');
         Route::post('paquetes', 'storePackage')->name('paquetes.store');
@@ -165,8 +165,8 @@ Route::middleware(['auth', 'role:admin,inquilino', 'ensure-company', 'module:inv
     Route::post('inventario/movimientos', [InventoryController::class, 'storeMovement'])->name('inventory.movements.store');
 });
 
-// ── Módulo Inventario: parámetros (solo admin) ─────────────────────────────────
-Route::middleware(['auth', 'role:admin', 'ensure-company', 'module:inventory'])->prefix('admin')->name('admin.')->group(function () {
+// ── Módulo Inventario: parámetros (admin + inquilino) ─────────────────────────
+Route::middleware(['auth', 'role:admin,inquilino', 'ensure-company', 'module:inventory'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('inventario/parametros', [InventoryController::class, 'parameters'])->name('inventory.parameters');
     Route::post('inventario/parametros', [InventoryController::class, 'saveParameters'])->name('inventory.parameters.save');
 });
@@ -206,8 +206,8 @@ Route::middleware(['auth', 'role:admin,inquilino', 'ensure-company', 'module:bil
     });
 });
 
-// ── Módulo Facturación: parámetros (solo admin) ────────────────────────────────
-Route::middleware(['auth', 'role:admin', 'ensure-company', 'module:billing'])->prefix('admin')->name('admin.')->group(function () {
+// ── Módulo Facturación: parámetros (admin + inquilino) ────────────────────────
+Route::middleware(['auth', 'role:admin,inquilino', 'ensure-company', 'module:billing'])->prefix('admin')->name('admin.')->group(function () {
     Route::prefix('factura-sv')->name('factura-sv.')->controller(FacturaElectronicaSVController::class)->group(function () {
         Route::get('billing/configuracion', 'configuracionPage')->name('billing.configuracion');
         Route::post('configuracion', 'guardarConfiguracion')->name('configuracion.guardar');
@@ -239,8 +239,8 @@ Route::middleware(['auth', 'role:admin,inquilino', 'ensure-company', 'module:pay
     });
 });
 
-// ── Módulo Nómina: parámetros (solo admin) ────────────────────────────────────
-Route::middleware(['auth', 'role:admin', 'ensure-company', 'module:payroll'])->prefix('admin')->name('admin.')->group(function () {
+// ── Módulo Nómina: parámetros (admin + inquilino) ────────────────────────────
+Route::middleware(['auth', 'role:admin,inquilino', 'ensure-company', 'module:payroll'])->prefix('admin')->name('admin.')->group(function () {
     Route::prefix('nomina')->name('payroll.')->controller(PayrollController::class)->group(function () {
         Route::get('configuracion', 'settingsIndex')->name('settings.index');
         Route::post('configuracion', 'saveSettings')->name('settings.save');

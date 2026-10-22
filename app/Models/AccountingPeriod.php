@@ -8,9 +8,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class AccountingPeriod extends Model
 {
     protected $fillable = [
-        'year', 'month', 'name', 'status',
+        'company_id', 'year', 'month', 'name', 'status',
         'opened_at', 'closed_at', 'closed_by', 'notes',
     ];
+
+    protected $appends = ['is_open'];
 
     protected $casts = [
         'year'      => 'integer',
@@ -24,6 +26,11 @@ class AccountingPeriod extends Model
         'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
     ];
 
+    public function scopeForCompany($query, int $companyId)
+    {
+        return $query->where('company_id', $companyId);
+    }
+
     public function closedByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'closed_by');
@@ -32,6 +39,11 @@ class AccountingPeriod extends Model
     public function yearPeriod(): BelongsTo
     {
         return $this->belongsTo(AccountingYearPeriod::class, 'year', 'year');
+    }
+
+    public function getIsOpenAttribute(): bool
+    {
+        return $this->status === 'abierto';
     }
 
     public function isOpen(): bool
