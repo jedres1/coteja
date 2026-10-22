@@ -135,9 +135,7 @@ export default function AppLayout({ title, children }) {
                                     <NavLink href={route('admin.purchase-invoices.index')} routePattern="admin.purchase-invoices.index">Facturas de compra</NavLink>
                                     <NavLink href={route('admin.purchase-invoices.accounts-payable')} routePattern="admin.purchase-invoices.accounts-payable">Cuentas por pagar</NavLink>
                                     <NavLink href={route('admin.suppliers.index')} routePattern="admin.suppliers.*">Proveedores</NavLink>
-                                    {!isInquilino && (
-                                        <NavLink href={route('admin.purchase-invoices.settings')} routePattern="admin.purchase-invoices.settings">Configuración</NavLink>
-                                    )}
+                                    <NavLink href={route('admin.purchase-invoices.settings')} routePattern="admin.purchase-invoices.settings">Configuración</NavLink>
                                 </NavGroup>
                             )}
 
@@ -168,9 +166,7 @@ export default function AppLayout({ title, children }) {
                                     <NavLink href={route('admin.accounting.estado-resultados')} routePattern="admin.accounting.estado-resultados">Estado de Resultados</NavLink>
                                     <NavLink href={route('admin.accounting.reportes-fiscales')} routePattern="admin.accounting.reportes-fiscales*">Reportes fiscales</NavLink>
                                     <NavLink href={route('admin.accounting.periodos')} routePattern="admin.accounting.periodos">Períodos contables</NavLink>
-                                    {!isInquilino && (
-                                        <NavLink href={route('admin.accounting.configuracion')} routePattern="admin.accounting.configuracion">Configuración</NavLink>
-                                    )}
+                                    <NavLink href={route('admin.accounting.configuracion')} routePattern="admin.accounting.configuracion">Configuración</NavLink>
                                 </NavGroup>
                             )}
 
@@ -183,9 +179,7 @@ export default function AppLayout({ title, children }) {
                                     <NavLink href={route('admin.payroll.index')} isActive={isPayrollEmployees}>Empleados</NavLink>
                                     <NavLink href={route('admin.payroll.index', { tab: 'nominas' })} isActive={isPayrollPeriods}>Períodos de Nómina</NavLink>
                                     <NavLink href={route('admin.payroll.concepts.index')} routePattern="admin.payroll.concepts.*">Gestión de conceptos</NavLink>
-                                    {!isInquilino && (
-                                        <NavLink href={route('admin.payroll.settings.index')} routePattern="admin.payroll.settings.*">Configuración</NavLink>
-                                    )}
+                                    <NavLink href={route('admin.payroll.settings.index')} routePattern="admin.payroll.settings.*">Configuración</NavLink>
                                 </NavGroup>
                             )}
 
@@ -199,9 +193,7 @@ export default function AppLayout({ title, children }) {
                                     <NavLink href={route('admin.factura-sv.billing.productos')} routePattern="admin.factura-sv.billing.productos">Productos</NavLink>
                                     <NavLink href={route('admin.inventory.product-types')} routePattern="admin.inventory.product-types">Tipos de producto</NavLink>
                                     <NavLink href={route('admin.inventory.warehouses')} routePattern="admin.inventory.warehouses">Bodegas</NavLink>
-                                    {!isInquilino && (
-                                        <NavLink href={route('admin.inventory.parameters')} routePattern="admin.inventory.parameters">Parámetros</NavLink>
-                                    )}
+                                    <NavLink href={route('admin.inventory.parameters')} routePattern="admin.inventory.parameters">Parámetros</NavLink>
                                 </NavGroup>
                             )}
 
@@ -217,9 +209,7 @@ export default function AppLayout({ title, children }) {
                                     <NavLink href={route('admin.factura-sv.billing.cuentas-por-cobrar')} routePattern="admin.factura-sv.billing.cuentas-por-cobrar">Cuentas por cobrar</NavLink>
                                     <NavLink href={route('admin.factura-sv.billing.clientes')} routePattern="admin.factura-sv.billing.clientes">Clientes</NavLink>
                                     <NavLink href={route('admin.factura-sv.billing.productos')} routePattern="admin.factura-sv.billing.productos">Bienes y servicios</NavLink>
-                                    {!isInquilino && (
-                                        <NavLink href={route('admin.factura-sv.billing.configuracion')} routePattern="admin.factura-sv.billing.configuracion">Configuración</NavLink>
-                                    )}
+                                    <NavLink href={route('admin.factura-sv.billing.configuracion')} routePattern="admin.factura-sv.billing.configuracion">Configuración</NavLink>
                                 </NavGroup>
                             )}
                         </>
