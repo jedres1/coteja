@@ -30,7 +30,8 @@ class CompanyController extends Controller
 
     public function store(Request $request)
     {
-        Company::create($this->validated($request));
+        $company = Company::create($this->validated($request));
+        $company->syncBillingSettings();
 
         return back()->with('status', 'Empresa creada.');
     }
@@ -38,6 +39,8 @@ class CompanyController extends Controller
     public function update(Request $request, Company $company)
     {
         $company->update($this->validated($request));
+        $company->refresh();
+        $company->syncBillingSettings();
 
         return back()->with('status', 'Empresa actualizada.');
     }
