@@ -43,6 +43,7 @@ function CompanyForm({ company, modules, onSuccess }) {
         trade_name:           company?.trade_name           ?? '',
         nit_dui:              company?.nit_dui              ?? '',
         nrc:                  company?.nrc                  ?? '',
+        tipo_persona:         company?.tipo_persona         ?? 'Natural',
         business_activity:    company?.business_activity    ?? '',
         address_department:   company?.address_department   ?? '',
         address_municipality: company?.address_municipality ?? '',
@@ -125,6 +126,18 @@ function CompanyForm({ company, modules, onSuccess }) {
                         onChange={(e) => form.setData('nrc', e.target.value)}
                     />
                     {form.errors.nrc && <p className="field-error">{form.errors.nrc}</p>}
+                </label>
+
+                <label>
+                    Tipo de persona <span style={{ color: 'red' }}>*</span>
+                    <select
+                        value={form.data.tipo_persona}
+                        onChange={(e) => form.setData('tipo_persona', e.target.value)}
+                    >
+                        <option value="Natural">Natural</option>
+                        <option value="Jurídica">Jurídica</option>
+                    </select>
+                    {form.errors.tipo_persona && <p className="field-error">{form.errors.tipo_persona}</p>}
                 </label>
 
                 <label className="full-width">

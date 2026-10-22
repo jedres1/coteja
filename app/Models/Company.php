@@ -17,6 +17,7 @@ class Company extends Model
         'trade_name',
         'nit_dui',
         'nrc',
+        'tipo_persona',
         'business_activity',
         'address_department',
         'address_municipality',
@@ -87,25 +88,24 @@ class Company extends Model
 
         $emisor = array_merge(
             [
-                'tipo_persona'           => $existing['tipo_persona']           ?? 'Natural',
                 'desc_actividad'         => $existing['desc_actividad']         ?? null,
                 'codigo_establecimiento' => $existing['codigo_establecimiento'] ?? 'M001',
                 'punto_venta'            => $existing['punto_venta']            ?? 'P001',
                 'logo_path'              => $existing['logo_path']              ?? null,
             ],
             [
-                'nit'                => $this->nit_dui,
-                'nrc'                => $this->nrc,
-                'nombre_empresa'     => $this->business_name,
-                'nombre_comercial'   => $this->trade_name ?? $this->business_name,
-                'actividad_economica'=> $this->business_activity,
-                'desc_actividad'     => $existing['desc_actividad'] ?? null,
-                'telefono'           => $this->phone,
-                'email'              => $this->email,
-                'departamento'       => $this->address_department,
-                'municipio'          => $this->address_municipality,
-                'distrito'           => $this->address_district,
-                'direccion'          => $this->address,
+                'nit'                 => $this->nit_dui,
+                'nrc'                 => $this->nrc,
+                'tipo_persona'        => $this->tipo_persona ?? 'Natural',
+                'nombre_empresa'      => $this->business_name,
+                'nombre_comercial'    => $this->trade_name ?? $this->business_name,
+                'actividad_economica' => $this->business_activity,
+                'telefono'            => $this->phone,
+                'email'               => $this->email,
+                'departamento'        => $this->address_department,
+                'municipio'           => $this->address_municipality,
+                'distrito'            => $this->address_district,
+                'direccion'           => $this->address,
             ]
         );
 

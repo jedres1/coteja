@@ -52,6 +52,7 @@ class CompanyController extends Controller
             'trade_name'      => ['nullable', 'string', 'max:255'],
             'nit_dui'         => ['required', 'string', 'max:50'],
             'nrc'                => ['nullable', 'string', 'max:50'],
+            'tipo_persona'       => ['required', 'in:Natural,Jurídica'],
             'business_activity'    => ['nullable', 'string', 'max:255'],
             'address_department'   => ['nullable', 'string', 'size:2'],
             'address_municipality' => ['nullable', 'string', 'between:2,4'],
