@@ -16,7 +16,8 @@
         .side { background:#111827; color:#f9fafb; padding:22px 16px; }
         body.dark-mode .side { background:#020617; }
         .brand { display:grid; align-items:center; justify-items:center; margin-bottom:24px; }
-        .brand img { width:136px; max-width:100%; max-height:136px; height:auto; display:block; object-fit:contain; }
+        .brand img { width:136px; height:136px; max-width:100%; aspect-ratio:1 / 1; display:block; object-fit:contain; object-position:center; flex:0 0 auto; }
+        body.dark-mode .brand img { background:#fff; border-radius:12px; }
         .nav { display:grid; gap:6px; align-items:stretch; }
         .nav a, .logout-btn { width:100%; min-height:40px; display:flex; align-items:center; justify-content:flex-start; padding:10px 12px; border-radius:8px; color:#d1d5db; background:transparent; border:0; text-align:left; font:inherit; line-height:1.2; cursor:pointer; }
         .nav a:hover, .logout-btn:hover { background:#1f2937; color:#fff; }

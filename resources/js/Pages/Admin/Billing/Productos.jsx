@@ -237,10 +237,11 @@ function ProductForm({ initial, productTypes, hasInventory, nextProductCodes, on
 
 export default function Productos({ products, productTypes, hasInventory, nextProductCodes }) {
     const [search, setSearch]       = useState('');
+    const [appliedSearch, setAppliedSearch] = useState('');
     const [modal, setModal]         = useState(null); // null | { mode: 'create' | 'edit', product?: {} }
 
     const filtered = products.filter((p) => {
-        const q = search.toLowerCase();
+        const q = appliedSearch.toLowerCase();
         return !q || p.code?.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q);
     });
 
@@ -289,13 +290,19 @@ export default function Productos({ products, productTypes, hasInventory, nextPr
             </div>
 
             <div className="card" style={{ marginBottom: 16 }}>
-                <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Buscar por código o descripción…"
-                    style={{ maxWidth: 320 }}
-                />
+                <form
+                    onSubmit={(e) => { e.preventDefault(); setAppliedSearch(search.trim()); }}
+                    style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}
+                >
+                    <input
+                        type="search"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Buscar por código o descripción…"
+                        style={{ maxWidth: 320 }}
+                    />
+                    <button type="submit" className="btn">Buscar</button>
+                </form>
             </div>
 
             <div className="card table-scroll">

@@ -216,10 +216,11 @@ export default function Clientes({ clients }) {
     const [showCreate, setShowCreate] = useState(false);
     const [editItem, setEditItem] = useState(null);
     const [search, setSearch] = useState('');
+    const [appliedSearch, setAppliedSearch] = useState('');
 
     const filtered = clients.filter((c) => {
-        if (!search.trim()) return true;
-        const q = search.toLowerCase();
+        if (!appliedSearch) return true;
+        const q = appliedSearch.toLowerCase();
         return (
             c.name?.toLowerCase().includes(q) ||
             c.tradeName?.toLowerCase().includes(q) ||
@@ -247,13 +248,19 @@ export default function Clientes({ clients }) {
             </div>
 
             <div className="card" style={{ marginBottom: 16 }}>
-                <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Buscar por nombre, documento, NRC o correo…"
-                    style={{ width: '100%', maxWidth: 400 }}
-                />
+                <form
+                    onSubmit={(e) => { e.preventDefault(); setAppliedSearch(search.trim()); }}
+                    style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}
+                >
+                    <input
+                        type="search"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Buscar por nombre, documento, NRC o correo…"
+                        style={{ width: '100%', maxWidth: 400 }}
+                    />
+                    <button type="submit" className="btn">Buscar</button>
+                </form>
             </div>
 
             <div className="card table-scroll">
