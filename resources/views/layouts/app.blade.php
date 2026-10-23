@@ -13,11 +13,12 @@
         body.dark-mode { --bg:#0b1220; --panel:#111827; --ink:#f9fafb; --muted:#9ca3af; --line:#263244; --brand:#3b82f6; --ok:#34d399; --warn:#f59e0b; --bad:#f87171; }
         a { color:inherit; text-decoration:none; }
         .shell { display:grid; grid-template-columns:240px 1fr; min-height:100vh; }
+        body.sidebar-collapsed .shell { grid-template-columns:minmax(0, 1fr); }
+        body.sidebar-collapsed .side { display:none; }
         .side { background:#111827; color:#f9fafb; padding:22px 16px; }
         body.dark-mode .side { background:#020617; }
         .brand { display:grid; align-items:center; justify-items:center; margin-bottom:24px; }
-        .brand img { width:136px; height:136px; max-width:100%; aspect-ratio:1 / 1; display:block; object-fit:contain; object-position:center; flex:0 0 auto; }
-        body.dark-mode .brand img { background:#fff; border-radius:12px; }
+        .brand img { width:136px; height:136px; max-width:100%; aspect-ratio:1 / 1; display:block; object-fit:contain; object-position:center; flex:0 0 auto; background:#fff; border-radius:12px; }
         .nav { display:grid; gap:6px; align-items:stretch; }
         .nav a, .logout-btn { width:100%; min-height:40px; display:flex; align-items:center; justify-content:flex-start; padding:10px 12px; border-radius:8px; color:#d1d5db; background:transparent; border:0; text-align:left; font:inherit; line-height:1.2; cursor:pointer; }
         .nav a:hover, .logout-btn:hover { background:#1f2937; color:#fff; }
@@ -33,6 +34,8 @@
         .nav-sub { display:grid; gap:4px; }
         .nav-sub a { min-height:36px; padding-left:24px; font-size:13px; }
         .main { padding:24px; }
+        .sidebar-toggle { display:inline-flex; align-items:center; gap:8px; min-height:36px; margin-bottom:16px; padding:8px 11px; border:1px solid var(--line); border-radius:8px; background:var(--panel); color:var(--ink); font:inherit; cursor:pointer; }
+        .sidebar-toggle:hover { border-color:var(--brand); }
         .top { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:20px; }
         .top h1 { margin:0; font-size:26px; }
         .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; }
@@ -68,7 +71,7 @@
 <body>
 @auth
     <div class="shell">
-        <aside class="side">
+        <aside class="side" id="app-sidebar">
             <div class="brand">
                 <img src="/images/facturacion-electron-logo.png" alt="CONSULTING AND TECH JANDRES" width="136" height="136">
             </div>
@@ -253,6 +256,7 @@
             </nav>
         </aside>
         <main class="main">
+            <button type="button" class="sidebar-toggle" id="sidebar-toggle" aria-expanded="true" aria-controls="app-sidebar"><span aria-hidden="true">☰</span><span id="sidebar-toggle-label">Ocultar menú</span></button>
             @if(session('status')) <div class="notice">{{ session('status') }}</div> @endif
             @if($errors->any()) <div class="errors">{{ $errors->first() }}</div> @endif
             {{ $slot }}
@@ -262,6 +266,21 @@
     {{ $slot }}
 @endauth
 <script>
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    const sidebarLabel = document.getElementById('sidebar-toggle-label');
+    const sidebarIsCollapsed = localStorage.getItem('coteja-sidebar-collapsed') === 'true';
+    document.body.classList.toggle('sidebar-collapsed', sidebarIsCollapsed);
+    if (sidebarToggle) {
+        sidebarToggle.setAttribute('aria-expanded', String(!sidebarIsCollapsed));
+        if (sidebarLabel) sidebarLabel.textContent = sidebarIsCollapsed ? 'Mostrar menú' : 'Ocultar menú';
+        sidebarToggle.addEventListener('click', () => {
+            const isCollapsed = document.body.classList.toggle('sidebar-collapsed');
+            localStorage.setItem('coteja-sidebar-collapsed', String(isCollapsed));
+            sidebarToggle.setAttribute('aria-expanded', String(!isCollapsed));
+            if (sidebarLabel) sidebarLabel.textContent = isCollapsed ? 'Mostrar menú' : 'Ocultar menú';
+        });
+    }
+
     const storedTheme = localStorage.getItem('coteja-theme');
     const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
     document.body.classList.toggle('dark-mode', storedTheme ? storedTheme === 'dark' : prefersDark);
