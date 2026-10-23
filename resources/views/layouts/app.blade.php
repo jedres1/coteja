@@ -12,7 +12,7 @@
         body { margin:0; font-family:Inter, system-ui, -apple-system, Segoe UI, sans-serif; background:var(--bg); color:var(--ink); }
         body.dark-mode { --bg:#0b1220; --panel:#111827; --ink:#f9fafb; --muted:#9ca3af; --line:#263244; --brand:#3b82f6; --ok:#34d399; --warn:#f59e0b; --bad:#f87171; }
         a { color:inherit; text-decoration:none; }
-        .shell { display:grid; grid-template-columns:240px 1fr; min-height:100vh; }
+        .shell { display:grid; grid-template-columns:minmax(0, 240px) minmax(0, 1fr); min-height:100vh; }
         body.sidebar-collapsed .shell { grid-template-columns:minmax(0, 1fr); }
         body.sidebar-collapsed .side { display:none; }
         .side { background:#111827; color:#f9fafb; padding:22px 16px; }
@@ -33,8 +33,10 @@
         .nav-group:not(.open) .nav-sub { display:none; }
         .nav-sub { display:grid; gap:4px; }
         .nav-sub a { min-height:36px; padding-left:24px; font-size:13px; }
-        .main { padding:24px; }
-        .sidebar-toggle { display:inline-flex; align-items:center; gap:8px; min-height:36px; margin-bottom:16px; padding:8px 11px; border:1px solid var(--line); border-radius:8px; background:var(--panel); color:var(--ink); font:inherit; cursor:pointer; }
+        .main { min-width:0; padding:24px; }
+        .sidebar-toggle { display:none; align-items:center; gap:8px; min-height:36px; margin-bottom:16px; padding:8px 11px; border:1px solid var(--line); border-radius:8px; background:var(--panel); color:var(--ink); font:inherit; cursor:pointer; }
+        .sidebar-toggle-in-side { display:inline-flex; width:100%; justify-content:flex-start; margin-bottom:16px; border-color:rgb(255 255 255 / .16); background:transparent; color:#f9fafb; }
+        body.sidebar-collapsed .sidebar-toggle-in-main { display:inline-flex; }
         .sidebar-toggle:hover { border-color:var(--brand); }
         .top { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:20px; }
         .top h1 { margin:0; font-size:26px; }
@@ -65,13 +67,25 @@
         .theme-toggle button { width:52px; height:30px; display:flex; align-items:center; padding:3px; border:1px solid rgb(255 255 255 / .16); border-radius:999px; background:#1f2937; color:#f9fafb; cursor:pointer; font:inherit; }
         .theme-toggle button span { width:22px; height:22px; display:grid; place-items:center; border-radius:50%; background:#f9fafb; color:#111827; transition:transform .18s ease; }
         body.dark-mode .theme-toggle button span { transform:translateX(20px); background:#111827; color:#fbbf24; }
-        @media (max-width:800px){ .shell{grid-template-columns:1fr}.side{position:static}.main{padding:16px} }
+        @media (max-width:800px){
+            .shell{grid-template-columns:minmax(0, 1fr)}
+            .side{position:static}
+            .main{padding:16px}
+            .top,.section-top{align-items:flex-start;flex-direction:column}
+            .grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}
+            .form-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr))}
+            table{display:block;max-width:100%;overflow-x:auto;white-space:nowrap}
+            .overlay-layer{padding:52px 12px 16px;place-items:start stretch}
+            .overlay-panel{width:100%;max-height:calc(100vh - 68px)}
+        }
+        @media (max-width:480px){.main{padding:12px}.card{padding:14px}.top h1,.section-top h1{font-size:22px}}
     </style>
 </head>
 <body>
 @auth
     <div class="shell">
         <aside class="side" id="app-sidebar">
+            <button type="button" class="sidebar-toggle sidebar-toggle-in-side" data-sidebar-toggle aria-expanded="true" aria-controls="app-sidebar"><span aria-hidden="true">☰</span><span>Ocultar menú</span></button>
             <div class="brand">
                 <img src="/images/facturacion-electron-logo.png" alt="CONSULTING AND TECH JANDRES" width="136" height="136">
             </div>
@@ -256,7 +270,7 @@
             </nav>
         </aside>
         <main class="main">
-            <button type="button" class="sidebar-toggle" id="sidebar-toggle" aria-expanded="true" aria-controls="app-sidebar"><span aria-hidden="true">☰</span><span id="sidebar-toggle-label">Ocultar menú</span></button>
+            <button type="button" class="sidebar-toggle sidebar-toggle-in-main" data-sidebar-toggle aria-expanded="false" aria-controls="app-sidebar"><span aria-hidden="true">☰</span><span>Mostrar menú</span></button>
             @if(session('status')) <div class="notice">{{ session('status') }}</div> @endif
             @if($errors->any()) <div class="errors">{{ $errors->first() }}</div> @endif
             {{ $slot }}
@@ -266,20 +280,19 @@
     {{ $slot }}
 @endauth
 <script>
-    const sidebarToggle = document.getElementById('sidebar-toggle');
-    const sidebarLabel = document.getElementById('sidebar-toggle-label');
     const sidebarIsCollapsed = localStorage.getItem('coteja-sidebar-collapsed') === 'true';
     document.body.classList.toggle('sidebar-collapsed', sidebarIsCollapsed);
-    if (sidebarToggle) {
+    document.querySelectorAll('[data-sidebar-toggle]').forEach((sidebarToggle) => {
         sidebarToggle.setAttribute('aria-expanded', String(!sidebarIsCollapsed));
-        if (sidebarLabel) sidebarLabel.textContent = sidebarIsCollapsed ? 'Mostrar menú' : 'Ocultar menú';
         sidebarToggle.addEventListener('click', () => {
             const isCollapsed = document.body.classList.toggle('sidebar-collapsed');
             localStorage.setItem('coteja-sidebar-collapsed', String(isCollapsed));
-            sidebarToggle.setAttribute('aria-expanded', String(!isCollapsed));
-            if (sidebarLabel) sidebarLabel.textContent = isCollapsed ? 'Mostrar menú' : 'Ocultar menú';
+            document.querySelectorAll('[data-sidebar-toggle]').forEach((toggle) => {
+                toggle.setAttribute('aria-expanded', String(!isCollapsed));
+                toggle.lastElementChild.textContent = isCollapsed ? 'Mostrar menú' : 'Ocultar menú';
+            });
         });
-    }
+    });
 
     const storedTheme = localStorage.getItem('coteja-theme');
     const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
