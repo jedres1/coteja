@@ -89,6 +89,7 @@ function DteDetailView({ invoice }) {
     const receptor = dte.receptor        ?? {};
     const items   = dte.cuerpoDocumento  ?? [];
     const res     = dte.resumen          ?? {};
+    const paymentCondition = { 1: 'Contado', 2: 'A crédito', 3: 'Otro' };
 
     return (
         <div style={{ fontSize: 13, maxHeight: '75vh', overflowY: 'auto', paddingRight: 4 }}>
@@ -98,6 +99,7 @@ function DteDetailView({ invoice }) {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px' }}>
                     <Row label="Tipo DTE" value={TIPOS_DTE[id.tipoDte] ?? id.tipoDte} />
                     <Row label="Fecha / Hora" value={`${id.fecEmi ?? ''} ${id.horEmi ?? ''}`.trim()} />
+                    <Row label="Condición de pago" value={paymentCondition[res.condicionOperacion] ?? res.condicionOperacion} />
                     <Row label="Número de control" value={id.numeroControl} mono full />
                     <Row label="Código de generación" value={id.codigoGeneracion} mono full />
                 </div>
@@ -425,7 +427,7 @@ export default function PendingApproval({ invoices, total, showAll }) {
                                     />
                                 </td>
                                 <td className="muted">{formatDate(invoice.purchase_date)}</td>
-                                <td style={{ fontWeight: 600 }}>{invoice.supplier?.name}</td>
+                                <td style={{ fontWeight: 600 }}>{invoice.supplier?.name ?? invoice.issuer_name ?? '—'}</td>
                                 <td>
                                     {invoice.receptor_name
                                         ? <span style={{ fontSize: 13 }}>{invoice.receptor_name}</span>

@@ -27,11 +27,11 @@ class PurchaseInvoiceMailboxImporter
             'password'    => $db['mailbox_password']    ?? $env['password'],
             'mailbox'     => $db['mailbox_mailbox']     ?? $env['mailbox'],
             'only_unseen' => isset($db['mailbox_only_unseen']) ? (bool) $db['mailbox_only_unseen'] : $env['only_unseen'],
-            'limit'       => (int) ($db['mailbox_limit'] ?? $env['limit']),
+            'limit'       => min(5000, max(1, (int) ($db['mailbox_limit'] ?? $env['limit']))),
         ];
     }
 
-    public function import(?string $from = null, ?string $to = null, ?int $companyId = null): array
+    public function import(?string $from = null, ?string $to = null, ?int $companyId = null, ?callable $onProgress = null): array
     {
         if (! $companyId || ! Company::whereKey($companyId)->exists()) {
             throw new RuntimeException('Selecciona una empresa antes de extraer facturas.');
@@ -75,7 +75,11 @@ class PurchaseInvoiceMailboxImporter
 
             $search = empty($queryTokens) ? 'ALL' : implode(' ', $queryTokens);
             $uids = $this->parseSearchUids($this->command('UID SEARCH '.$search));
-            $uids = array_slice(array_reverse($uids), 0, max(1, (int) $config['limit']));
+            $uids = array_slice(array_reverse($uids), 0, min(5000, max(1, (int) $config['limit'])));
+            $totalMessages = count($uids);
+            if ($onProgress) {
+                $onProgress(['total' => $totalMessages, 'reviewed' => 0, 'imported' => 0, 'duplicates' => 0]);
+            }
 
             foreach ($uids as $uid) {
                 $summary['messages']++;
@@ -98,6 +102,15 @@ class PurchaseInvoiceMailboxImporter
                     }
                 } catch (\Throwable $exception) {
                     $summary['errors'][] = "Correo UID {$uid}: ".$exception->getMessage();
+                }
+
+                if ($onProgress) {
+                    $onProgress([
+                        'total' => $totalMessages,
+                        'reviewed' => $summary['messages'],
+                        'imported' => $summary['imported'],
+                        'duplicates' => $summary['duplicates'],
+                    ]);
                 }
             }
         } finally {
@@ -146,7 +159,7 @@ class PurchaseInvoiceMailboxImporter
 
             $search = empty($queryTokens) ? 'ALL' : implode(' ', $queryTokens);
             $uids = $this->parseSearchUids($this->command('UID SEARCH '.$search));
-            $uids = array_slice(array_reverse($uids), 0, max(1, (int) $config['limit']));
+            $uids = array_slice(array_reverse($uids), 0, min(5000, max(1, (int) $config['limit'])));
 
             foreach ($uids as $uid) {
                 $details['messages']++;

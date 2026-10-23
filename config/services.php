@@ -51,7 +51,7 @@ return [
         'password' => env('PURCHASE_INVOICE_MAIL_PASSWORD'),
         'mailbox' => env('PURCHASE_INVOICE_MAILBOX', 'INBOX'),
         'only_unseen' => (bool) env('PURCHASE_INVOICE_MAIL_ONLY_UNSEEN', false),
-        'limit' => (int) env('PURCHASE_INVOICE_MAIL_LIMIT', 25),
+        'limit' => min(5000, max(1, (int) env('PURCHASE_INVOICE_MAIL_LIMIT', 5000))),
     ],
 
 ];

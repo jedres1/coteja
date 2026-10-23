@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { Head, router, usePage } from '@inertiajs/react';
 import { route } from 'ziggy-js';
+import { showToast } from '@/utils';
 
 export default function SelectCompany() {
-    const { availableCompanies = [], auth } = usePage().props;
+    const { availableCompanies = [], auth, flash } = usePage().props;
     const [selected, setSelected] = useState(null);
     const [open, setOpen]         = useState(false);
     const [loading, setLoading]   = useState(false);
@@ -16,6 +17,10 @@ export default function SelectCompany() {
         document.addEventListener('mousedown', onOutside);
         return () => document.removeEventListener('mousedown', onOutside);
     }, []);
+
+    useEffect(() => {
+        if (flash?.error) showToast(flash.error, false);
+    }, [flash?.error]);
 
     function choose(company) {
         setSelected(company);

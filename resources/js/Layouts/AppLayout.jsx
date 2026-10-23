@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, router, usePage } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import TenantSelector from '@/Components/Billing/TenantSelector';
+import { showToast } from '@/utils';
+import PurchaseInvoiceExtractionWidget from '@/Components/PurchaseInvoiceExtractionWidget';
 
 function NavIco({ d, d2, d3 }) {
     return (
@@ -55,7 +57,7 @@ function NavLink({ href, children, routePattern, isActive }) {
 }
 
 export default function AppLayout({ title, children }) {
-    const { auth, flash, activeCompany, availableCompanies = [] } = usePage().props;
+    const { auth, flash, activeCompany, activeExtraction, availableCompanies = [] } = usePage().props;
     const user = auth?.user;
     const [darkMode, setDarkMode] = useState(() => {
         const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('coteja-theme') : null;
@@ -68,6 +70,14 @@ export default function AppLayout({ title, children }) {
         document.body.classList.toggle('dark-mode', darkMode);
         localStorage.setItem('coteja-theme', darkMode ? 'dark' : 'light');
     }, [darkMode]);
+
+    useEffect(() => {
+        if (flash?.error) showToast(flash.error, false);
+    }, [flash?.error]);
+
+    useEffect(() => {
+        if (flash?.status) showToast(flash.status, true);
+    }, [flash?.status]);
 
     const handleLogout = (e) => {
         e.preventDefault();
@@ -232,6 +242,7 @@ export default function AppLayout({ title, children }) {
             </aside>
 
             <main className="main">
+                <PurchaseInvoiceExtractionWidget activeExtraction={activeExtraction} />
                 <div className="topbar">
                     <div className="topbar-user">
                         <span className="topbar-name">{user?.name}</span>
@@ -244,8 +255,6 @@ export default function AppLayout({ title, children }) {
                         />
                     )}
                 </div>
-                {flash?.status && <div className="notice">{flash.status}</div>}
-                {flash?.error && <div className="errors">{flash.error}</div>}
                 {children}
             </main>
         </div>

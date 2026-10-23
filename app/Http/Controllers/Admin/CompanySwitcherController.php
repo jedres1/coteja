@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Company;
 use Illuminate\Http\Request;
 
 class CompanySwitcherController extends Controller
@@ -15,20 +16,37 @@ class CompanySwitcherController extends Controller
 
         if ($user->isAdmin() || $user->accessibleCompanies()->where('companies.id', $companyId)->exists()) {
             $request->session()->put('active_company_id', $companyId);
+        } else {
+            abort(403);
         }
 
-        // Honor the intended URL stored by EnsureCompanySelected when it forced a redirect
-        if ($request->session()->has('url.intended')) {
-            return redirect()->intended()->with('status', 'Empresa activa actualizada.');
+        // The saved intended URL may belong to another company or a disabled module.
+        // Always enter through a module enabled for the company just selected.
+        $request->session()->forget('url.intended');
+
+        if ($user->isAdmin()) {
+            return redirect()->route('admin.dashboard')->with('status', 'Empresa activa actualizada.');
         }
 
-        // Coming from the selection page: go to role-appropriate home instead of back()
-        $previousUrl = url()->previous();
-        if (str_contains($previousUrl, route('admin.seleccionar-empresa'))) {
-            return redirect()->route('admin.seleccionar-empresa')->with('status', 'Empresa activa actualizada.');
+        $company = Company::findOrFail($companyId);
+        $moduleRoutes = [
+            'purchases' => 'admin.purchase-invoices.index',
+            'billing' => 'admin.factura-sv.billing.facturas',
+            'accounting' => 'admin.accounting.diario.index',
+            'banking' => 'admin.bank-transactions.index',
+            'inventory' => 'admin.inventory.movements',
+            'payroll' => 'admin.payroll.index',
+        ];
+
+        foreach ($moduleRoutes as $module => $routeName) {
+            if (in_array($module, $company->module_accesses ?? [], true)) {
+                return redirect()->route($routeName)->with('status', 'Empresa activa actualizada.');
+            }
         }
 
-        return back()->with('status', 'Empresa activa actualizada.');
+        $request->session()->forget('active_company_id');
+        return redirect()->route('admin.seleccionar-empresa')
+            ->with('error', 'La empresa seleccionada no tiene módulos habilitados. Contacta al administrador.');
     }
 
     public function clear(Request $request)

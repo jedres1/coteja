@@ -34,7 +34,8 @@ class EnsureCompanySelected
         $companies = $user->accessibleCompanies;
 
         if ($companies->isEmpty()) {
-            abort(403, 'No tienes empresas asignadas. Contacta al administrador.');
+            return redirect()->route('admin.seleccionar-empresa')
+                ->with('error', 'No tienes una empresa asignada. Contacta al administrador.');
         }
 
         if ($companies->count() === 1) {

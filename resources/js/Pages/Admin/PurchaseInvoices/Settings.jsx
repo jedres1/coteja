@@ -90,7 +90,7 @@ function MailboxForm({ host, port, username, password, mailbox, onlyUnseen, limi
                         onChange={(e) => setData('mailbox_limit', e.target.value)}
                         required
                         min="1"
-                        max="100"
+                        max="5000"
                     />
                     {errors.mailbox_limit && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.mailbox_limit}</span>}
                 </label>

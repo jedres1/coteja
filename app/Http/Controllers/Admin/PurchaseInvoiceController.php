@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Exceptions\AccountingPeriodException;
+use App\Jobs\ImportSelectedCompanyInvoicesJob;
 use App\Http\Controllers\Controller;
 use App\Models\BillingSetting;
 use App\Traits\ExportsCsv;
@@ -21,6 +22,7 @@ use App\Services\Accounting\AccountingPeriodService;
 use App\Services\PurchaseInvoiceMailboxImporter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use RuntimeException;
@@ -171,7 +173,7 @@ class PurchaseInvoiceController extends Controller
             'mailbox_password'    => ['nullable', 'string', 'max:255'],
             'mailbox_mailbox'     => ['required', 'string', 'max:100'],
             'mailbox_only_unseen' => ['nullable', 'boolean'],
-            'mailbox_limit'       => ['required', 'integer', 'min:1', 'max:100'],
+            'mailbox_limit'       => ['required', 'integer', 'min:1', 'max:5000'],
         ]);
 
         foreach ($data as $key => $value) {
@@ -368,7 +370,13 @@ class PurchaseInvoiceController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        $invoices->getCollection()->each->append('receptor_name');
+        $invoices->getCollection()->each(function (PurchaseInvoice $invoice) {
+            $invoice->append('receptor_name');
+            $body = is_array($invoice->extracted_document_body)
+                ? $invoice->extracted_document_body
+                : json_decode($invoice->extracted_document_body ?? '', true);
+            $invoice->setAttribute('issuer_name', data_get($body, 'emisor.nombre'));
+        });
 
         $total = PurchaseInvoice::whereIn('company_id', $companyIds)
             ->where('status', 'extracted')->count();
@@ -539,56 +547,55 @@ class PurchaseInvoiceController extends Controller
         return back()->with('status', 'Factura de compra registrada.');
     }
 
-    public function extract(Request $request, PurchaseInvoiceMailboxImporter $importer)
+    public function extract(Request $request)
     {
         $request->validate([
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date', 'after_or_equal:from'],
         ]);
 
-        try {
-            $summary = $importer->import(
-                $request->input('from'),
-                $request->input('to'),
-                $this->activeTenantId($request),
-            );
-        } catch (RuntimeException $exception) {
-            return back()->withErrors($exception->getMessage());
+        $companyId = $this->activeTenantId($request);
+        if (! $companyId) {
+            return back()->with('error', 'Selecciona una empresa antes de extraer facturas.');
         }
 
-        $message = sprintf(
-            'Extracción finalizada: %d correo(s) revisado(s), %d adjunto(s) JSON, %d factura(s) importada(s), %d duplicada(s) y %d filtrada(s) por NIT/DUI.',
-            $summary['messages'],
-            $summary['attachments'],
-            $summary['imported'],
-            $summary['duplicates'],
-            $summary['filtered']
-        );
+        $id = (string) Str::uuid();
+        DB::table('purchase_invoice_extractions')->insert([
+            'id' => $id,
+            'user_id' => $request->user()->id,
+            'company_id' => $companyId,
+            'date_from' => $request->input('from'),
+            'date_to' => $request->input('to'),
+            'status' => 'queued',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
-        if (!empty($summary['details'])) {
-            $detailsText = "\n\nDetalles:\n";
-            foreach ($summary['details'] as $detail) {
-                $statusEmoji = $detail['status'] === 'IMPORTADA' ? '✓' : '⚠';
-                $detailsText .= sprintf(
-                    "%s %s | Proveedor: %s | NumControl: %s | CodGen: %s%s\n",
-                    $statusEmoji,
-                    $detail['status'],
-                    $detail['supplier'],
-                    $detail['numeroControl'] ?? 'N/A',
-                    $detail['codigoGeneracion'] ?? 'N/A',
-                    $detail['razon'] ? ' | Razón: '.$detail['razon'] : ''
-                );
-            }
-            $message .= $detailsText;
-        }
+        ImportSelectedCompanyInvoicesJob::dispatch($id)->onConnection('background');
 
-        if ($summary['errors']) {
-            return back()
-                ->with('status', $message)
-                ->withErrors($summary['errors']);
-        }
+        return back();
+    }
 
-        return back()->with('status', $message);
+    public function extractionProgress(Request $request, string $extraction)
+    {
+        $run = DB::table('purchase_invoice_extractions')
+            ->where('id', $extraction)
+            ->where('user_id', $request->user()->id)
+            ->first();
+
+        abort_unless($run, 404);
+
+        return response()->json([
+            'id' => $run->id,
+            'status' => $run->status,
+            'from' => $run->date_from,
+            'to' => $run->date_to,
+            'total' => (int) $run->total_messages,
+            'reviewed' => (int) $run->reviewed,
+            'imported' => (int) $run->imported,
+            'duplicates' => (int) $run->duplicates,
+            'errors' => (int) $run->errors,
+        ]);
     }
 
     public function update(Request $request, PurchaseInvoice $purchaseInvoice)

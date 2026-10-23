@@ -4,8 +4,8 @@ export function showToast(msg, ok) {
         t = document.createElement('div');
         t.id = 'coteja-toast';
         t.style.cssText =
-            'position:fixed;bottom:1.25rem;right:1.25rem;z-index:9999;padding:.75rem 1.25rem;' +
-            'border-radius:.375rem;color:#fff;font-size:.875rem;display:none;max-width:20rem;' +
+            'position:fixed;top:1.25rem;left:50%;transform:translateX(-50%);z-index:9999;padding:.75rem 1.25rem;' +
+            'border-radius:.375rem;color:#fff;font-size:.875rem;display:none;max-width:min(90vw,36rem);' +
             'box-shadow:0 4px 12px rgba(0,0,0,.25);';
         document.body.appendChild(t);
     }

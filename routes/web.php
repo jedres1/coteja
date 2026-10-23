@@ -57,6 +57,7 @@ Route::middleware(['auth', 'role:admin,inquilino', 'ensure-company', 'module:pur
     Route::get('suppliers/export', [SupplierController::class, 'export'])->name('suppliers.export');
     Route::resource('suppliers', SupplierController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::post('purchase-invoices/extract', [PurchaseInvoiceController::class, 'extract'])->name('purchase-invoices.extract');
+    Route::get('purchase-invoices/extractions/{extraction}', [PurchaseInvoiceController::class, 'extractionProgress'])->name('purchase-invoices.extractions.progress');
     Route::get('extraccion-pendiente', [PurchaseInvoiceController::class, 'pendingApproval'])->name('purchase-invoices.pending-approval');
     Route::post('purchase-invoices/aprobar-masivo', [PurchaseInvoiceController::class, 'approveBulk'])->name('purchase-invoices.approve-bulk');
     Route::post('purchase-invoices/rechazar-masivo', [PurchaseInvoiceController::class, 'rejectBulk'])->name('purchase-invoices.reject-bulk');

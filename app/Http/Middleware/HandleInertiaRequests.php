@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\Company;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -86,6 +87,27 @@ class HandleInertiaRequests extends Middleware
                     ->get(['companies.id', 'companies.business_name'])
                     ->map(fn ($c) => ['id' => $c->id, 'name' => $c->business_name])
                     ->toArray();
+            },
+            'activeExtraction' => function () use ($user) {
+                if (! $user || ! $user->canAccessAdmin()) return null;
+
+                $run = DB::table('purchase_invoice_extractions')
+                    ->where('user_id', $user->id)
+                    ->where('updated_at', '>=', now()->subMinutes(10))
+                    ->latest('created_at')
+                    ->first();
+
+                return $run ? [
+                    'id' => $run->id,
+                    'status' => $run->status,
+                    'from' => $run->date_from,
+                    'to' => $run->date_to,
+                    'total' => (int) $run->total_messages,
+                    'reviewed' => (int) $run->reviewed,
+                    'imported' => (int) $run->imported,
+                    'duplicates' => (int) $run->duplicates,
+                    'errors' => (int) $run->errors,
+                ] : null;
             },
         ]);
     }
