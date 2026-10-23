@@ -113,25 +113,30 @@ export default function AppLayout({ title, children }) {
                 <nav className="nav">
                     {canAccessAdmin && (
                         <>
-                            {isAdmin && (
-                                <NavLink href={route('admin.dashboard')} routePattern="admin.dashboard">
-                                    <NavIco d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                                    Dashboard
-                                </NavLink>
-                            )}
-
-                            {isAdmin && !activeCompany && (
+                            {mod.billing && (
                                 <NavGroup
-                                    label="Administración"
-                                    icon={<NavIco d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" d2="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />}
-                                    routePatterns={['admin.users.*','admin.companies.*','admin.licenses.*','admin.plans.*','admin.releases.*','admin.backups.*']}
+                                    label="Facturación"
+                                    icon={<NavIco d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />}
+                                    routePatterns={['admin.factura-sv.billing.*']}
                                 >
-                                    <NavLink href={route('admin.users.index')} routePattern="admin.users.*">Usuarios y acceso</NavLink>
-                                    <NavLink href={route('admin.companies.index')} routePattern="admin.companies.*">Empresas</NavLink>
-                                    <NavLink href={route('admin.licenses.index')} routePattern="admin.licenses.*">Licencias</NavLink>
-                                    <NavLink href={route('admin.plans.index')} routePattern="admin.plans.*">Planes</NavLink>
-                                    <NavLink href={route('admin.releases.index')} routePattern="admin.releases.*">Descargas</NavLink>
-                                    <NavLink href={route('admin.backups.index')} routePattern="admin.backups.*">Backups</NavLink>
+                                    <NavLink href={route('admin.factura-sv.billing.dashboard')} routePattern="admin.factura-sv.billing.dashboard">Dashboard</NavLink>
+                                    <NavLink href={route('admin.factura-sv.billing.facturas')} routePattern="admin.factura-sv.billing.facturas">Facturas</NavLink>
+                                    <NavLink href={route('admin.factura-sv.billing.nueva-factura')} routePattern="admin.factura-sv.billing.nueva-factura">Nueva Factura</NavLink>
+                                    <NavLink href={route('admin.factura-sv.billing.cuentas-por-cobrar')} routePattern="admin.factura-sv.billing.cuentas-por-cobrar">Cuentas por cobrar</NavLink>
+                                    <NavLink href={route('admin.factura-sv.billing.clientes')} routePattern="admin.factura-sv.billing.clientes">Clientes</NavLink>
+                                    <NavLink href={route('admin.factura-sv.billing.productos')} routePattern="admin.factura-sv.billing.productos">Bienes y servicios</NavLink>
+                                    <NavLink href={route('admin.factura-sv.billing.configuracion')} routePattern="admin.factura-sv.billing.configuracion">Configuración</NavLink>
+                                </NavGroup>
+                            )}
+                            {mod.banking && (
+                                <NavGroup
+                                    label="Control de bancos"
+                                    icon={<NavIco d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />}
+                                    routePatterns={['admin.bank-transactions.*']}
+                                >
+                                    <NavLink href={route('admin.bank-transactions.accounts')} routePattern="admin.bank-transactions.accounts">Cuentas bancarias</NavLink>
+                                    <NavLink href={route('admin.bank-transactions.transactions')} routePattern="admin.bank-transactions.transactions">Transacciones</NavLink>
+                                    <NavLink href={route('admin.bank-transactions.reconciliations')} routePattern="admin.bank-transactions.reconciliations*">Conciliación</NavLink>
                                 </NavGroup>
                             )}
 
@@ -146,18 +151,6 @@ export default function AppLayout({ title, children }) {
                                     <NavLink href={route('admin.purchase-invoices.accounts-payable')} routePattern="admin.purchase-invoices.accounts-payable">Cuentas por pagar</NavLink>
                                     <NavLink href={route('admin.suppliers.index')} routePattern="admin.suppliers.*">Proveedores</NavLink>
                                     <NavLink href={route('admin.purchase-invoices.settings')} routePattern="admin.purchase-invoices.settings">Configuración</NavLink>
-                                </NavGroup>
-                            )}
-
-                            {mod.banking && (
-                                <NavGroup
-                                    label="Control de bancos"
-                                    icon={<NavIco d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />}
-                                    routePatterns={['admin.bank-transactions.*']}
-                                >
-                                    <NavLink href={route('admin.bank-transactions.accounts')} routePattern="admin.bank-transactions.accounts">Cuentas bancarias</NavLink>
-                                    <NavLink href={route('admin.bank-transactions.transactions')} routePattern="admin.bank-transactions.transactions">Transacciones</NavLink>
-                                    <NavLink href={route('admin.bank-transactions.reconciliations')} routePattern="admin.bank-transactions.reconciliations*">Conciliación</NavLink>
                                 </NavGroup>
                             )}
 
@@ -180,19 +173,6 @@ export default function AppLayout({ title, children }) {
                                 </NavGroup>
                             )}
 
-                            {mod.payroll && (
-                                <NavGroup
-                                    label="Nómina"
-                                    icon={<NavIco d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />}
-                                    routePatterns={['admin.payroll.*']}
-                                >
-                                    <NavLink href={route('admin.payroll.index')} isActive={isPayrollEmployees}>Empleados</NavLink>
-                                    <NavLink href={route('admin.payroll.index', { tab: 'nominas' })} isActive={isPayrollPeriods}>Períodos de Nómina</NavLink>
-                                    <NavLink href={route('admin.payroll.concepts.index')} routePattern="admin.payroll.concepts.*">Gestión de conceptos</NavLink>
-                                    <NavLink href={route('admin.payroll.settings.index')} routePattern="admin.payroll.settings.*">Configuración</NavLink>
-                                </NavGroup>
-                            )}
-
                             {mod.inventory && (
                                 <NavGroup
                                     label="Inventarios"
@@ -207,21 +187,41 @@ export default function AppLayout({ title, children }) {
                                 </NavGroup>
                             )}
 
-                            {mod.billing && (
+                            {mod.payroll && (
                                 <NavGroup
-                                    label="Facturación"
-                                    icon={<NavIco d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />}
-                                    routePatterns={['admin.factura-sv.billing.*']}
+                                    label="Nómina"
+                                    icon={<NavIco d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />}
+                                    routePatterns={['admin.payroll.*']}
                                 >
-                                    <NavLink href={route('admin.factura-sv.billing.dashboard')} routePattern="admin.factura-sv.billing.dashboard">Dashboard</NavLink>
-                                    <NavLink href={route('admin.factura-sv.billing.facturas')} routePattern="admin.factura-sv.billing.facturas">Facturas</NavLink>
-                                    <NavLink href={route('admin.factura-sv.billing.nueva-factura')} routePattern="admin.factura-sv.billing.nueva-factura">Nueva Factura</NavLink>
-                                    <NavLink href={route('admin.factura-sv.billing.cuentas-por-cobrar')} routePattern="admin.factura-sv.billing.cuentas-por-cobrar">Cuentas por cobrar</NavLink>
-                                    <NavLink href={route('admin.factura-sv.billing.clientes')} routePattern="admin.factura-sv.billing.clientes">Clientes</NavLink>
-                                    <NavLink href={route('admin.factura-sv.billing.productos')} routePattern="admin.factura-sv.billing.productos">Bienes y servicios</NavLink>
-                                    <NavLink href={route('admin.factura-sv.billing.configuracion')} routePattern="admin.factura-sv.billing.configuracion">Configuración</NavLink>
+                                    <NavLink href={route('admin.payroll.index')} isActive={isPayrollEmployees}>Empleados</NavLink>
+                                    <NavLink href={route('admin.payroll.index', { tab: 'nominas' })} isActive={isPayrollPeriods}>Períodos de Nómina</NavLink>
+                                    <NavLink href={route('admin.payroll.concepts.index')} routePattern="admin.payroll.concepts.*">Gestión de conceptos</NavLink>
+                                    <NavLink href={route('admin.payroll.settings.index')} routePattern="admin.payroll.settings.*">Configuración</NavLink>
                                 </NavGroup>
                             )}
+
+                            {isAdmin && (
+                                <NavLink href={route('admin.dashboard')} routePattern="admin.dashboard">
+                                    <NavIco d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                                    Dashboard
+                                </NavLink>
+                            )}
+
+                            {isAdmin && !activeCompany && (
+                                <NavGroup
+                                    label="Administración"
+                                    icon={<NavIco d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" d2="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />}
+                                    routePatterns={['admin.users.*','admin.companies.*','admin.licenses.*','admin.plans.*','admin.releases.*','admin.backups.*']}
+                                >
+                                    <NavLink href={route('admin.users.index')} routePattern="admin.users.*">Usuarios y acceso</NavLink>
+                                    <NavLink href={route('admin.companies.index')} routePattern="admin.companies.*">Empresas</NavLink>
+                                    <NavLink href={route('admin.licenses.index')} routePattern="admin.licenses.*">Licencias</NavLink>
+                                    <NavLink href={route('admin.plans.index')} routePattern="admin.plans.*">Planes</NavLink>
+                                    <NavLink href={route('admin.releases.index')} routePattern="admin.releases.*">Descargas</NavLink>
+                                    <NavLink href={route('admin.backups.index')} routePattern="admin.backups.*">Backups</NavLink>
+                                </NavGroup>
+                            )}
+
                         </>
                     )}
 
