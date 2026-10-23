@@ -103,6 +103,15 @@ textarea { min-height: 80px; }
 .theme-toggle button span { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; background: #f9fafb; color: #111827; transition: transform .18s ease; }
 body.dark-mode .theme-toggle button span { transform: translateX(20px); background: #111827; color: #fbbf24; }
 
+/* Mobile hamburger (hidden on desktop) */
+.mobile-menu-btn { display: none; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); cursor: pointer; flex-shrink: 0; }
+.mobile-menu-btn:hover { border-color: var(--brand); }
+
+/* Mobile sidebar backdrop (hidden by default) */
+.mobile-sidebar-backdrop { display: none; position: fixed; inset: 0; background: rgb(0 0 0 / .5); z-index: 199; border: 0; cursor: pointer; }
+body.mobile-sidebar-open .mobile-sidebar-backdrop { display: block; }
+body.mobile-sidebar-open { overflow: hidden; }
+
 /* Overlays */
 .overlay-modal > summary { list-style: none; }
 .overlay-modal > summary::-webkit-details-marker { display: none; }
@@ -220,7 +229,22 @@ body.dark-mode .form-group { color: #d1d5db; }
 
 @media (max-width: 800px) {
     .shell { grid-template-columns: minmax(0, 1fr); }
-    .side { position: static; }
+    /* Sidebar becomes a slide-in drawer on mobile */
+    .side {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: min(280px, 85vw);
+        z-index: 200;
+        transform: translateX(-100%);
+        transition: transform .25s ease;
+        overflow-y: auto;
+    }
+    body.mobile-sidebar-open .side { transform: translateX(0); box-shadow: 8px 0 32px rgb(0 0 0 / .3); }
+    .sidebar-toggle-in-side { display: none; }
+    .mobile-menu-btn { display: inline-flex; }
+    .topbar { margin: -16px -16px 16px; padding: 10px 16px; position: sticky; top: 0; z-index: 50; }
     .main { padding: 16px; }
     .top, .section-top { align-items: flex-start; flex-direction: column; }
     .grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
@@ -232,6 +256,7 @@ body.dark-mode .form-group { color: #d1d5db; }
 
 @media (max-width: 480px) {
     .main { padding: 12px; }
+    .topbar { margin: -12px -12px 12px; padding: 8px 12px; }
     .card { padding: 14px; }
     .top h1, .section-top h1 { font-size: 22px; }
 }

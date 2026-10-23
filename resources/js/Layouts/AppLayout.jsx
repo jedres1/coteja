@@ -80,6 +80,7 @@ export default function AppLayout({ title, children }) {
     const [sidebarCollapsed, setSidebarCollapsed] = useState(() => (
         typeof localStorage !== 'undefined' && localStorage.getItem('coteja-sidebar-collapsed') === 'true'
     ));
+    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const logoutFormRef = useRef(null);
 
     useEffect(() => {
@@ -91,6 +92,14 @@ export default function AppLayout({ title, children }) {
         document.body.classList.toggle('sidebar-collapsed', sidebarCollapsed);
         localStorage.setItem('coteja-sidebar-collapsed', sidebarCollapsed ? 'true' : 'false');
     }, [sidebarCollapsed]);
+
+    useEffect(() => {
+        document.body.classList.toggle('mobile-sidebar-open', mobileSidebarOpen);
+    }, [mobileSidebarOpen]);
+
+    useEffect(() => {
+        return router.on('navigate', () => setMobileSidebarOpen(false));
+    }, []);
 
     useEffect(() => {
         if (flash?.error) showToast(flash.error, false);
@@ -275,9 +284,27 @@ export default function AppLayout({ title, children }) {
                 </nav>
             </aside>
 
+            <button
+                type="button"
+                className="mobile-sidebar-backdrop"
+                aria-label="Cerrar menú"
+                onClick={() => setMobileSidebarOpen(false)}
+            />
+
             <main className="main">
                 <PurchaseInvoiceExtractionWidget activeExtraction={activeExtraction} />
                 <div className="topbar">
+                    <button
+                        type="button"
+                        className="mobile-menu-btn"
+                        aria-label={mobileSidebarOpen ? 'Cerrar menú' : 'Abrir menú'}
+                        aria-expanded={mobileSidebarOpen}
+                        onClick={() => setMobileSidebarOpen((v) => !v)}
+                    >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M3 6h18M3 12h18M3 18h18" />
+                        </svg>
+                    </button>
                     <div className="topbar-user">
                         <span className="topbar-name">{user?.name}</span>
                         <span className="topbar-email">{user?.email}</span>

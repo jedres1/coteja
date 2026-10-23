@@ -67,9 +67,18 @@
         .theme-toggle button { width:52px; height:30px; display:flex; align-items:center; padding:3px; border:1px solid rgb(255 255 255 / .16); border-radius:999px; background:#1f2937; color:#f9fafb; cursor:pointer; font:inherit; }
         .theme-toggle button span { width:22px; height:22px; display:grid; place-items:center; border-radius:50%; background:#f9fafb; color:#111827; transition:transform .18s ease; }
         body.dark-mode .theme-toggle button span { transform:translateX(20px); background:#111827; color:#fbbf24; }
+        .mobile-menu-btn{display:none;align-items:center;justify-content:center;width:36px;height:36px;padding:0;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--ink);cursor:pointer;flex-shrink:0}
+        .mobile-menu-btn:hover{border-color:var(--brand)}
+        .mobile-sidebar-backdrop{display:none;position:fixed;inset:0;background:rgb(0 0 0/.5);z-index:199;border:0;cursor:pointer}
+        body.mobile-sidebar-open .mobile-sidebar-backdrop{display:block}
+        body.mobile-sidebar-open{overflow:hidden}
         @media (max-width:800px){
-            .shell{grid-template-columns:minmax(0, 1fr)}
-            .side{position:static}
+            .shell{grid-template-columns:minmax(0,1fr)}
+            .side{position:fixed;top:0;bottom:0;left:0;width:min(280px,85vw);z-index:200;transform:translateX(-100%);transition:transform .25s ease;overflow-y:auto}
+            body.mobile-sidebar-open .side{transform:translateX(0);box-shadow:8px 0 32px rgb(0 0 0/.3)}
+            .sidebar-toggle-in-side{display:none}
+            .mobile-menu-btn{display:inline-flex}
+            .sidebar-toggle-in-main{display:inline-flex}
             .main{padding:16px}
             .top,.section-top{align-items:flex-start;flex-direction:column}
             .grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}
@@ -269,8 +278,10 @@
                 </div>
             </nav>
         </aside>
+        <button type="button" class="mobile-sidebar-backdrop" id="mobile-sidebar-backdrop" aria-label="Cerrar menú"></button>
+
         <main class="main">
-            <button type="button" class="sidebar-toggle sidebar-toggle-in-main" data-sidebar-toggle aria-expanded="false" aria-controls="app-sidebar"><span aria-hidden="true">☰</span><span>Mostrar menú</span></button>
+            <button type="button" class="sidebar-toggle sidebar-toggle-in-main" id="mobile-menu-btn" aria-label="Abrir menú" aria-expanded="false"><span aria-hidden="true">☰</span><span>Menú</span></button>
             @if(session('status')) <div class="notice">{{ session('status') }}</div> @endif
             @if($errors->any()) <div class="errors">{{ $errors->first() }}</div> @endif
             {{ $slot }}
@@ -292,6 +303,21 @@
                 toggle.lastElementChild.textContent = isCollapsed ? 'Mostrar menú' : 'Ocultar menú';
             });
         });
+    });
+
+    // Mobile drawer
+    function closeMobileSidebar() {
+        document.body.classList.remove('mobile-sidebar-open');
+        const btn = document.getElementById('mobile-menu-btn');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+    }
+    document.getElementById('mobile-menu-btn')?.addEventListener('click', () => {
+        const isOpen = document.body.classList.toggle('mobile-sidebar-open');
+        document.getElementById('mobile-menu-btn').setAttribute('aria-expanded', String(isOpen));
+    });
+    document.getElementById('mobile-sidebar-backdrop')?.addEventListener('click', closeMobileSidebar);
+    document.querySelectorAll('.nav a').forEach((link) => {
+        link.addEventListener('click', closeMobileSidebar);
     });
 
     const storedTheme = localStorage.getItem('coteja-theme');
