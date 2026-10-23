@@ -196,6 +196,12 @@ const METODOS_PAGO = {
     '08': 'Otros',
 };
 
+const CONDICIONES_PAGO = {
+    1: 'Contado',
+    2: 'A crédito',
+    3: 'Otro',
+};
+
 function DteSection({ title, children }) {
     return (
         <section style={{ marginBottom: 14, padding: '10px 12px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
@@ -273,6 +279,7 @@ function DteDetailView({ invoice }) {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px' }}>
                     <div><span style={{ color: '#6b7280', fontSize: 12 }}>Tipo DTE</span><br />{TIPOS_DTE[id.tipoDte] ?? id.tipoDte ?? '—'}</div>
                     <div><span style={{ color: '#6b7280', fontSize: 12 }}>Fecha / Hora</span><br />{`${id.fecEmi ?? ''} ${id.horEmi ?? ''}`.trim() || '—'}</div>
+                    <div><span style={{ color: '#6b7280', fontSize: 12 }}>Condición de pago</span><br />{CONDICIONES_PAGO[res.condicionOperacion] ?? res.condicionOperacion ?? '—'}</div>
                     <div style={{ gridColumn: '1/-1' }}><span style={{ color: '#6b7280', fontSize: 12 }}>Número de control</span><br /><span style={{ fontFamily: 'monospace', fontSize: 12 }}>{id.numeroControl ?? '—'}</span></div>
                     <div style={{ gridColumn: '1/-1' }}><span style={{ color: '#6b7280', fontSize: 12 }}>Código de generación</span><br /><span style={{ fontFamily: 'monospace', fontSize: 11, wordBreak: 'break-all' }}>{id.codigoGeneracion ?? '—'}</span></div>
                 </div>
