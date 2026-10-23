@@ -72,12 +72,12 @@ class Customer extends Model
 
     public function licenses()
     {
-        return $this->hasMany(License::class);
+        return $this->hasManyThrough(License::class, Company::class, 'customer_id', 'company_id');
     }
 
     public function payments()
     {
-        return $this->hasManyThrough(Payment::class, License::class);
+        return $this->hasManyThrough(Payment::class, Company::class, 'customer_id', 'company_id');
     }
 
     public function purchaseInvoices()
@@ -87,6 +87,6 @@ class Customer extends Model
 
     public function backups()
     {
-        return $this->hasManyThrough(Backup::class, License::class);
+        return $this->hasManyThrough(Backup::class, Company::class, 'customer_id', 'company_id');
     }
 }

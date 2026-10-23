@@ -163,7 +163,6 @@ class CustomerControllerTest extends TestCase
         ]);
         $plan = Plan::create(['code' => 'BASIC', 'name' => 'Básico', 'monthly_price' => 0]);
         License::create([
-            'customer_id' => $customer->id,
             'company_id'  => $company->id,
             'plan_id'     => $plan->id,
             'license_key' => 'ACTIVE-KEY-001',

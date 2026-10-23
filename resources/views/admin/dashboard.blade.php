@@ -9,17 +9,17 @@
     <div class="grid" style="margin-top:16px;">
         <div class="card">
             <h3>Licencias recientes</h3>
-            <table><tr><th>Cliente</th><th>Empresa</th><th>Plan</th><th>Estado</th><th>Vence</th></tr>
+            <table><tr><th>Empresa</th><th>Plan</th><th>Estado</th><th>Vence</th></tr>
                 @foreach($recentLicenses as $license)
-                    <tr><td>{{ $license->customer->name }}</td><td>{{ $license->company->business_name }}</td><td>{{ $license->plan->name }}</td><td><span class="badge {{ $license->status }}">{{ $license->status }}</span></td><td>{{ optional($license->expires_at)->format('Y-m-d') }}</td></tr>
+                    <tr><td>{{ $license->company->business_name }}</td><td>{{ $license->plan->name }}</td><td><span class="badge {{ $license->status }}">{{ $license->status }}</span></td><td>{{ optional($license->expires_at)->format('Y-m-d') }}</td></tr>
                 @endforeach
             </table>
         </div>
         <div class="card">
             <h3>Backups recientes</h3>
-            <table><tr><th>Cliente</th><th>Empresa</th><th>Fecha</th><th>Tamano</th></tr>
+            <table><tr><th>Empresa</th><th>Fecha</th><th>Tamano</th></tr>
                 @foreach($recentBackups as $backup)
-                    <tr><td>{{ $backup->license->customer->name }}</td><td>{{ $backup->company->business_name }}</td><td>{{ optional($backup->uploaded_at)->format('Y-m-d H:i') }}</td><td>{{ number_format($backup->size_bytes / 1024, 1) }} KB</td></tr>
+                    <tr><td>{{ $backup->company->business_name }}</td><td>{{ optional($backup->uploaded_at)->format('Y-m-d H:i') }}</td><td>{{ number_format($backup->size_bytes / 1024, 1) }} KB</td></tr>
                 @endforeach
             </table>
         </div>

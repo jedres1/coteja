@@ -20,8 +20,8 @@ class DashboardController extends Controller
             'activeLicensesCount' => License::where('status', 'active')->count(),
             'expiredLicensesCount' => License::whereDate('expires_at', '<', now())->count(),
             'monthlyRevenue' => Payment::where('status', 'paid')->whereMonth('paid_at', now()->month)->sum('total'),
-            'recentLicenses' => License::with(['customer', 'company', 'plan'])->latest()->take(8)->get(),
-            'recentBackups' => Backup::with(['company', 'license.customer'])->latest('uploaded_at')->take(8)->get(),
+            'recentLicenses' => License::with(['company', 'plan'])->latest()->take(8)->get(),
+            'recentBackups' => Backup::with('company')->latest('uploaded_at')->take(8)->get(),
         ]);
     }
 }

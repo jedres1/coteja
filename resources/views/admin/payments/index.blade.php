@@ -45,7 +45,7 @@
                 <tbody>
                 @forelse($payments as $payment)
                     <tr>
-                        <td>{{ $payment->license->customer->name }}</td>
+                        <td>{{ $payment->company->customer->name }}</td>
                         <td>{{ $payment->company->business_name }}</td>
                         <td>{{ $periods[$payment->period] ?? $payment->period }}</td>
                         <td>${{ number_format($payment->total, 2) }}<br><span class="muted">Base ${{ number_format($payment->amount, 2) }} · IVA ${{ number_format($payment->iva, 2) }}</span></td>
@@ -61,7 +61,7 @@
                                         <div class="overlay-header">
                                             <div>
                                                 <h3>Editar cobro</h3>
-                                                <span class="muted">{{ $payment->license->customer->name }} - ${{ number_format($payment->total, 2) }}</span>
+                                                <span class="muted">{{ $payment->company->customer->name }} - ${{ number_format($payment->total, 2) }}</span>
                                             </div>
                                             <button class="btn secondary overlay-close" type="button" data-overlay-close>Cerrar</button>
                                         </div>

@@ -3,7 +3,6 @@
 namespace Database\Factories;
 
 use App\Models\Company;
-use App\Models\Customer;
 use App\Models\License;
 use App\Models\Plan;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -16,7 +15,6 @@ class LicenseFactory extends Factory
     public function definition(): array
     {
         return [
-            'customer_id'       => Customer::factory(),
             'company_id'        => Company::factory(),
             'plan_id'           => Plan::factory(),
             'license_key'       => strtoupper(Str::random(20)),

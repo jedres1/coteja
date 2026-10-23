@@ -16,8 +16,8 @@ class LicenseController extends Controller
     public function index()
     {
         return Inertia::render('Admin/Licenses/Index', [
-            'licenses'  => License::with(['company', 'plan'])->latest()->paginate(15),
-            'companies' => Company::orderBy('business_name')->get(['id', 'business_name']),
+            'licenses'  => License::with(['company.customer', 'plan'])->latest()->paginate(15),
+            'companies' => Company::with('customer')->orderBy('business_name')->get(['id', 'business_name', 'customer_id']),
             'plans'     => Plan::where('is_active', true)->orderBy('name')->get(),
         ]);
     }
@@ -37,8 +37,6 @@ class LicenseController extends Controller
         ]);
 
         $company = Company::findOrFail($data['company_id']);
-        $data['customer_id'] = $company->customer_id;
-
         if ($data['license_type'] === 'propietario') {
             $data['expires_at'] = null;
         }

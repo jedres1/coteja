@@ -12,7 +12,7 @@ class BackupController extends Controller
     public function index()
     {
         return Inertia::render('Admin/Backups/Index', [
-            'backups' => Backup::with(['company', 'license.customer'])->latest('uploaded_at')->paginate(15),
+            'backups' => Backup::with(['company.customer'])->latest('uploaded_at')->paginate(15),
         ]);
     }
 

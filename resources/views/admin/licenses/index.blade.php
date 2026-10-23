@@ -23,7 +23,7 @@
                         <label>Empresa
                             <select name="company_id" required>
                                 @foreach($companies as $company)
-                                    <option value="{{ $company->id }}" @selected((string) old('company_id') === (string) $company->id)>{{ $company->business_name }} - {{ $company->customer->name }}</option>
+                                    <option value="{{ $company->id }}" @selected((string) old('company_id') === (string) $company->id)>{{ $company->business_name }} - {{ $company->customer?->name }}</option>
                                 @endforeach
                             </select>
                         </label>
@@ -57,7 +57,7 @@
                 @forelse($licenses as $license)
                     <tr>
                         <td><code>{{ $license->license_key }}</code></td>
-                        <td>{{ $license->customer->name }}</td>
+                        <td>{{ $license->company->customer?->name ?? '—' }}</td>
                         <td>{{ $license->company->business_name }}</td>
                         <td>{{ $license->plan->name }}</td>
                         <td><span class="badge {{ $license->status }}">{{ $licenseStatuses[$license->status] ?? $license->status }}</span></td>

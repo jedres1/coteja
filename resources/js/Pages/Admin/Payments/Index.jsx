@@ -51,7 +51,7 @@ function PaymentForm({ payment, licenses, onSuccess }) {
                     <option value="">— Seleccionar —</option>
                     {licenses.map((l) => (
                         <option key={l.id} value={l.id}>
-                            {l.customer?.name} — {l.company?.business_name} — {l.license_key}
+                            {l.company?.customer?.name} — {l.company?.business_name} — {l.license_key}
                         </option>
                     ))}
                 </select>
@@ -178,7 +178,7 @@ export default function PaymentsIndex({ payments, licenses }) {
                         {payments.data.map((payment) => (
                             <tr key={payment.id}>
                                 <td>
-                                    <div>{payment.license?.customer?.name ?? '—'}</div>
+                                    <div>{payment.company?.customer?.name ?? '—'}</div>
                                     <div className="muted" style={{ fontSize: '0.85em' }}>
                                         {payment.company?.business_name ?? '—'}
                                     </div>

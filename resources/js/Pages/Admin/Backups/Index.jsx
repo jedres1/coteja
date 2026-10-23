@@ -40,7 +40,7 @@ export default function BackupsIndex({ backups }) {
                         )}
                         {backups.data.map((backup) => (
                             <tr key={backup.id}>
-                                <td>{backup.license?.customer?.name ?? '—'}</td>
+                                <td>{backup.company?.customer?.name ?? '—'}</td>
                                 <td>{backup.company?.business_name ?? '—'}</td>
                                 <td style={{ fontFamily: 'monospace', fontSize: '0.85em' }}>{backup.filename}</td>
                                 <td>

@@ -13,8 +13,8 @@ class PaymentController extends Controller
     public function index()
     {
         return Inertia::render('Admin/Payments/Index', [
-            'payments' => Payment::with(['license.customer', 'company'])->latest()->paginate(15),
-            'licenses' => License::with(['customer', 'company'])->orderByDesc('created_at')->get(),
+            'payments' => Payment::with(['company.customer', 'license.company.customer'])->latest()->paginate(15),
+            'licenses' => License::with(['company.customer'])->orderByDesc('created_at')->get(),
             'periods' => ['monthly' => 'Mensual', 'annual' => 'Anual', 'implementation' => 'Implementación', 'additional' => 'Usuario adicional'],
             'paymentStatuses' => ['paid' => 'Pagado', 'pending' => 'Pendiente', 'void' => 'Anulado'],
         ]);

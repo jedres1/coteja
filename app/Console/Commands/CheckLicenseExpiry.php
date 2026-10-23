@@ -16,7 +16,7 @@ class CheckLicenseExpiry extends Command
     {
         $days = (int) $this->option('days');
 
-        $expiring = License::with(['customer', 'company'])
+        $expiring = License::with('company.customer')
             ->where('status', 'active')
             ->whereNotNull('expires_at')
             ->whereBetween('expires_at', [now()->toDateString(), now()->addDays($days)->toDateString()])

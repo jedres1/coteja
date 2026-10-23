@@ -52,7 +52,6 @@ export default function Dashboard({ companiesCount, activeLicensesCount, expired
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Cliente</th>
                                     <th>Empresa</th>
                                     <th>Plan</th>
                                     <th>Estado</th>
@@ -61,11 +60,10 @@ export default function Dashboard({ companiesCount, activeLicensesCount, expired
                             </thead>
                             <tbody>
                                 {recentLicenses.length === 0 && (
-                                    <tr><td colSpan={5} className="empty">Sin licencias recientes</td></tr>
+                                    <tr><td colSpan={4} className="empty">Sin licencias recientes</td></tr>
                                 )}
                                 {recentLicenses.map((l) => (
                                     <tr key={l.id}>
-                                        <td>{l.customer?.name || '—'}</td>
                                         <td>{l.company?.business_name || '—'}</td>
                                         <td>{l.plan?.name || '—'}</td>
                                         <td>
@@ -89,7 +87,6 @@ export default function Dashboard({ companiesCount, activeLicensesCount, expired
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Cliente</th>
                                     <th>Empresa</th>
                                     <th>Fecha</th>
                                     <th>Tamaño</th>
@@ -97,11 +94,10 @@ export default function Dashboard({ companiesCount, activeLicensesCount, expired
                             </thead>
                             <tbody>
                                 {recentBackups.length === 0 && (
-                                    <tr><td colSpan={4} className="empty">Sin backups recientes</td></tr>
+                                    <tr><td colSpan={3} className="empty">Sin backups recientes</td></tr>
                                 )}
                                 {recentBackups.map((b) => (
                                     <tr key={b.id}>
-                                        <td>{b.license?.customer?.name || '—'}</td>
                                         <td>{b.company?.business_name || '—'}</td>
                                         <td>{b.uploaded_at ? b.uploaded_at.substring(0, 16).replace('T', ' ') : '—'}</td>
                                         <td>{b.size_bytes ? (b.size_bytes / 1024).toFixed(1) + ' KB' : '—'}</td>

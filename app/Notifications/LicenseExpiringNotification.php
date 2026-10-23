@@ -23,7 +23,7 @@ class LicenseExpiringNotification extends Notification
             'type'       => 'license_expiring',
             'license_id' => $this->license->id,
             'license_key'=> $this->license->license_key,
-            'customer'   => $this->license->customer?->name ?? 'N/A',
+            'customer'   => $this->license->company?->customer?->name ?? 'N/A',
             'company'    => $this->license->company?->business_name ?? 'N/A',
             'expires_at' => $this->license->expires_at?->toDateString(),
             'days_left'  => $this->daysLeft,

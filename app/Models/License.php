@@ -12,7 +12,6 @@ class License extends Model
     use HasFactory;
 
     protected $fillable = [
-        'customer_id',
         'company_id',
         'plan_id',
         'license_key',
@@ -31,11 +30,6 @@ class License extends Model
         'expires_at' => 'date',
         'last_validated_at' => 'datetime',
     ];
-
-    public function customer()
-    {
-        return $this->belongsTo(Customer::class);
-    }
 
     public function company()
     {

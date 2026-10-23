@@ -2,7 +2,7 @@
     <select name="license_id" required>
         @foreach($licenses as $license)
             <option value="{{ $license->id }}" @selected((string) old('license_id', $payment?->license_id) === (string) $license->id)>
-                {{ $license->customer->name }} - {{ $license->company->business_name }} - {{ $license->license_key }}
+                {{ $license->company->customer->name }} - {{ $license->company->business_name }} - {{ $license->license_key }}
             </option>
         @endforeach
     </select>

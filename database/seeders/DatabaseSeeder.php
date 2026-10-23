@@ -104,7 +104,6 @@ class DatabaseSeeder extends Seeder
         License::updateOrCreate(
             ['license_key' => 'COT-DEMO-0001'],
             [
-                'customer_id' => $customer->id,
                 'company_id' => $company->id,
                 'plan_id' => $local->id,
                 'status' => 'active',
