@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { Children, useState, useEffect, useRef } from 'react';
 import { Link, router, usePage } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import TenantSelector from '@/Components/Billing/TenantSelector';
@@ -11,6 +11,16 @@ function NavIco({ d, d2, d3 }) {
             <path d={d} />
             {d2 && <path d={d2} />}
             {d3 && <path d={d3} />}
+        </svg>
+    );
+}
+
+function SidebarToggleIcon({ collapsed }) {
+    return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M9 3v18" />
+            <path d={collapsed ? 'm14 9 3 3-3 3' : 'm16 15-3-3 3-3'} />
         </svg>
     );
 }
@@ -32,6 +42,7 @@ function NavGroup({ label, icon, children, routePatterns = [] }) {
                 className="nav-toggle"
                 type="button"
                 aria-expanded={open}
+                title={label}
                 onClick={() => setOpen((v) => !v)}
             >
                 {icon}
@@ -49,9 +60,11 @@ function NavLink({ href, children, routePattern, isActive }) {
         try { active = route().current(routePattern); } catch { active = false; }
     }
 
+    const label = Children.toArray(children).filter((child) => typeof child === 'string').join('').trim();
+
     return (
-        <Link href={href} className={active ? 'active-link' : ''}>
-            {children}
+        <Link href={href} className={active ? 'active-link' : ''} title={label || undefined} aria-label={label || undefined}>
+            {Children.map(children, (child) => typeof child === 'string' ? <span className="nav-link-label">{child}</span> : child)}
         </Link>
     );
 }
@@ -64,12 +77,20 @@ export default function AppLayout({ title, children }) {
         if (stored) return stored === 'dark';
         return typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches;
     });
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(() => (
+        typeof localStorage !== 'undefined' && localStorage.getItem('coteja-sidebar-collapsed') === 'true'
+    ));
     const logoutFormRef = useRef(null);
 
     useEffect(() => {
         document.body.classList.toggle('dark-mode', darkMode);
         localStorage.setItem('coteja-theme', darkMode ? 'dark' : 'light');
     }, [darkMode]);
+
+    useEffect(() => {
+        document.body.classList.toggle('sidebar-collapsed', sidebarCollapsed);
+        localStorage.setItem('coteja-sidebar-collapsed', sidebarCollapsed ? 'true' : 'false');
+    }, [sidebarCollapsed]);
 
     useEffect(() => {
         if (flash?.error) showToast(flash.error, false);
@@ -101,6 +122,16 @@ export default function AppLayout({ title, children }) {
     return (
         <div className="shell">
             <aside className="side">
+                <button
+                    className="sidebar-toggle sidebar-toggle-in-side"
+                    type="button"
+                    aria-expanded={!sidebarCollapsed}
+                    aria-label={sidebarCollapsed ? 'Expandir barra de navegación' : 'Contraer barra de navegación'}
+                    title={sidebarCollapsed ? 'Expandir barra de navegación' : 'Contraer barra de navegación'}
+                    onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+                >
+                    <SidebarToggleIcon collapsed={sidebarCollapsed} />
+                </button>
                 <div className="brand">
                     <img
                         src="/images/facturacion-electron-logo.png"
@@ -226,7 +257,10 @@ export default function AppLayout({ title, children }) {
                     )}
 
                     <form onSubmit={handleLogout}>
-                        <button className="logout-btn" type="submit">Salir</button>
+                        <button className="logout-btn" type="submit" aria-label="Salir" title="Salir">
+                            <NavIco d="M10 17l5-5-5-5M15 12H3m9-9h5a2 2 0 012 2v14a2 2 0 01-2 2h-5" />
+                            <span className="nav-link-label">Salir</span>
+                        </button>
                     </form>
 
                     <div className="theme-toggle">
