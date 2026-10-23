@@ -24,7 +24,9 @@ export default function Login({ errors: serverErrors }) {
                         height="168"
                         style={{ width: '168px', maxWidth: '100%', height: 'auto', margin: '0 auto 14px', display: 'block' }}
                     />
-                    <p className="muted" style={{ margin: '0 0 18px' }}>Consulting and Tech Jandres.</p>
+                    <p className="muted" style={{ margin: '0 0 18px', textAlign: 'center', fontSize: 12 }}>
+                        Consulting and Tech Jandres S.A.S de C.V
+                    </p>
 
                     {errors.email && <div className="errors">{errors.email}</div>}
 
