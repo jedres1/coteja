@@ -143,10 +143,10 @@ export default function AppLayout({ title, children }) {
                 </button>
                 <div className="brand">
                     <img
-                        src="/images/coteja-erp-logo-oscuro.svg"
-                        alt="Coteja ERP"
-                        width="330"
-                        height="90"
+                        src="/images/facturacion-electron-logo.png"
+                        alt="CONSULTING AND TECH JANDRES"
+                        width="136"
+                        height="136"
                     />
                 </div>
 

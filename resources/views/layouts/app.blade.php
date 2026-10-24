@@ -18,7 +18,7 @@
         .side { background:#111827; color:#f9fafb; padding:22px 16px; }
         body.dark-mode .side { background:#020617; }
         .brand { display:grid; align-items:center; justify-items:center; margin-bottom:24px; }
-        .brand img { width:184px; height:auto; max-width:100%; display:block; object-fit:contain; object-position:center; flex:0 0 auto; }
+        .brand img { width:136px; height:136px; max-width:100%; aspect-ratio:1 / 1; display:block; object-fit:contain; object-position:center; flex:0 0 auto; background:#fff; border-radius:12px; }
         .nav { display:grid; gap:6px; align-items:stretch; }
         .nav a, .logout-btn { width:100%; min-height:40px; display:flex; align-items:center; justify-content:flex-start; padding:10px 12px; border-radius:8px; color:#d1d5db; background:transparent; border:0; text-align:left; font:inherit; line-height:1.2; cursor:pointer; }
         .nav a:hover, .logout-btn:hover { background:#1f2937; color:#fff; }
@@ -96,7 +96,7 @@
         <aside class="side" id="app-sidebar">
             <button type="button" class="sidebar-toggle sidebar-toggle-in-side" data-sidebar-toggle aria-expanded="true" aria-controls="app-sidebar" aria-label="Ocultar barra de navegación" title="Ocultar barra de navegación"><span aria-hidden="true">☰</span></button>
             <div class="brand">
-                <img src="/images/coteja-erp-logo-oscuro.svg" alt="Coteja ERP" width="330" height="90">
+                <img src="/images/facturacion-electron-logo.png" alt="CONSULTING AND TECH JANDRES" width="136" height="136">
             </div>
             @php($facturaView = request('view'))
             <nav class="nav">
