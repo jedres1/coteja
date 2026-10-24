@@ -19,6 +19,7 @@
         body.dark-mode .side { background:#020617; }
         .brand { display:grid; align-items:center; justify-items:center; margin-bottom:24px; }
         .brand img { width:184px; height:auto; max-width:100%; display:block; object-fit:contain; object-position:center; flex:0 0 auto; }
+        body.sidebar-collapsed .brand img { width:40px; height:40px; object-fit:contain; object-position:center; }
         .nav { display:grid; gap:6px; align-items:stretch; }
         .nav a, .logout-btn { width:100%; min-height:40px; display:flex; align-items:center; justify-content:flex-start; padding:10px 12px; border-radius:8px; color:#d1d5db; background:transparent; border:0; text-align:left; font:inherit; line-height:1.2; cursor:pointer; }
         .nav a:hover, .logout-btn:hover { background:#1f2937; color:#fff; }
@@ -96,7 +97,7 @@
         <aside class="side" id="app-sidebar">
             <button type="button" class="sidebar-toggle sidebar-toggle-in-side" data-sidebar-toggle aria-expanded="true" aria-controls="app-sidebar" aria-label="Ocultar barra de navegación" title="Ocultar barra de navegación"><span aria-hidden="true">☰</span></button>
             <div class="brand">
-                <img src="/images/coteja-erp-logo-oscuro.svg" alt="Coteja ERP" width="330" height="90">
+                <img src="/images/coteja-erp-logo-claro.svg" alt="Coteja ERP" width="330" height="90" data-brand-logo data-brand-logo-light="/images/coteja-erp-logo-claro.svg" data-brand-logo-dark="/images/coteja-erp-logo-oscuro.svg" data-brand-logo-icon="/images/coteja-icono.svg">
             </div>
             @php($facturaView = request('view'))
             <nav class="nav">
@@ -293,11 +294,22 @@
 <script>
     const sidebarIsCollapsed = localStorage.getItem('coteja-sidebar-collapsed') === 'true';
     document.body.classList.toggle('sidebar-collapsed', sidebarIsCollapsed);
+    const brandLogo = document.querySelector('[data-brand-logo]');
+    function syncBrandLogo() {
+        if (!brandLogo) return;
+        brandLogo.src = document.body.classList.contains('sidebar-collapsed')
+            ? brandLogo.dataset.brandLogoIcon
+            : document.body.classList.contains('dark-mode')
+                ? brandLogo.dataset.brandLogoDark
+                : brandLogo.dataset.brandLogoLight;
+    }
+    syncBrandLogo();
     document.querySelectorAll('[data-sidebar-toggle]').forEach((sidebarToggle) => {
         sidebarToggle.setAttribute('aria-expanded', String(!sidebarIsCollapsed));
         sidebarToggle.addEventListener('click', () => {
             const isCollapsed = document.body.classList.toggle('sidebar-collapsed');
             localStorage.setItem('coteja-sidebar-collapsed', String(isCollapsed));
+            syncBrandLogo();
             document.querySelectorAll('[data-sidebar-toggle]').forEach((toggle) => {
                 toggle.setAttribute('aria-expanded', String(!isCollapsed));
                 const action = isCollapsed ? 'Mostrar' : 'Ocultar';
@@ -325,6 +337,7 @@
     const storedTheme = localStorage.getItem('coteja-theme');
     const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
     document.body.classList.toggle('dark-mode', storedTheme ? storedTheme === 'dark' : prefersDark);
+    syncBrandLogo();
 
     function syncThemeIcon() {
         const icon = document.getElementById('theme-icon');
@@ -337,6 +350,7 @@
         const isDark = document.body.classList.toggle('dark-mode');
         localStorage.setItem('coteja-theme', isDark ? 'dark' : 'light');
         syncThemeIcon();
+        syncBrandLogo();
     });
 
     document.getElementById('logout-form')?.addEventListener('submit', (event) => {
