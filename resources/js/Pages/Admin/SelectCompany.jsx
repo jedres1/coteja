@@ -5,6 +5,12 @@ import { showToast } from '@/utils';
 
 export default function SelectCompany() {
     const { availableCompanies = [], auth, flash } = usePage().props;
+    const [darkLogo] = useState(() => {
+        const storedTheme = typeof localStorage !== 'undefined' ? localStorage.getItem('coteja-theme') : null;
+        if (storedTheme) return storedTheme === 'dark';
+        if (typeof document !== 'undefined' && document.body.classList.contains('dark-mode')) return true;
+        return typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+    });
     const [selected, setSelected] = useState(null);
     const [open, setOpen]         = useState(false);
     const [loading, setLoading]   = useState(false);
@@ -42,10 +48,10 @@ export default function SelectCompany() {
 
             <div className="card" style={{ width: 'min(420px, 100%)' }}>
                 <img
-                    src="/images/facturacion-electron-logo.png"
-                    alt="CONSULTING AND TECH JANDRES"
-                    width="168" height="168"
-                    style={{ width: 168, maxWidth: '100%', height: 'auto', margin: '0 auto 14px', display: 'block' }}
+                    src={`/images/coteja-erp-logo-${darkLogo ? 'oscuro' : 'claro'}.svg`}
+                    alt="Coteja ERP"
+                    width="330" height="90"
+                    style={{ width: 280, maxWidth: '100%', height: 'auto', margin: '0 auto 14px', display: 'block' }}
                 />
 
                 <p className="muted" style={{ margin: '0 0 4px' }}>Bienvenido, <strong>{auth?.user?.name}</strong>.</p>

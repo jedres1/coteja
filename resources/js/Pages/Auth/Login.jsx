@@ -1,7 +1,14 @@
+import { useState } from 'react';
 import { Head, useForm } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 
 export default function Login({ errors: serverErrors }) {
+    const [darkLogo] = useState(() => {
+        const storedTheme = typeof localStorage !== 'undefined' ? localStorage.getItem('coteja-theme') : null;
+        if (storedTheme) return storedTheme === 'dark';
+        if (typeof document !== 'undefined' && document.body.classList.contains('dark-mode')) return true;
+        return typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+    });
     const { data, setData, post, processing, errors } = useForm({
         email: '',
         password: '',
@@ -18,11 +25,11 @@ export default function Login({ errors: serverErrors }) {
             <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '24px' }}>
                 <form onSubmit={submit} className="card" style={{ width: 'min(420px,100%)' }}>
                     <img
-                        src="/images/facturacion-electron-logo.png"
-                        alt="CONSULTING AND TECH JANDRES"
-                        width="168"
-                        height="168"
-                        style={{ width: '168px', maxWidth: '100%', height: '140px', objectFit: 'cover', objectPosition: 'center', margin: '0 auto', display: 'block' }}
+                        src={`/images/coteja-erp-logo-${darkLogo ? 'oscuro' : 'claro'}.svg`}
+                        alt="Coteja ERP"
+                        width="330"
+                        height="90"
+                        style={{ width: '280px', maxWidth: '100%', height: 'auto', margin: '0 auto 14px', display: 'block' }}
                     />
                     <p className="muted" style={{ margin: '0 0 18px', textAlign: 'center', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: 12, fontWeight: 600, letterSpacing: '0.15px' }}>
                         Consulting and Tech Jandres S.A.S de C.V
