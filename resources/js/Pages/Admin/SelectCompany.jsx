@@ -42,10 +42,10 @@ export default function SelectCompany() {
 
             <div className="card" style={{ width: 'min(420px, 100%)' }}>
                 <img
-                    src="/images/facturacion-electron-logo.png"
-                    alt="CONSULTING AND TECH JANDRES"
-                    width="168" height="168"
-                    style={{ width: 168, maxWidth: '100%', height: 'auto', margin: '0 auto 14px', display: 'block' }}
+                    src="/images/coteja-erp-logo-claro.svg"
+                    alt="Coteja ERP"
+                    width="330" height="90"
+                    style={{ width: 280, maxWidth: '100%', height: 'auto', margin: '0 auto 14px', display: 'block' }}
                 />
 
                 <p className="muted" style={{ margin: '0 0 4px' }}>Bienvenido, <strong>{auth?.user?.name}</strong>.</p>
