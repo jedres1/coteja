@@ -4,10 +4,7 @@ import { route } from 'ziggy-js';
 
 export default function Login({ errors: serverErrors }) {
     const [darkLogo] = useState(() => {
-        const storedTheme = typeof localStorage !== 'undefined' ? localStorage.getItem('coteja-theme') : null;
-        if (storedTheme) return storedTheme === 'dark';
-        if (typeof document !== 'undefined' && document.body.classList.contains('dark-mode')) return true;
-        return typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+        return typeof document !== 'undefined' && document.body.classList.contains('dark-mode');
     });
     const { data, setData, post, processing, errors } = useForm({
         email: '',

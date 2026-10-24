@@ -143,10 +143,10 @@ export default function AppLayout({ title, children }) {
                 </button>
                 <div className="brand">
                     <img
-                        src="/images/coteja-erp-logo-oscuro.svg"
+                        src={sidebarCollapsed ? '/images/coteja-icono.svg' : '/images/coteja-erp-logo-oscuro.svg'}
                         alt="Coteja ERP"
-                        width="330"
-                        height="90"
+                        width={sidebarCollapsed ? 64 : 330}
+                        height={sidebarCollapsed ? 64 : 90}
                     />
                 </div>
 
