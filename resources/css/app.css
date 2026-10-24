@@ -46,7 +46,7 @@ body.dark-mode .side { background: #020617; }
 .sidebar-toggle { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; margin-bottom: 16px; padding: 8px 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); font: inherit; cursor: pointer; }
 .sidebar-toggle:hover { border-color: var(--brand); }
 .sidebar-toggle-in-side { width: 36px; justify-content: center; margin-bottom: 16px; padding: 8px; border-color: rgb(255 255 255 / .16); background: transparent; color: #f9fafb; }
-body.sidebar-collapsed .brand img { width: 40px; height: 40px; object-fit: contain; object-position: center; }
+body.sidebar-collapsed .brand img { width: 40px; height: 40px; object-fit: cover; object-position: left center; }
 body.sidebar-collapsed .nav a,
 body.sidebar-collapsed .nav-toggle,
 body.sidebar-collapsed .logout-btn { justify-content: center; gap: 0; padding: 9px 4px; }
