@@ -94,7 +94,7 @@
 @auth
     <div class="shell">
         <aside class="side" id="app-sidebar">
-            <button type="button" class="sidebar-toggle sidebar-toggle-in-side" data-sidebar-toggle aria-expanded="true" aria-controls="app-sidebar"><span aria-hidden="true">☰</span><span>Ocultar menú</span></button>
+            <button type="button" class="sidebar-toggle sidebar-toggle-in-side" data-sidebar-toggle aria-expanded="true" aria-controls="app-sidebar" aria-label="Ocultar barra de navegación" title="Ocultar barra de navegación"><span aria-hidden="true">☰</span></button>
             <div class="brand">
                 <img src="/images/facturacion-electron-logo.png" alt="CONSULTING AND TECH JANDRES" width="136" height="136">
             </div>
@@ -300,7 +300,9 @@
             localStorage.setItem('coteja-sidebar-collapsed', String(isCollapsed));
             document.querySelectorAll('[data-sidebar-toggle]').forEach((toggle) => {
                 toggle.setAttribute('aria-expanded', String(!isCollapsed));
-                toggle.lastElementChild.textContent = isCollapsed ? 'Mostrar menú' : 'Ocultar menú';
+                const action = isCollapsed ? 'Mostrar' : 'Ocultar';
+                toggle.setAttribute('aria-label', `${action} barra de navegación`);
+                toggle.title = `${action} barra de navegación`;
             });
         });
     });

@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AppReleaseController;
 use App\Http\Controllers\Admin\InventoryController;
 use App\Http\Controllers\Admin\BackupController;
 use App\Http\Controllers\Admin\CompanyController;
+use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\CompanySelectionController;
 use App\Http\Controllers\Admin\CompanySwitcherController;
 use App\Http\Controllers\Admin\DashboardController;
@@ -43,6 +44,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
 
 // ── Solo admin: gestión global ────────────────────────────────────────────────
 Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::resource('customers', CustomerController::class)->only(['index', 'store', 'update']);
     Route::resource('users', UserController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('companies', CompanyController::class)->only(['index', 'store', 'update']);
     Route::resource('licenses', LicenseController::class)->only(['index', 'store', 'update']);

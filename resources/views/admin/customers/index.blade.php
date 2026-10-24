@@ -207,17 +207,17 @@
                                                 </select>
                                             </label>
                                             <label>Tipo documento
-                                                <select name="document_type" required>
+                                                <select name="document_type">
                                                     @foreach($documentTypes as $value => $label)
                                                         <option value="{{ $value }}" @selected(old('document_type', $customer->document_type) === $value)>{{ $label }}</option>
                                                     @endforeach
                                                 </select>
                                             </label>
-                                            <label>Número documento<input name="document_number" value="{{ old('document_number', $customer->document_number) }}" required></label>
+                                            <label>Número documento<input name="document_number" value="{{ old('document_number', $customer->document_number) }}"></label>
                                             <label>NRC<input name="nrc" value="{{ old('nrc', $customer->nrc) }}"></label>
                                             <label>Nombre comercial<input name="trade_name" value="{{ old('trade_name', $customer->trade_name) }}"></label>
                                             <label>Tipo DTE preferido
-                                                <select name="preferred_dte_type" required>
+                                                <select name="preferred_dte_type">
                                                     @foreach($dteTypes as $value => $label)
                                                         <option value="{{ $value }}" @selected(old('preferred_dte_type', $customer->preferred_dte_type) === $value)>{{ $label }}</option>
                                                     @endforeach
@@ -226,7 +226,7 @@
                                             <label>Actividad económica<input name="business_activity" value="{{ old('business_activity', $customer->business_activity) }}" placeholder="62020"></label>
                                             <label>Descripción actividad<input name="activity_description" value="{{ old('activity_description', $customer->activity_description) }}"></label>
                                             <label>Departamento
-                                                <select name="address_department" class="customer-department" required>
+                                                <select name="address_department" class="customer-department">
                                                     <option value="">Seleccionar departamento...</option>
                                                     @foreach($departments as $department)
                                                         <option value="{{ $department['codigo'] }}" @selected(old('address_department', $customer->address_department) === $department['codigo'])>
@@ -236,7 +236,7 @@
                                                 </select>
                                             </label>
                                             <label>Municipio
-                                                <select name="address_municipality" class="customer-municipality" required>
+                                                <select name="address_municipality" class="customer-municipality">
                                                     <option value="">Seleccionar municipio...</option>
                                                     @foreach($municipalitiesFlat as $municipality)
                                                         <option value="{{ $municipality['codigo'] }}" data-department="{{ $municipality['departamento'] }}" @selected(old('address_municipality', $customer->address_municipality) === $municipality['codigo'])>
@@ -245,7 +245,7 @@
                                                     @endforeach
                                                 </select>
                                             </label>
-                                            <label class="full-width">Dirección<input name="address" value="{{ old('address', $customer->address) }}" required></label>
+                                            <label class="full-width">Dirección<input name="address" value="{{ old('address', $customer->address) }}"></label>
                                             <label>Email facturación<input type="email" name="billing_email" value="{{ old('billing_email', $customer->billing_email) }}"></label>
                                             <label>Teléfono facturación<input name="billing_phone" value="{{ old('billing_phone', $customer->billing_phone) }}"></label>
                                             <div class="form-actions full-width">

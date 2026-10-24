@@ -22,9 +22,9 @@ export default function Login({ errors: serverErrors }) {
                         alt="CONSULTING AND TECH JANDRES"
                         width="168"
                         height="168"
-                        style={{ width: '168px', maxWidth: '100%', height: 'auto', margin: '0 auto 14px', display: 'block' }}
+                        style={{ width: '168px', maxWidth: '100%', height: '140px', objectFit: 'cover', objectPosition: 'center', margin: '0 auto', display: 'block' }}
                     />
-                    <p className="muted" style={{ margin: '0 0 18px', textAlign: 'center', fontSize: 12 }}>
+                    <p className="muted" style={{ margin: '0 0 18px', textAlign: 'center', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: 12, fontWeight: 600, letterSpacing: '0.15px' }}>
                         Consulting and Tech Jandres S.A.S de C.V
                     </p>
 
