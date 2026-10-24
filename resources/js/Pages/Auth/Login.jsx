@@ -1,7 +1,14 @@
+import { useState } from 'react';
 import { Head, useForm } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 
 export default function Login({ errors: serverErrors }) {
+    const [darkLogo] = useState(() => {
+        const storedTheme = typeof localStorage !== 'undefined' ? localStorage.getItem('coteja-theme') : null;
+        if (storedTheme) return storedTheme === 'dark';
+        if (typeof document !== 'undefined' && document.body.classList.contains('dark-mode')) return true;
+        return typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+    });
     const { data, setData, post, processing, errors } = useForm({
         email: '',
         password: '',
@@ -18,7 +25,7 @@ export default function Login({ errors: serverErrors }) {
             <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '24px' }}>
                 <form onSubmit={submit} className="card" style={{ width: 'min(420px,100%)' }}>
                     <img
-                        src="/images/coteja-erp-logo-claro.svg"
+                        src={`/images/coteja-erp-logo-${darkLogo ? 'oscuro' : 'claro'}.svg`}
                         alt="Coteja ERP"
                         width="330"
                         height="90"
