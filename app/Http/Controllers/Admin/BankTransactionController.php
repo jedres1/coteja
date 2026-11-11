@@ -241,55 +241,74 @@ class BankTransactionController extends Controller
             ->with('status', 'Conciliación creada.');
     }
 
-    public function showReconciliation(BankReconciliation $reconciliation)
+    public function showReconciliation(BankReconciliation $reconciliation, BankReconciliationService $svc)
     {
         $tenantId = $this->tenantId();
         if ($tenantId) {
             abort_unless($reconciliation->bankAccount?->company_id === $tenantId, 403);
         }
 
+        $reconciliation->load('bankAccount');
         $account = $reconciliation->bankAccount;
-        $from = Carbon::create($reconciliation->period_year, $reconciliation->period_month, 1)->startOfMonth()->toDateString();
-        $to   = Carbon::create($reconciliation->period_year, $reconciliation->period_month, 1)->endOfMonth()->toDateString();
 
-        $bankTxs = BankTransaction::with(['purchaseInvoices.supplier'])
-            ->where('bank_account_id', $account->id)
-            ->whereBetween('transaction_date', [$from, $to])
-            ->get()->map(function ($tx) {
-                $docs = $tx->purchaseInvoices->map(fn ($inv) => $inv->invoice_number)->join(', ');
-                return [
-                    'raw_id'         => $tx->id,
-                    'source'         => $tx->purchaseInvoices->isNotEmpty() ? 'compras' : 'manual',
-                    'date'           => $tx->transaction_date->format('Y-m-d'),
-                    'type'           => $tx->type ?? 'pago',
-                    'amount'         => (float) $tx->amount,
-                    'reference'      => $tx->reference,
-                    'document'       => $docs ?: null,
-                    'document_label' => $docs ? 'Factura(s) compra' : null,
-                    'is_reconciled'  => (bool) $tx->is_reconciled,
-                ];
-            });
+        // Bank transaction candidates (up to cut_date, not firmly reconciled elsewhere)
+        $piIds = \DB::table('bank_transaction_purchase_invoice')
+            ->pluck('bank_transaction_id')
+            ->flip();
+
+        $candidates = $svc->candidates($reconciliation)->map(fn ($tx) => [
+            'id'                 => $tx->id,
+            'source'             => isset($piIds[$tx->id]) ? 'compras' : 'manual',
+            'date'               => $tx->transaction_date->format('Y-m-d'),
+            'type'               => $tx->type,
+            'amount'             => (float) $tx->amount,
+            'reference'          => $tx->reference,
+            'notes'              => $tx->notes,
+            'is_reconciled'      => (bool) $tx->is_reconciled,
+            'reconciliation_id'  => $tx->reconciliation_id,
+            'transaction_status' => $tx->transaction_status instanceof \App\Enums\BankTransactionStatus
+                ? $tx->transaction_status->value
+                : ($tx->transaction_status ?? 'active'),
+        ]);
+
+        // Billing payments (keep old toggle flow; shown separately)
+        $cutDate = $reconciliation->cut_date
+            ?? Carbon::create($reconciliation->period_year, $reconciliation->period_month, 1)->endOfMonth();
+        $from = Carbon::create($reconciliation->period_year, $reconciliation->period_month, 1)
+            ->startOfMonth()->toDateString();
 
         $billingPayments = BillingInvoicePayment::with('invoice')
             ->where('bank_account_id', $account->id)
-            ->whereBetween(\DB::raw('DATE(registered_at)'), [$from, $to])
-            ->get()->map(function ($payment) {
-                return [
-                    'raw_id'         => $payment->id,
-                    'source'         => 'facturacion',
-                    'date'           => $payment->registered_at->format('Y-m-d'),
-                    'type'           => $payment->method ?? 'pago',
-                    'amount'         => (float) $payment->amount,
-                    'reference'      => $payment->reference,
-                    'document'       => $payment->invoice?->number_control,
-                    'document_label' => 'Factura venta',
-                    'is_reconciled'  => (bool) $payment->is_reconciled,
-                ];
-            });
+            ->whereBetween(\DB::raw('DATE(registered_at)'), [$from, $cutDate->toDateString()])
+            ->get()->map(fn ($p) => [
+                'raw_id'         => $p->id,
+                'source'         => 'facturacion',
+                'date'           => $p->registered_at->format('Y-m-d'),
+                'type'           => $p->method ?? 'pago',
+                'amount'         => (float) $p->amount,
+                'reference'      => $p->reference,
+                'document'       => $p->invoice?->number_control,
+                'document_label' => 'Factura venta',
+                'is_reconciled'  => (bool) $p->is_reconciled,
+            ])->sortByDesc('date')->values();
 
-        $transactions = $bankTxs->concat($billingPayments)->sortByDesc('date')->values();
+        $summary = $svc->calculate($reconciliation);
 
-        return Inertia::render('Admin/BankTransactions/ReconciliationDetail', compact('reconciliation', 'transactions'));
+        return Inertia::render('Admin/BankTransactions/ReconciliationDetail', [
+            'reconciliation'  => $reconciliation,
+            'candidates'      => $candidates->values(),
+            'billingPayments' => $billingPayments,
+            'initialSummary'  => [
+                'statement_balance'  => $summary->statementBalance,
+                'book_balance'       => $summary->bookBalance,
+                'total_transit_out'  => $summary->totalTransitOut,
+                'total_transit_in'   => $summary->totalTransitIn,
+                'reconciled_balance' => $summary->reconciledBalance,
+                'difference'         => $summary->difference,
+                'balances'           => $summary->balances(),
+                'pending_count'      => $summary->pendingCount,
+            ],
+        ]);
     }
 
     public function uploadStatement(Request $request, BankReconciliation $reconciliation)
