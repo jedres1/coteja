@@ -100,6 +100,18 @@ Route::middleware(['auth', 'role:admin,inquilino', 'ensure-company', 'module:ban
     Route::post('control-bancario/conciliacion/{reconciliation}/upload', [BankTransactionController::class, 'uploadStatement'])->name('bank-transactions.reconciliations.upload');
     Route::post('control-bancario/conciliacion/{reconciliation}/toggle', [BankTransactionController::class, 'toggleReconcile'])->name('bank-transactions.reconciliations.toggle');
     Route::post('control-bancario/conciliacion/{reconciliation}/complete', [BankTransactionController::class, 'completeReconciliation'])->name('bank-transactions.reconciliations.complete');
+
+    // New workflow: opening, en-firme state machine, void, auto-matching
+    Route::post('control-bancario/cuentas/{account}/apertura/preview', [BankTransactionController::class, 'openingPreview'])->name('bank-transactions.reconciliations.opening-preview');
+    Route::post('control-bancario/cuentas/{account}/apertura', [BankTransactionController::class, 'storeOpening'])->name('bank-transactions.reconciliations.opening-store');
+    Route::get('control-bancario/conciliacion/{reconciliation}/resumen', [BankTransactionController::class, 'reconciliationSummary'])->name('bank-transactions.reconciliations.summary');
+    Route::post('control-bancario/conciliacion/{reconciliation}/marcar', [BankTransactionController::class, 'markTransactions'])->name('bank-transactions.reconciliations.mark');
+    Route::post('control-bancario/conciliacion/{reconciliation}/desmarcar', [BankTransactionController::class, 'unmarkTransactions'])->name('bank-transactions.reconciliations.unmark');
+    Route::post('control-bancario/conciliacion/{reconciliation}/en-firme', [BankTransactionController::class, 'confirmReconciliation'])->name('bank-transactions.reconciliations.confirm');
+    Route::post('control-bancario/conciliacion/{reconciliation}/anular', [BankTransactionController::class, 'voidReconciliation'])->name('bank-transactions.reconciliations.void');
+    Route::delete('control-bancario/conciliacion/{reconciliation}', [BankTransactionController::class, 'deleteReconciliation'])->name('bank-transactions.reconciliations.destroy');
+    Route::post('control-bancario/conciliacion/{reconciliation}/sugerir-emparejamiento', [BankTransactionController::class, 'suggestMatches'])->name('bank-transactions.reconciliations.suggest-matches');
+    Route::post('control-bancario/conciliacion/{reconciliation}/confirmar-emparejamiento', [BankTransactionController::class, 'confirmMatches'])->name('bank-transactions.reconciliations.confirm-matches');
 });
 
 // ── Módulo Contabilidad: operaciones (admin + inquilino) ──────────────────────

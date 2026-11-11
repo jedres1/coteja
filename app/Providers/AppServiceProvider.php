@@ -3,12 +3,16 @@
 namespace App\Providers;
 
 use App\Models\BillingInvoice;
+use App\Models\BankReconciliation;
+use App\Models\BankTransaction;
 use App\Models\Customer;
 use App\Models\Employee;
 use App\Models\JournalEntry;
 use App\Models\PurchaseInvoice;
 use App\Models\Supplier;
 use App\Observers\AuditObserver;
+use App\Observers\BankTransactionObserver;
+use App\Policies\BankReconciliationPolicy;
 use App\Policies\CustomerPolicy;
 use App\Policies\JournalEntryPolicy;
 use App\Policies\PurchaseInvoicePolicy;
@@ -30,8 +34,11 @@ class AppServiceProvider extends ServiceProvider
         JournalEntry::observe($observer);
         Employee::observe($observer);
 
+        BankTransaction::observe(BankTransactionObserver::class);
+
         Gate::policy(JournalEntry::class, JournalEntryPolicy::class);
         Gate::policy(PurchaseInvoice::class, PurchaseInvoicePolicy::class);
         Gate::policy(Customer::class, CustomerPolicy::class);
+        Gate::policy(BankReconciliation::class, BankReconciliationPolicy::class);
     }
 }

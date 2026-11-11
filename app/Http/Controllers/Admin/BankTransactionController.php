@@ -2,8 +2,13 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Data\ReconciliationSummary;
+use App\Exceptions\BankReconciliationException;
 use App\Http\Controllers\Controller;
 use App\Models\BankAccount;
+use App\Models\BankStatementLine;
+use App\Services\Banking\BankReconciliationService;
+use App\Services\Banking\StatementMatchingService;
 use App\Traits\ExportsCsv;
 use App\Traits\HasTenantScope;
 use App\Models\BankReconciliation;
@@ -349,6 +354,199 @@ class BankTransactionController extends Controller
         $reconciliation->update(['status' => 'completado', 'completed_at' => now()]);
 
         return back()->with('status', 'Conciliación marcada como completada.');
+    }
+
+    // ── New workflow: opening, confirm en firme, void, summary ────────────────
+
+    public function openingPreview(Request $request, BankAccount $account, BankReconciliationService $svc)
+    {
+        $tenantId = $this->tenantId();
+        if ($tenantId) abort_unless($account->company_id === $tenantId, 403);
+
+        $data = $request->validate([
+            'cut_date'          => ['required', 'date'],
+            'statement_balance' => ['required', 'numeric'],
+            'transit_ids'       => ['nullable', 'array'],
+            'transit_ids.*'     => ['integer'],
+        ]);
+
+        $preview = $svc->previewOpening(
+            $account,
+            Carbon::parse($data['cut_date']),
+            (float) $data['statement_balance'],
+            $data['transit_ids'] ?? [],
+        );
+
+        return response()->json($preview);
+    }
+
+    public function storeOpening(Request $request, BankAccount $account, BankReconciliationService $svc)
+    {
+        $tenantId = $this->tenantId();
+        if ($tenantId) abort_unless($account->company_id === $tenantId, 403);
+
+        $data = $request->validate([
+            'cut_date'          => ['required', 'date'],
+            'statement_balance' => ['required', 'numeric'],
+            'transit_ids'       => ['nullable', 'array'],
+            'transit_ids.*'     => ['integer'],
+            'reference_act'     => ['nullable', 'string', 'max:100'],
+        ]);
+
+        try {
+            $recon = $svc->createOpening(
+                $account,
+                Carbon::parse($data['cut_date']),
+                (float) $data['statement_balance'],
+                $data['transit_ids'] ?? [],
+                auth()->user(),
+                $data['reference_act'] ?? null,
+            );
+        } catch (BankReconciliationException $e) {
+            return back()->withErrors(['recon' => $e->getMessage()]);
+        }
+
+        return redirect()
+            ->route('admin.bank-transactions.reconciliations.show', $recon)
+            ->with('status', 'Conciliación de apertura creada.');
+    }
+
+    public function reconciliationSummary(BankReconciliation $reconciliation, BankReconciliationService $svc)
+    {
+        $tenantId = $this->tenantId();
+        if ($tenantId) abort_unless($reconciliation->bankAccount?->company_id === $tenantId, 403);
+
+        $summary = $svc->calculate($reconciliation);
+        $cgDiff  = $svc->validateAgainstAccounting($reconciliation);
+
+        return response()->json([
+            'statement_balance'  => $summary->statementBalance,
+            'book_balance'       => $summary->bookBalance,
+            'total_transit_out'  => $summary->totalTransitOut,
+            'total_transit_in'   => $summary->totalTransitIn,
+            'reconciled_balance' => $summary->reconciledBalance,
+            'difference'         => $summary->difference,
+            'balances'           => $summary->balances(),
+            'pending_count'      => $summary->pendingCount,
+            'cg_difference'      => $cgDiff,
+        ]);
+    }
+
+    public function markTransactions(Request $request, BankReconciliation $reconciliation, BankReconciliationService $svc)
+    {
+        $tenantId = $this->tenantId();
+        if ($tenantId) abort_unless($reconciliation->bankAccount?->company_id === $tenantId, 403);
+
+        $data = $request->validate([
+            'ids'   => ['required', 'array'],
+            'ids.*' => ['integer'],
+        ]);
+
+        try {
+            $svc->mark($reconciliation, $data['ids']);
+        } catch (BankReconciliationException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json($svc->calculate($reconciliation));
+    }
+
+    public function unmarkTransactions(Request $request, BankReconciliation $reconciliation, BankReconciliationService $svc)
+    {
+        $tenantId = $this->tenantId();
+        if ($tenantId) abort_unless($reconciliation->bankAccount?->company_id === $tenantId, 403);
+
+        $data = $request->validate([
+            'ids'   => ['required', 'array'],
+            'ids.*' => ['integer'],
+        ]);
+
+        try {
+            $svc->unmark($reconciliation, $data['ids']);
+        } catch (BankReconciliationException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json($svc->calculate($reconciliation));
+    }
+
+    public function confirmReconciliation(BankReconciliation $reconciliation, BankReconciliationService $svc)
+    {
+        $tenantId = $this->tenantId();
+        if ($tenantId) abort_unless($reconciliation->bankAccount?->company_id === $tenantId, 403);
+
+        try {
+            $svc->confirm($reconciliation, auth()->user());
+        } catch (BankReconciliationException $e) {
+            return back()->withErrors(['recon' => $e->getMessage()]);
+        }
+
+        return back()->with('status', 'Conciliación puesta en firme.');
+    }
+
+    public function voidReconciliation(Request $request, BankReconciliation $reconciliation, BankReconciliationService $svc)
+    {
+        $tenantId = $this->tenantId();
+        if ($tenantId) abort_unless($reconciliation->bankAccount?->company_id === $tenantId, 403);
+
+        $data = $request->validate([
+            'void_reason' => ['required', 'string', 'min:10', 'max:500'],
+        ]);
+
+        try {
+            $svc->void($reconciliation, auth()->user(), $data['void_reason']);
+        } catch (BankReconciliationException $e) {
+            return back()->withErrors(['recon' => $e->getMessage()]);
+        }
+
+        return redirect()
+            ->route('admin.bank-transactions.reconciliations')
+            ->with('status', 'Conciliación anulada.');
+    }
+
+    public function deleteReconciliation(BankReconciliation $reconciliation, BankReconciliationService $svc)
+    {
+        $tenantId = $this->tenantId();
+        if ($tenantId) abort_unless($reconciliation->bankAccount?->company_id === $tenantId, 403);
+
+        try {
+            $svc->delete($reconciliation);
+        } catch (BankReconciliationException $e) {
+            return back()->withErrors(['recon' => $e->getMessage()]);
+        }
+
+        return redirect()
+            ->route('admin.bank-transactions.reconciliations')
+            ->with('status', 'Conciliación eliminada.');
+    }
+
+    public function suggestMatches(BankReconciliation $reconciliation, StatementMatchingService $svc)
+    {
+        $tenantId = $this->tenantId();
+        if ($tenantId) abort_unless($reconciliation->bankAccount?->company_id === $tenantId, 403);
+
+        $count = $svc->suggest($reconciliation);
+
+        return response()->json(['suggested' => $count]);
+    }
+
+    public function confirmMatches(Request $request, BankReconciliation $reconciliation, StatementMatchingService $svc)
+    {
+        $tenantId = $this->tenantId();
+        if ($tenantId) abort_unless($reconciliation->bankAccount?->company_id === $tenantId, 403);
+
+        $data = $request->validate([
+            'line_ids'   => ['required', 'array'],
+            'line_ids.*' => ['integer'],
+        ]);
+
+        try {
+            $svc->confirm($reconciliation, $data['line_ids']);
+        } catch (BankReconciliationException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['ok' => true]);
     }
 
     public function exportTransactions(Request $request)
