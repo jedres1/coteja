@@ -204,7 +204,9 @@ class BankTransactionController extends Controller
 
         $reconciliations = BankReconciliation::with('bankAccount')
             ->when($tenantId, fn ($q) => $q->whereHas('bankAccount', fn ($a) => $a->where('company_id', $tenantId)))
-            ->orderByDesc('period_year')->orderByDesc('period_month')->get();
+            ->orderByDesc('cut_date')->orderByDesc('id')
+            ->get(['id','bank_account_id','period_year','period_month','cut_date','statement_balance',
+                   'status','is_opening','confirmed_at','voided_at','notes']);
 
         return Inertia::render('Admin/BankTransactions/Reconciliations', compact('bankAccounts', 'reconciliations'));
     }
@@ -221,19 +223,30 @@ class BankTransactionController extends Controller
             'bank_account_id'   => ['required', $accountRule],
             'period_year'       => ['required', 'integer', 'min:2020', 'max:2100'],
             'period_month'      => ['required', 'integer', 'min:1', 'max:12'],
+            'cut_date'          => ['nullable', 'date'],
             'statement_balance' => ['nullable', 'numeric', 'min:0'],
             'notes'             => ['nullable', 'string', 'max:1000'],
         ]);
 
+        // Allow new reconciliation for same period only if previous is voided
         $existing = BankReconciliation::where([
             'bank_account_id' => $data['bank_account_id'],
             'period_year'     => $data['period_year'],
             'period_month'    => $data['period_month'],
-        ])->exists();
+        ])->whereIn('status', ['abierta', 'en_firme'])->exists();
 
         if ($existing) {
-            return back()->withErrors(['Ya existe una conciliación para ese mes y cuenta.']);
+            return back()->withErrors(['Ya existe una conciliación activa para ese mes y cuenta.']);
         }
+
+        // Default cut_date to last day of the period if not provided
+        if (empty($data['cut_date'])) {
+            $data['cut_date'] = Carbon::create($data['period_year'], $data['period_month'], 1)
+                ->endOfMonth()->toDateString();
+        }
+
+        $data['status']      = 'abierta';
+        $data['prepared_by'] = auth()->id();
 
         $recon = BankReconciliation::create($data);
 
@@ -254,7 +267,8 @@ class BankTransactionController extends Controller
         // Bank transaction candidates (up to cut_date, not firmly reconciled elsewhere)
         $piIds = \DB::table('bank_transaction_purchase_invoice')
             ->pluck('bank_transaction_id')
-            ->flip();
+            ->flip()
+            ->toArray();
 
         $candidates = $svc->candidates($reconciliation)->map(fn ($tx) => [
             'id'                 => $tx->id,
