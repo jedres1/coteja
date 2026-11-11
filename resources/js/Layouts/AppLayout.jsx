@@ -196,6 +196,7 @@ export default function AppLayout({ title, children }) {
                                     icon={<NavIco d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />}
                                     routePatterns={['admin.bank-transactions.*']}
                                 >
+                                    <NavLink href={route('admin.bank-transactions.index')} routePattern="admin.bank-transactions.index">Dashboard</NavLink>
                                     <NavLink href={route('admin.bank-transactions.accounts')} routePattern="admin.bank-transactions.accounts">Cuentas bancarias</NavLink>
                                     <NavLink href={route('admin.bank-transactions.transactions')} routePattern="admin.bank-transactions.transactions">Transacciones</NavLink>
                                     <NavLink href={route('admin.bank-transactions.reconciliations')} routePattern="admin.bank-transactions.reconciliations*">Conciliación</NavLink>

@@ -27,7 +27,56 @@ class BankTransactionController extends Controller
 
     public function index()
     {
-        return redirect()->route('admin.bank-transactions.transactions');
+        $tenantId = $this->tenantId();
+
+        $accounts = BankAccount::when($tenantId, fn ($q) => $q->forCompany($tenantId))
+            ->with(['reconciliations' => fn ($q) => $q->whereIn('status', ['abierta', 'en_firme'])->latest('cut_date')->limit(1)])
+            ->orderBy('name')
+            ->get()
+            ->map(function (BankAccount $a) {
+                $open = $a->reconciliations->where('status', 'abierta')->first();
+                $firm = $a->reconciliations->where('status', 'en_firme')->first()
+                    ?? $a->reconciliations()->where('status', 'en_firme')->exists();
+
+                return [
+                    'id'                     => $a->id,
+                    'name'                   => $a->name,
+                    'bank_name'              => $a->bank_name,
+                    'currency'               => $a->currency,
+                    'is_active'              => $a->is_active,
+                    'book_balance'           => $a->bookBalanceAt(now()),
+                    'last_reconciliation_date' => $a->last_reconciliation_date?->format('Y-m-d'),
+                    'open_reconciliation_id' => $open?->id,
+                    'has_firm_reconciliation'=> (bool) $firm,
+                ];
+            });
+
+        $openReconciliations = \App\Models\BankReconciliation::with('bankAccount')
+            ->when($tenantId, fn ($q) => $q->whereHas('bankAccount', fn ($a) => $a->where('company_id', $tenantId)))
+            ->where('status', 'abierta')
+            ->latest('cut_date')
+            ->get(['id', 'bank_account_id', 'period_year', 'period_month', 'cut_date', 'statement_balance'])
+            ->map(fn ($r) => [
+                'id'               => $r->id,
+                'bank_account'     => ['name' => $r->bankAccount?->name],
+                'period_label'     => $r->periodLabel(),
+                'cut_date'         => $r->cut_date?->format('Y-m-d'),
+                'statement_balance' => $r->statement_balance,
+            ]);
+
+        $totalFirm = \App\Models\BankReconciliation::when($tenantId, fn ($q) =>
+            $q->whereHas('bankAccount', fn ($a) => $a->where('company_id', $tenantId))
+        )->where('status', 'en_firme')->count();
+
+        return Inertia::render('Admin/BankTransactions/Dashboard', [
+            'stats'               => [
+                'active_accounts'      => $accounts->where('is_active', true)->count(),
+                'open_reconciliations' => $openReconciliations->count(),
+                'firm_reconciliations' => $totalFirm,
+            ],
+            'accounts'            => $accounts->values(),
+            'openReconciliations' => $openReconciliations->values(),
+        ]);
     }
 
     // ── Bank accounts ─────────────────────────────────────────────────────────
