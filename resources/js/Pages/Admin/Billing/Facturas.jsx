@@ -147,10 +147,12 @@ function DetailModal({ invoice, onClose }) {
     if (!invoice) return null;
     const row = (label, value) => (
         <div key={label}>
-            <p style={{ margin: '0 0 2px', fontSize: 11, color: '#6b7280' }}>{label}</p>
-            <p style={{ margin: 0, fontSize: 13 }}>{value ?? '—'}</p>
+            <p style={{ margin: '0 0 2px', fontSize: 12, color: '#6b7280' }}>{label}</p>
+            <div style={{ fontSize: 13, overflowWrap: 'anywhere' }}>{value ?? '—'}</div>
         </div>
     );
+    const sectionStyle = { margin: 0, padding: '10px 12px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' };
+    const sectionTitleStyle = { margin: '0 0 8px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6b7280' };
     async function sendInvoiceEmail() {
         setEmailError('');
         setEmailMessage('');
@@ -191,8 +193,10 @@ function DetailModal({ invoice, onClose }) {
     if (invoice.detailError) return <div className="errors">{invoice.detailError}</div>;
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: '75vh', overflowY: 'auto', paddingRight: 4 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 20px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: '75vh', overflowY: 'auto', paddingRight: 4, fontSize: 13 }}>
+            <section style={sectionStyle}>
+                <h3 style={sectionTitleStyle}>Identificación y estado</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '8px 16px' }}>
                 {row('Fecha', invoice.date)}
                 {row('No. Control', invoice.numberControl)}
                 {row('Código generación', <span style={{ fontFamily: 'monospace', fontSize: 11, wordBreak: 'break-all' }}>{invoice.generationCode}</span>)}
@@ -201,10 +205,12 @@ function DetailModal({ invoice, onClose }) {
                 {row('Estado', <StatusBadge status={invoice.status} />)}
                 {row('Aceptado', invoice.accepted ? 'Sí' : 'No')}
                 {row('Correo enviado', invoice.emailSent ? 'Sí' : 'No')}
-            </div>
-            <section className="card" style={{ margin: 0 }}>
-                <h3>Emisor</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
+                </div>
+            </section>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+            <section style={sectionStyle}>
+                <h3 style={sectionTitleStyle}>Emisor</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px 16px' }}>
                     {row('Nombre', invoice.emisor?.nombre)}
                     {row('NIT', invoice.emisor?.nit)}
                     {row('NRC', invoice.emisor?.nrc)}
@@ -214,9 +220,9 @@ function DetailModal({ invoice, onClose }) {
                     {row('Dirección', [invoice.emisor?.direccion?.departamento, invoice.emisor?.direccion?.municipio, invoice.emisor?.direccion?.complemento].filter(Boolean).join(' · '))}
                 </div>
             </section>
-            <section className="card" style={{ margin: 0 }}>
-                <h3>Receptor</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
+            <section style={sectionStyle}>
+                <h3 style={sectionTitleStyle}>Receptor</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px 16px' }}>
                     {row('Nombre', invoice.customer?.name)}
                     {row('Documento', [invoice.customer?.documentType, invoice.customer?.document].filter(Boolean).join(' '))}
                     {row('NRC', invoice.customer?.nrc)}
@@ -226,26 +232,27 @@ function DetailModal({ invoice, onClose }) {
                     {row('Dirección', [invoice.customer?.department, invoice.customer?.municipality, invoice.customer?.address].filter(Boolean).join(' · '))}
                 </div>
             </section>
-            {invoice.identificacion && <section className="card" style={{ margin: 0 }}>
-                <h3>Identificación del DTE</h3>
+            </div>
+            {invoice.identificacion && <section style={sectionStyle}>
+                <h3 style={sectionTitleStyle}>Identificación del DTE</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
                     {Object.entries(invoice.identificacion).map(([key, value]) => row(key, showValue(value)))}
                 </div>
             </section>}
-            {Array.isArray(invoice.items) && invoice.items.length > 0 && <section className="card table-scroll" style={{ margin: 0 }}>
-                <h3>Detalle de productos y servicios</h3>
-                <table>
-                    <thead><tr><th>#</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Precio</th><th>Descuento</th><th>IVA</th><th>Total</th></tr></thead>
-                    <tbody>{invoice.items.map((item, index) => <tr key={`${item.number ?? index}-${item.code ?? ''}`}>
+            {Array.isArray(invoice.items) && invoice.items.length > 0 && <section style={{ ...sectionStyle, overflowX: 'auto' }}>
+                <h3 style={sectionTitleStyle}>Detalle ({invoice.items.length} línea{invoice.items.length !== 1 ? 's' : ''})</h3>
+                <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                    <thead><tr style={{ borderBottom: '2px solid #e2e8f0' }}>{['#', 'Código', 'Descripción', 'Cantidad', 'Precio', 'Descuento', 'IVA', 'Total'].map((label) => <th key={label} style={{ textAlign: label === 'Descripción' || label === 'Código' || label === '#' ? 'left' : 'right', padding: '3px 6px 5px', color: '#6b7280', fontWeight: 600, whiteSpace: 'nowrap' }}>{label}</th>)}</tr></thead>
+                    <tbody>{invoice.items.map((item, index) => <tr key={`${item.number ?? index}-${item.code ?? ''}`} style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td>{item.number ?? index + 1}</td><td>{item.code || '—'}</td><td>{item.description}</td>
                         <td>{fmt(item.quantity)}</td><td>${fmt(item.unitPrice)}</td><td>${fmt(item.discount)}</td><td>${fmt(item.iva)}</td>
                         <td>${fmt(item.total ?? (item.subtotal + item.iva))}</td>
                     </tr>)}</tbody>
                 </table>
             </section>}
-            {invoice.summary && <section className="card" style={{ margin: 0 }}>
-                <h3>Resumen</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
+            {invoice.summary && <section style={sectionStyle}>
+                <h3 style={sectionTitleStyle}>Resumen</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '4px 24px', maxWidth: 440, marginLeft: 'auto' }}>
                     {Object.entries(invoice.summary).map(([key, value]) => row(summaryLabels[key] || key, showValue(value)))}
                 </div>
             </section>}
