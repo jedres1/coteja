@@ -196,6 +196,7 @@ Route::middleware(['auth', 'role:admin,inquilino', 'ensure-company', 'module:bil
         Route::get('dashboard', 'dashboard')->name('dashboard');
         Route::get('facturas', 'facturas')->name('facturas');
         Route::get('facturas/{invoice}', 'verFactura')->name('facturas.ver');
+        Route::get('facturas/{invoice}/pdf', 'descargarPdfFactura')->name('facturas.pdf');
         Route::post('facturas/contingencia', 'eventoContingencia')->name('facturas.contingencia');
         Route::post('facturas/{invoice}/marcar-contingencia', 'marcarContingencia')->name('facturas.marcar-contingencia');
         Route::post('facturas/{invoice}/enviar', 'enviarFacturaGuardada')->name('facturas.enviar');

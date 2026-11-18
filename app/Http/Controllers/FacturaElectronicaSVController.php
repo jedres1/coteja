@@ -104,12 +104,16 @@ class FacturaElectronicaSVController extends Controller
         $scope    = fn ($q) => $q->when($tenantId !== null, fn ($q) => $q->where('company_id', $tenantId));
 
         $invoices = $this->buildFacturasQuery($request, $tenantId)->paginate(15);
+        $todaySentTotal = BillingInvoice::whereDate('issued_at', $today)
+            ->whereIn('status', ['ENVIADO', 'ACEPTADO'])
+            ->tap($scope)
+            ->get()
+            ->sum(fn (BillingInvoice $invoice) => $this->totalFactura($invoice));
 
         return Inertia::render('Admin/Billing/Facturas', [
             'stats' => [
                 'todayCount'     => BillingInvoice::whereDate('issued_at', $today)->tap($scope)->count(),
-                'todaySentTotal' => (float) BillingInvoice::whereDate('issued_at', $today)
-                    ->whereIn('status', ['ENVIADO', 'ACEPTADO'])->tap($scope)->sum('total'),
+                'todaySentTotal' => (float) $todaySentTotal,
                 'sentCount'      => BillingInvoice::whereIn('status', ['ENVIADO', 'ACEPTADO'])->tap($scope)->count(),
                 'pendingCount'   => BillingInvoice::whereIn('status', ['PENDIENTE', 'FIRMADO', 'CONTINGENCIA'])->tap($scope)->count(),
                 'voidedCount'    => BillingInvoice::where('status', 'ANULADO')->tap($scope)->count(),
@@ -177,11 +181,48 @@ class FacturaElectronicaSVController extends Controller
 
     // ── Vista de Factura ───────────────────────────────────────────────────────
 
-    public function verFactura(BillingInvoice $invoice)
+    public function verFactura(Request $request, BillingInvoice $invoice)
     {
+        $tenantId = $this->activeTenantId($request);
+        if ($tenantId !== null && $invoice->company_id !== $tenantId) abort(403);
+
         return response()->json([
             'success' => true,
             'invoice' => $this->invoiceDetail($invoice),
+        ]);
+    }
+
+    public function descargarPdfFactura(Request $request, BillingInvoice $invoice)
+    {
+        $tenantId = $this->activeTenantId($request);
+        if ($tenantId !== null && $invoice->company_id !== $tenantId) abort(403);
+        $dte = $invoice->signed_dte ?: $invoice->json_dte;
+        if (! $dte) abort(404, 'La factura no tiene un DTE disponible para generar el PDF.');
+
+        $settings = BillingSetting::allAsArray($invoice->company_id ?? $tenantId);
+        $codigo = preg_replace('/[^A-Za-z0-9_-]/', '_', $invoice->generation_code ?: $invoice->number_control);
+        $filename = 'DTE_'.$codigo.'.pdf';
+        $result = $this->engine->pdf([
+            'numero_control' => $invoice->number_control,
+            'codigo_generacion' => $invoice->generation_code,
+            'fecha_emision' => optional($invoice->issued_at)->format('Y-m-d'),
+            'cliente' => $invoice->customer_name,
+            'subtotal' => (float) $invoice->subtotal,
+            'iva' => (float) $invoice->iva,
+            'total' => $this->totalFactura($invoice),
+            'estado' => $invoice->status,
+            'sello_recepcion' => $invoice->reception_stamp,
+        ], $dte, $settings['emisor'] ?? [], $filename);
+
+        $content = base64_decode($result['base64'] ?? '', true);
+        if (! ($result['success'] ?? false) || $content === false) {
+            return response()->json(['success' => false, 'message' => 'No se pudo generar el PDF de la factura.'], 500);
+        }
+
+        return response($content, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+            'Content-Length' => strlen($content),
         ]);
     }
 
@@ -918,13 +959,17 @@ class FacturaElectronicaSVController extends Controller
 
     // ── Correo Guardado ────────────────────────────────────────────────────────
 
-    public function enviarCorreoFacturaGuardada(BillingInvoice $invoice)
+    public function enviarCorreoFacturaGuardada(Request $request, BillingInvoice $invoice)
     {
+        $tenantId = $this->activeTenantId($request);
+        if ($tenantId !== null && $invoice->company_id !== $tenantId) abort(403);
         if (! $invoice->accepted || ! $invoice->reception_stamp) {
             return response()->json(['success' => false, 'message' => 'Solo se puede enviar por correo un documento aprobado por Hacienda.'], 422);
         }
 
-        SendInvoiceEmailJob::dispatch($invoice->id);
+        $data = $request->validate(['email' => 'required|email|max:254']);
+
+        SendInvoiceEmailJob::dispatch($invoice->id, $data['email']);
 
         return response()->json([
             'success' => true,
@@ -1495,7 +1540,7 @@ class FacturaElectronicaSVController extends Controller
             'generationCode' => $invoice->generation_code,
             'documentType'   => $invoice->document_type,
             'customerName'   => $invoice->customer_name,
-            'total'          => (float) $invoice->total,
+            'total'          => $this->totalFactura($invoice),
             'status'         => $invoice->status,
             'hasError'       => $invoice->has_error,
             'accepted'       => $invoice->accepted,
@@ -1507,6 +1552,24 @@ class FacturaElectronicaSVController extends Controller
             'voidReason'     => $invoice->void_reason,
             'observations'   => $invoice->observations,
         ];
+    }
+
+    private function totalFactura(BillingInvoice $invoice): float
+    {
+        $dte = $invoice->signed_dte ?: $invoice->json_dte ?: [];
+        $summary = data_get($dte, 'resumen', []);
+        if (str_pad((string) $invoice->document_type, 2, '0', STR_PAD_LEFT) === '07') {
+            return (float) (data_get($summary, 'totalIVAretenido') ?? $invoice->total);
+        }
+        $total = data_get($summary, 'totalPagar')
+            ?? data_get($summary, 'montoTotalOperacion')
+            ?? data_get($summary, 'montoTotal')
+            ?? data_get($summary, 'totalCompra')
+            ?? data_get($summary, 'totalSujetoRetencion')
+            ?? data_get($summary, 'totalIVAretenido')
+            ?? $invoice->total;
+
+        return (float) $total;
     }
 
     private function invoiceDetail(BillingInvoice $invoice): array
@@ -1532,26 +1595,46 @@ class FacturaElectronicaSVController extends Controller
             'voidReason'     => $invoice->void_reason,
             'voidJson'       => $invoice->void_json,
             'observations'   => $invoice->observations,
+            'emisor'         => $dte['emisor'] ?? [],
+            'identificacion' => $dte['identificacion'] ?? [],
+            'documentoRelacionado' => $dte['documentoRelacionado'] ?? null,
+            'apendice'       => $dte['apendice'] ?? null,
             'subtotal'       => (float) ($resumen['subTotal'] ?? $resumen['subTotalVentas'] ?? $invoice->subtotal),
             'iva'            => (float) ($resumen['totalIva'] ?? $invoice->iva),
             'ivaRetenido'    => (float) ($resumen['ivaRete1'] ?? 0),
             'ivaPercibido'   => (float) ($resumen['ivaPerci1'] ?? 0),
             'rentaRetenida'  => (float) ($resumen['reteRenta'] ?? 0),
-            'total'          => (float) ($resumen['totalPagar'] ?? $resumen['montoTotalOperacion'] ?? $invoice->total),
+            'total'          => $this->totalFactura($invoice),
             'customer'       => [
-                'name'     => $receptor['nombre']       ?? $invoice->customer_name,
-                'document' => $receptor['numDocumento'] ?? null,
-                'address'  => data_get($receptor, 'direccion.complemento'),
-                'email'    => $receptor['correo']       ?? null,
-                'phone'    => $receptor['telefono']     ?? null,
+                'name'        => $receptor['nombre']       ?? $invoice->customer_name,
+                'documentType' => $receptor['tipoDocumento'] ?? null,
+                'document'    => $receptor['numDocumento'] ?? null,
+                'nrc'         => $receptor['nrc'] ?? null,
+                'activityCode' => $receptor['codActividad'] ?? null,
+                'activityDescription' => $receptor['descActividad'] ?? null,
+                'address'     => data_get($receptor, 'direccion.complemento'),
+                'department'  => data_get($receptor, 'direccion.departamento'),
+                'municipality' => data_get($receptor, 'direccion.municipio'),
+                'email'       => $invoice->billingClient?->billing_email ?: $invoice->billingClient?->email ?: ($receptor['correo'] ?? null),
+                'phone'       => $invoice->billingClient?->billing_phone ?: $invoice->billingClient?->phone ?: ($receptor['telefono'] ?? null),
             ],
             'items' => collect($dte['cuerpoDocumento'] ?? [])->map(fn ($item) => [
+                'number' => $item['numItem'] ?? null,
+                'code' => $item['codigo'] ?? null,
+                'type' => $item['tipoItem'] ?? null,
                 'description' => $item['descripcion'] ?? '',
                 'quantity'    => (float) ($item['cantidad'] ?? 0),
+                'unit' => $item['uniMedida'] ?? null,
                 'unitPrice'   => (float) ($item['precioUni'] ?? 0),
+                'discount' => (float) ($item['montoDescu'] ?? 0),
                 'iva'         => (float) ($item['ivaItem'] ?? 0),
+                'nonSubject' => (float) ($item['ventaNoSuj'] ?? 0),
+                'exempt' => (float) ($item['ventaExenta'] ?? 0),
+                'taxable' => (float) ($item['ventaGravada'] ?? 0),
                 'subtotal'    => (float) ($item['ventaGravada'] ?? $item['ventaExenta'] ?? $item['compra'] ?? 0),
+                'total' => (float) ($item['ventaGravada'] ?? $item['ventaExenta'] ?? $item['ventaNoSuj'] ?? $item['compra'] ?? 0),
             ])->values(),
+            'summary' => $resumen,
             'dte' => $dte,
         ];
     }

@@ -73,6 +73,11 @@ class BillingInvoice extends Model
         return $this->belongsTo(Customer::class);
     }
 
+    public function billingClient()
+    {
+        return $this->belongsTo(BillingClient::class);
+    }
+
     public function company()
     {
         return $this->belongsTo(Company::class);

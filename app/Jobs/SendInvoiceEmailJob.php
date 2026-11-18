@@ -15,22 +15,25 @@ class SendInvoiceEmailJob implements ShouldQueue
 
     public int $tries = 3;
 
-    public function __construct(public readonly int $invoiceId) {}
+    public function __construct(public readonly int $invoiceId, public readonly ?string $recipient = null) {}
 
     public function handle(DteEngine $engine): void
     {
-        $invoice = BillingInvoice::with('customer')->find($this->invoiceId);
+        $invoice = BillingInvoice::with(['customer', 'billingClient'])->find($this->invoiceId);
 
         if (! $invoice || ! $invoice->accepted || ! $invoice->reception_stamp) {
             return;
         }
 
-        $settings = BillingSetting::allAsArray();
+        $settings = BillingSetting::allAsArray($invoice->company_id ?? $invoice->tenant_customer_id);
         $correo   = $settings['correo'] ?? [];
         $emisor   = $settings['emisor'] ?? [];
         $dte      = $invoice->signed_dte ?: $invoice->json_dte;
 
-        $destinatario = trim((string) ($invoice->customer?->billing_email
+        $destinatario = trim((string) ($this->recipient
+            ?: $invoice->billingClient?->billing_email
+            ?: $invoice->billingClient?->email
+            ?: $invoice->customer?->billing_email
             ?: $invoice->customer?->email
             ?: data_get($invoice->json_dte, 'receptor.correo')
             ?: data_get($invoice->json_dte, 'sujetoExcluido.correo')

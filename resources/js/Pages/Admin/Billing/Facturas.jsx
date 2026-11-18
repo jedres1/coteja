@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
@@ -139,6 +139,11 @@ function StatusBadge({ status }) {
 }
 
 function DetailModal({ invoice, onClose }) {
+    const [email, setEmail] = useState(invoice?.customer?.email || '');
+    const [emailSending, setEmailSending] = useState(false);
+    const [emailMessage, setEmailMessage] = useState('');
+    const [emailError, setEmailError] = useState('');
+    useEffect(() => setEmail(invoice?.customer?.email || ''), [invoice?.id, invoice?.customer?.email]);
     if (!invoice) return null;
     const row = (label, value) => (
         <div key={label}>
@@ -146,19 +151,106 @@ function DetailModal({ invoice, onClose }) {
             <p style={{ margin: 0, fontSize: 13 }}>{value ?? '—'}</p>
         </div>
     );
+    async function sendInvoiceEmail() {
+        setEmailError('');
+        setEmailMessage('');
+        if (!email.trim()) { setEmailError('Escribe el correo destinatario.'); return; }
+        const xsrf = document.cookie.split('; ').find((cookie) => cookie.startsWith('XSRF-TOKEN='))?.slice('XSRF-TOKEN='.length);
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+        setEmailSending(true);
+        try {
+            const response = await fetch(route('admin.factura-sv.facturas.correo', invoice.id), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    ...(xsrf ? { 'X-XSRF-TOKEN': decodeURIComponent(xsrf) } : { 'X-CSRF-TOKEN': csrf }),
+                },
+                body: JSON.stringify({ email: email.trim() }),
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) throw new Error(data.message || 'No se pudo enviar la factura por correo.');
+            setEmailMessage(data.message || 'Correo encolado para envío.');
+        } catch (error) {
+            setEmailError(error.message || 'No se pudo enviar la factura por correo.');
+        } finally {
+            setEmailSending(false);
+        }
+    }
+
+    const summaryLabels = {
+        subTotal: 'Subtotal', subTotalVentas: 'Subtotal ventas', totalGravada: 'Total gravado',
+        totalExenta: 'Total exento', totalNoSuj: 'Total no sujeto', totalDescu: 'Descuento',
+        totalIva: 'IVA', montoTotalOperacion: 'Monto total de operación', totalPagar: 'Total a pagar',
+        ivaRete1: 'IVA retenido', ivaPerci1: 'IVA percibido', reteRenta: 'Renta retenida',
+        totalCompra: 'Total compra', totalSujetoRetencion: 'Sujeto a retención', totalIVAretenido: 'IVA retenido',
+    };
+    const showValue = (value) => typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value ?? '—');
+
+    if (invoice.loadingDetail) return <div className="card">Cargando documento completo…</div>;
+    if (invoice.detailError) return <div className="errors">{invoice.detailError}</div>;
+
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: '75vh', overflowY: 'auto', paddingRight: 4 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 20px' }}>
                 {row('Fecha', invoice.date)}
                 {row('No. Control', invoice.numberControl)}
                 {row('Código generación', <span style={{ fontFamily: 'monospace', fontSize: 11, wordBreak: 'break-all' }}>{invoice.generationCode}</span>)}
                 {row('Tipo', DTE_TYPES.find((t) => t.code === invoice.documentType)?.label ?? invoice.documentType)}
-                {row('Cliente', invoice.customerName)}
                 {row('Total', `$${fmt(invoice.total)}`)}
                 {row('Estado', <StatusBadge status={invoice.status} />)}
                 {row('Aceptado', invoice.accepted ? 'Sí' : 'No')}
                 {row('Correo enviado', invoice.emailSent ? 'Sí' : 'No')}
             </div>
+            <section className="card" style={{ margin: 0 }}>
+                <h3>Emisor</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
+                    {row('Nombre', invoice.emisor?.nombre)}
+                    {row('NIT', invoice.emisor?.nit)}
+                    {row('NRC', invoice.emisor?.nrc)}
+                    {row('Actividad económica', [invoice.emisor?.codActividad, invoice.emisor?.descActividad].filter(Boolean).join(' — '))}
+                    {row('Correo', invoice.emisor?.correo)}
+                    {row('Teléfono', invoice.emisor?.telefono)}
+                    {row('Dirección', [invoice.emisor?.direccion?.departamento, invoice.emisor?.direccion?.municipio, invoice.emisor?.direccion?.complemento].filter(Boolean).join(' · '))}
+                </div>
+            </section>
+            <section className="card" style={{ margin: 0 }}>
+                <h3>Receptor</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
+                    {row('Nombre', invoice.customer?.name)}
+                    {row('Documento', [invoice.customer?.documentType, invoice.customer?.document].filter(Boolean).join(' '))}
+                    {row('NRC', invoice.customer?.nrc)}
+                    {row('Actividad económica', [invoice.customer?.activityCode, invoice.customer?.activityDescription].filter(Boolean).join(' — '))}
+                    {row('Correo', invoice.customer?.email)}
+                    {row('Teléfono', invoice.customer?.phone)}
+                    {row('Dirección', [invoice.customer?.department, invoice.customer?.municipality, invoice.customer?.address].filter(Boolean).join(' · '))}
+                </div>
+            </section>
+            {invoice.identificacion && <section className="card" style={{ margin: 0 }}>
+                <h3>Identificación del DTE</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
+                    {Object.entries(invoice.identificacion).map(([key, value]) => row(key, showValue(value)))}
+                </div>
+            </section>}
+            {Array.isArray(invoice.items) && invoice.items.length > 0 && <section className="card table-scroll" style={{ margin: 0 }}>
+                <h3>Detalle de productos y servicios</h3>
+                <table>
+                    <thead><tr><th>#</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Precio</th><th>Descuento</th><th>IVA</th><th>Total</th></tr></thead>
+                    <tbody>{invoice.items.map((item, index) => <tr key={`${item.number ?? index}-${item.code ?? ''}`}>
+                        <td>{item.number ?? index + 1}</td><td>{item.code || '—'}</td><td>{item.description}</td>
+                        <td>{fmt(item.quantity)}</td><td>${fmt(item.unitPrice)}</td><td>${fmt(item.discount)}</td><td>${fmt(item.iva)}</td>
+                        <td>${fmt(item.total ?? (item.subtotal + item.iva))}</td>
+                    </tr>)}</tbody>
+                </table>
+            </section>}
+            {invoice.summary && <section className="card" style={{ margin: 0 }}>
+                <h3>Resumen</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
+                    {Object.entries(invoice.summary).map(([key, value]) => row(summaryLabels[key] || key, showValue(value)))}
+                </div>
+            </section>}
+            {invoice.documentoRelacionado && row('Documentos relacionados', showValue(invoice.documentoRelacionado))}
+            {invoice.apendice && row('Apéndice', showValue(invoice.apendice))}
             {invoice.receptionStamp && (
                 <div>
                     <p style={{ margin: '0 0 2px', fontSize: 11, color: '#6b7280' }}>Sello de recepción</p>
@@ -192,6 +284,18 @@ function DetailModal({ invoice, onClose }) {
                     </p>
                 </div>
             )}
+            {invoice.dte && <details><summary style={{ cursor: 'pointer', fontWeight: 600 }}>Ver JSON DTE completo</summary><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', fontSize: 11, background: '#f8fafc', padding: 12, borderRadius: 6 }}>{JSON.stringify(invoice.dte, null, 2)}</pre></details>}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                <a className="btn secondary" href={route('admin.factura-sv.facturas.pdf', invoice.id)}>Generar / Descargar PDF</a>
+                {invoice.accepted && invoice.receptionStamp && <div style={{ display: 'flex', flex: '1 1 320px', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                    <label style={{ flex: '1 1 220px', margin: 0 }}>Enviar factura por correo
+                        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={254} placeholder="cliente@correo.com" />
+                    </label>
+                    <button type="button" className="btn" disabled={emailSending} onClick={sendInvoiceEmail}>{emailSending ? 'Enviando…' : 'Reenviar por correo'}</button>
+                </div>}
+            </div>
+            {emailMessage && <div className="notice">{emailMessage}</div>}
+            {emailError && <div className="errors">{emailError}</div>}
             <div style={{ marginTop: 8 }}>
                 <button type="button" className="btn secondary" onClick={onClose}>Cerrar</button>
             </div>
@@ -674,6 +778,18 @@ export default function Facturas({ stats, invoices, filters, contingenciaInvoice
         );
     }
 
+    async function handleViewInvoice(invoice) {
+        setDetailInv({ ...invoice, loadingDetail: true });
+        try {
+            const response = await fetch(route('admin.factura-sv.facturas.ver', invoice.id), { headers: { Accept: 'application/json' } });
+            const data = await response.json();
+            if (!response.ok || !data.success) throw new Error(data.message || 'No se pudo cargar el detalle de la factura.');
+            setDetailInv((current) => current?.id === invoice.id ? data.invoice : current);
+        } catch (error) {
+            setDetailInv((current) => current?.id === invoice.id ? { ...invoice, detailError: error.message || 'Error al cargar el DTE.' } : current);
+        }
+    }
+
     function handleMarkContingencia(invoice) {
         if (!confirm(`¿Marcar la factura ${invoice.numberControl} como CONTINGENCIA?\n\nPodrá enviarla en lote cuando Hacienda esté disponible.`)) return;
         setMarkingContingencia(invoice.id);
@@ -832,7 +948,7 @@ export default function Facturas({ stats, invoices, filters, contingenciaInvoice
                                             type="button"
                                             className="btn secondary btn-icon"
                                             title="Ver"
-                                            onClick={() => setDetailInv(inv)}
+                                            onClick={() => handleViewInvoice(inv)}
                                         >
                                             <IconEye />
                                         </button>
@@ -896,7 +1012,7 @@ export default function Facturas({ stats, invoices, filters, contingenciaInvoice
                 <Modal
                     title={`Factura ${detailInv.numberControl}`}
                     onClose={() => setDetailInv(null)}
-                    maxWidth={560}
+                    maxWidth={1000}
                 >
                     <DetailModal invoice={detailInv} onClose={() => setDetailInv(null)} />
                 </Modal>
