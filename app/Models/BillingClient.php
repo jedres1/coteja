@@ -15,6 +15,7 @@ class BillingClient extends Model
         'document_number',
         'nrc',
         'business_activity',
+        'activity_description',
         'email',
         'phone',
         'billing_email',

@@ -379,10 +379,9 @@ class FacturaElectronicaSVController extends Controller
             'document_number'      => 'nullable|string|max:50',
             'nrc'                  => 'nullable|string|max:30',
             'business_activity'    => 'nullable|string|max:10',
+            'activity_description' => 'nullable|string|max:255',
             'email'                => 'nullable|email|max:255',
             'phone'                => 'nullable|string|max:30',
-            'billing_email'        => 'nullable|email|max:255',
-            'billing_phone'        => 'nullable|string|max:30',
             'address_department'   => 'nullable|string|max:100',
             'address_municipality' => 'nullable|string|max:100',
             'address_district'     => 'nullable|string|max:6',
@@ -392,7 +391,13 @@ class FacturaElectronicaSVController extends Controller
 
         $attributes = array_merge(
             collect($data)->except('id')->all(),
-            ['company_id' => $tenantId]
+            [
+                'company_id'    => $tenantId,
+                // Keep legacy billing contact columns in sync with the single
+                // contact pair exposed by the client form.
+                'billing_email' => $data['email'] ?? null,
+                'billing_phone' => $data['phone'] ?? null,
+            ]
         );
 
         if ($clientId) {
@@ -427,6 +432,7 @@ class FacturaElectronicaSVController extends Controller
             'documentNumber'       => $c->document_number,
             'nrc'                  => $c->nrc,
             'businessActivity'     => $c->business_activity,
+            'activityDescription'  => $c->activity_description,
             'email'                => $c->email,
             'phone'                => $c->phone,
             'billingEmail'         => $c->billing_email,

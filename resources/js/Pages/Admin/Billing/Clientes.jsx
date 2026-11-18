@@ -36,10 +36,9 @@ function ClientForm({ client, onSuccess, onCancel }) {
         document_number:       client?.documentNumber ?? '',
         nrc:                   client?.nrc ?? '',
         business_activity:     client?.businessActivity ?? '',
-        email:                 client?.email ?? '',
-        phone:                 client?.phone ?? '',
-        billing_email:         client?.billingEmail ?? '',
-        billing_phone:         client?.billingPhone ?? '',
+        activity_description:  client?.activityDescription ?? '',
+        email:                 client?.email || client?.billingEmail || '',
+        phone:                 client?.phone || client?.billingPhone || '',
         address_department:    client?.addressDepartment ?? '',
         address_municipality:  client?.addressMunicipality ?? '',
         address_district:      client?.addressDistrict ?? '',
@@ -105,18 +104,23 @@ function ClientForm({ client, onSuccess, onCancel }) {
 
                 <label className="full-width">
                     Actividad económica
-                    <input
-                        type="text"
+                    <select
                         value={data.business_activity}
-                        onChange={(e) => setData('business_activity', e.target.value)}
-                        list="billing-client-activities-list"
-                        placeholder="Buscar por código o descripción…"
-                    />
-                    <datalist id="billing-client-activities-list">
+                        onChange={(e) => {
+                            const activity = activities.find((a) => a.codigo === e.target.value);
+                            setData({
+                                ...data,
+                                business_activity: e.target.value,
+                                activity_description: activity?.descripcion ?? '',
+                            });
+                        }}
+                    >
+                        <option value="">— Seleccionar actividad —</option>
                         {activities.map((a) => (
-                            <option key={a.codigo} value={`${a.codigo} - ${a.descripcion}`} />
+                            <option key={a.codigo} value={a.codigo}>{a.codigo} - {a.descripcion}</option>
                         ))}
-                    </datalist>
+                    </select>
+                    {data.activity_description && <small className="muted">{data.activity_description}</small>}
                     {errors.business_activity && <p className="field-error">{errors.business_activity}</p>}
                 </label>
 
@@ -177,18 +181,6 @@ function ClientForm({ client, onSuccess, onCancel }) {
                     Teléfono
                     <input value={data.phone} onChange={(e) => setData('phone', e.target.value)} />
                     {errors.phone && <p className="field-error">{errors.phone}</p>}
-                </label>
-
-                <label>
-                    Correo Facturación
-                    <input type="email" value={data.billing_email} onChange={(e) => setData('billing_email', e.target.value)} />
-                    {errors.billing_email && <p className="field-error">{errors.billing_email}</p>}
-                </label>
-
-                <label>
-                    Teléfono Facturación
-                    <input value={data.billing_phone} onChange={(e) => setData('billing_phone', e.target.value)} />
-                    {errors.billing_phone && <p className="field-error">{errors.billing_phone}</p>}
                 </label>
 
                 <label>
