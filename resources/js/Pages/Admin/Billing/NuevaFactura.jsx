@@ -647,21 +647,37 @@ export default function NuevaFactura({ customers, products, settings, correlativ
         const steps = STEP_LABELS.map((label) => ({ label, message: '', status: '' }));
         setOverlay({ visible: true, title: 'Envío de documento a Hacienda', subtitle: 'Preparando documento...', badge: 'En proceso', status: '', current: 0, steps });
 
+        const xsrfCookie = document.cookie
+            .split('; ')
+            .find((cookie) => cookie.startsWith('XSRF-TOKEN='))
+            ?.slice('XSRF-TOKEN='.length);
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+        const csrfHeaders = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            ...(xsrfCookie
+                ? { 'X-XSRF-TOKEN': decodeURIComponent(xsrfCookie) }
+                : { 'X-CSRF-TOKEN': csrfToken }),
+        };
 
         try {
             const response = await fetch('/admin/factura-sv/procesar', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                headers: csrfHeaders,
                 body: JSON.stringify(payload),
             });
-            const data = await response.json();
+            const contentType = response.headers.get('content-type') ?? '';
+            const data = contentType.includes('application/json') ? await response.json() : null;
 
             if (!response.ok) {
                 setOverlay((o) => ({ ...o, visible: false }));
-                setFormError(data.message || 'Error al procesar la factura.');
+                setFormError(response.status === 419
+                    ? 'La sesión venció o cambió el token de seguridad. La factura no se procesó; recarga la página e inténtalo nuevamente.'
+                    : data?.message || `Error al procesar la factura (HTTP ${response.status}).`);
                 return;
             }
+
+            if (!data) throw new Error(`El servidor respondió con un formato inesperado (HTTP ${response.status}).`);
 
             const receivedSteps = data.steps || [];
             setOverlay((o) => {
