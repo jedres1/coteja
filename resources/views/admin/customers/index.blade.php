@@ -182,6 +182,47 @@
                             <td>{{ $customer->licenses_count }}</td>
                             <td>
                                 <details class="overlay-modal">
+                                    <summary class="btn secondary btn-icon" title="Ver cliente" aria-label="Ver cliente">
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"></path>
+                                            <circle cx="12" cy="12" r="3"></circle>
+                                        </svg>
+                                    </summary>
+                                    <div class="overlay-layer">
+                                        <button class="overlay-backdrop" type="button" data-overlay-close aria-label="Cerrar"></button>
+                                        <div class="card overlay-panel wide">
+                                            <div class="overlay-header">
+                                                <div>
+                                                    <h3>Detalle del cliente</h3>
+                                                    <span class="muted">{{ $customer->name }}</span>
+                                                </div>
+                                                <button class="btn secondary overlay-close" type="button" data-overlay-close>Cerrar</button>
+                                            </div>
+                                            <div class="customer-detail-grid">
+                                                <div><span>Razón social</span><strong>{{ $customer->name }}</strong></div>
+                                                <div><span>Nombre comercial</span><strong>{{ $customer->trade_name ?: '—' }}</strong></div>
+                                                <div><span>Estado</span><strong>{{ $statuses[$customer->status] ?? $customer->status }}</strong></div>
+                                                <div><span>Tipo de documento</span><strong>{{ ($documentTypes[$customer->document_type] ?? $customer->document_type) ?: '—' }}</strong></div>
+                                                <div><span>Número de documento</span><strong>{{ $customer->document_number ?: '—' }}</strong></div>
+                                                <div><span>NRC</span><strong>{{ $customer->nrc ?: '—' }}</strong></div>
+                                                <div><span>Tipo DTE preferido</span><strong>{{ ($dteTypes[$customer->preferred_dte_type] ?? $customer->preferred_dte_type) ?: '—' }}</strong></div>
+                                                <div><span>Actividad económica</span><strong>{{ $customer->business_activity ?: '—' }}</strong></div>
+                                                <div><span>Descripción de actividad</span><strong>{{ $customer->activity_description ?: '—' }}</strong></div>
+                                                <div><span>Email portal</span><strong>{{ $customer->email ?: '—' }}</strong></div>
+                                                <div><span>Teléfono portal</span><strong>{{ $customer->phone ?: '—' }}</strong></div>
+                                                <div><span>Email facturación</span><strong>{{ $customer->billing_email ?: '—' }}</strong></div>
+                                                <div><span>Teléfono facturación</span><strong>{{ $customer->billing_phone ?: '—' }}</strong></div>
+                                                <div><span>Departamento</span><strong>{{ $customer->address_department ?: '—' }}</strong></div>
+                                                <div><span>Municipio</span><strong>{{ $customer->address_municipality ?: '—' }}</strong></div>
+                                                <div class="customer-detail-full"><span>Dirección</span><strong>{{ $customer->address ?: '—' }}</strong></div>
+                                                <div><span>Empresas</span><strong>{{ $customer->companies_count }}</strong></div>
+                                                <div><span>Licencias</span><strong>{{ $customer->licenses_count }}</strong></div>
+                                                <div><span>Registrado</span><strong>{{ optional($customer->created_at)->format('Y-m-d H:i') }}</strong></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </details>
+                                <details class="overlay-modal">
                                     <summary class="btn secondary">Editar</summary>
                                     <div class="overlay-layer">
                                         <button class="overlay-backdrop" type="button" data-overlay-close aria-label="Cerrar"></button>
@@ -292,6 +333,37 @@
 
         .customers-table td {
             vertical-align: middle;
+        }
+
+        .customer-detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 12px;
+        }
+
+        .customer-detail-grid > div {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 10px;
+            background: #f8fafc;
+            border-radius: 6px;
+            overflow-wrap: anywhere;
+        }
+
+        .customer-detail-grid span {
+            color: #6b7280;
+            font-size: 11px;
+        }
+
+        .customer-detail-grid strong {
+            font-size: 13px;
+            font-weight: 500;
+            white-space: pre-wrap;
+        }
+
+        .customer-detail-full {
+            grid-column: 1 / -1;
         }
 
         .prospect {

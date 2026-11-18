@@ -3,7 +3,7 @@ import { useForm, router } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Modal from '@/Components/Modal';
-import { IconEdit, IconTrash } from '@/Components/Icons';
+import { IconEdit, IconEye, IconTrash } from '@/Components/Icons';
 
 const DTE_LABEL = {
     '01': 'Factura', '03': 'CCF', '04': 'Nota de Remisión',
@@ -207,6 +207,7 @@ function ClientForm({ client, onSuccess, onCancel }) {
 export default function Clientes({ clients }) {
     const [showCreate, setShowCreate] = useState(false);
     const [editItem, setEditItem] = useState(null);
+    const [viewItem, setViewItem] = useState(null);
     const [search, setSearch] = useState('');
     const [appliedSearch, setAppliedSearch] = useState('');
 
@@ -307,6 +308,15 @@ export default function Clientes({ clients }) {
                                         <button
                                             type="button"
                                             className="btn secondary btn-icon"
+                                            title="Ver cliente"
+                                            aria-label={`Ver ${client.name}`}
+                                            onClick={() => setViewItem(client)}
+                                        >
+                                            <IconEye />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn secondary btn-icon"
                                             title="Editar"
                                             onClick={() => setEditItem(client)}
                                         >
@@ -348,6 +358,39 @@ export default function Clientes({ clients }) {
                     />
                 </Modal>
             )}
+
+            {viewItem && (
+                <Modal title={`Detalle de cliente — ${viewItem.name}`} onClose={() => setViewItem(null)} maxWidth={760}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+                        <BillingClientDetail label="Razón social" value={viewItem.name} />
+                        <BillingClientDetail label="Nombre comercial" value={viewItem.tradeName} />
+                        <BillingClientDetail label="Tipo de documento" value={viewItem.documentType} />
+                        <BillingClientDetail label="Número de documento" value={viewItem.documentNumber} />
+                        <BillingClientDetail label="NRC" value={viewItem.nrc} />
+                        <BillingClientDetail label="Actividad económica" value={viewItem.businessActivity} />
+                        <BillingClientDetail label="Descripción de actividad" value={viewItem.activityDescription} />
+                        <BillingClientDetail label="Correo" value={viewItem.email} />
+                        <BillingClientDetail label="Teléfono" value={viewItem.phone} />
+                        <BillingClientDetail label="Correo de facturación" value={viewItem.billingEmail} />
+                        <BillingClientDetail label="Teléfono de facturación" value={viewItem.billingPhone} />
+                        <BillingClientDetail label="Departamento" value={viewItem.addressDepartment} />
+                        <BillingClientDetail label="Municipio" value={viewItem.addressMunicipality} />
+                        <BillingClientDetail label="Distrito" value={viewItem.addressDistrict} />
+                        <BillingClientDetail label="Dirección" value={viewItem.address} />
+                        <BillingClientDetail label="DTE preferido" value={DTE_LABEL[viewItem.preferredDteType] || viewItem.preferredDteType} />
+                        <BillingClientDetail label="Tipo de registro" value={viewItem.isClientesVarios ? 'Cliente genérico del sistema' : 'Cliente'} />
+                    </div>
+                </Modal>
+            )}
         </AppLayout>
+    );
+}
+
+function BillingClientDetail({ label, value }) {
+    return (
+        <div style={{ padding: 10, background: '#f8fafc', borderRadius: 6 }}>
+            <div className="muted" style={{ fontSize: 11, marginBottom: 4 }}>{label}</div>
+            <div style={{ fontSize: 13, fontWeight: 500, overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}>{value ?? '—'}</div>
+        </div>
     );
 }
