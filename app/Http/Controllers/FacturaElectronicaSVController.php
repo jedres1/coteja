@@ -615,6 +615,14 @@ class FacturaElectronicaSVController extends Controller
             BillingSetting::put($key, $data[$key] ?? [], $tenantId);
         }
 
+        if ($tenantId !== null && array_key_exists('ambiente', $data['hacienda'] ?? [])) {
+            Company::whereKey($tenantId)->update([
+                'environment' => in_array((string) $data['hacienda']['ambiente'], ['01', 'production', 'produccion'], true)
+                    ? 'production'
+                    : 'testing',
+            ]);
+        }
+
         foreach (($data['correlativos'] ?? []) as $documentType => $nextNumber) {
             BillingDteCorrelative::updateOrCreate(
                 [

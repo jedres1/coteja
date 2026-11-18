@@ -4,7 +4,7 @@ import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
 import Modal from '@/Components/Modal';
 import { route } from 'ziggy-js';
-import { IconEdit } from '@/Components/Icons';
+import { IconEdit, IconEye } from '@/Components/Icons';
 
 const environments = {
     production: 'Produccion',
@@ -491,6 +491,7 @@ function LicenseBadge({ license }) {
 export default function CompaniesIndex({ companies, modules, plans }) {
     const [showCreate, setShowCreate] = useState(false);
     const [editItem, setEditItem]     = useState(null);
+    const [viewItem, setViewItem]     = useState(null);
     const [licenseCompany, setLicenseCompany] = useState(null);
 
     return (
@@ -560,6 +561,9 @@ export default function CompaniesIndex({ companies, modules, plans }) {
                                 </td>
                                 <td>
                                     <div style={{ display: 'flex', gap: 6, flexDirection: 'column', alignItems: 'flex-start' }}>
+                                        <button className="btn secondary btn-icon" title="Ver empresa" aria-label={`Ver ${company.business_name}`} onClick={() => setViewItem(company)}>
+                                            <IconEye />
+                                        </button>
                                         <button className="btn btn-icon" title="Editar" onClick={() => setEditItem(company)}>
                                             <IconEdit />
                                         </button>
@@ -597,6 +601,26 @@ export default function CompaniesIndex({ companies, modules, plans }) {
                 </Modal>
             )}
 
+            {viewItem && (
+                <Modal title={`Detalle de empresa — ${viewItem.business_name}`} onClose={() => setViewItem(null)} maxWidth={760}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+                        <CompanyDetail label="Razón social" value={viewItem.business_name} />
+                        <CompanyDetail label="Nombre comercial" value={viewItem.trade_name} />
+                        <CompanyDetail label="NIT / DUI" value={viewItem.nit_dui} />
+                        <CompanyDetail label="NRC" value={viewItem.nrc} />
+                        <CompanyDetail label="Tipo de persona" value={viewItem.tipo_persona} />
+                        <CompanyDetail label="Actividad económica" value={viewItem.business_activity} />
+                        <CompanyDetail label="Correo" value={viewItem.email} />
+                        <CompanyDetail label="Teléfono" value={viewItem.phone} />
+                        <CompanyDetail label="Dirección" value={[viewItem.address_department, viewItem.address_municipality, viewItem.address_district, viewItem.address].filter(Boolean).join(' · ')} />
+                        <CompanyDetail label="Ambiente de Hacienda" value={environments[viewItem.environment] ?? viewItem.environment} />
+                        <CompanyDetail label="Módulos activos" value={(viewItem.module_accesses || []).map((key) => modules[key] ?? key).join(', ')} />
+                        <CompanyDetail label="Licencia" value={viewItem.active_license?.plan?.name || (viewItem.active_license?.license_type === 'propietario' ? 'Propietario' : viewItem.active_license?.status || 'Sin licencia activa')} />
+                        <CompanyDetail label="Vencimiento de licencia" value={viewItem.active_license?.expires_at?.substring(0, 10)} />
+                    </div>
+                </Modal>
+            )}
+
             {licenseCompany && (
                 <Modal
                     title={licenseCompany.active_license
@@ -615,5 +639,14 @@ export default function CompaniesIndex({ companies, modules, plans }) {
                 </Modal>
             )}
         </AppLayout>
+    );
+}
+
+function CompanyDetail({ label, value }) {
+    return (
+        <div style={{ padding: 10, background: '#f8fafc', borderRadius: 6 }}>
+            <div className="muted" style={{ fontSize: 11, marginBottom: 4 }}>{label}</div>
+            <div style={{ fontSize: 13, fontWeight: 500, overflowWrap: 'anywhere' }}>{value ?? '—'}</div>
+        </div>
     );
 }

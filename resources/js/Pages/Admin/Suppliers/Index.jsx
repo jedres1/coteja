@@ -4,7 +4,7 @@ import { route } from 'ziggy-js';
 import AppLayout from '@/Layouts/AppLayout';
 import Pagination from '@/Components/Pagination';
 import Modal from '@/Components/Modal';
-import { IconEdit, IconTrash } from '@/Components/Icons';
+import { IconEdit, IconEye, IconTrash } from '@/Components/Icons';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const DOCUMENT_TYPES = {
@@ -298,6 +298,7 @@ function SupplierForm({ supplier, geography, onSuccess, onCancel }) {
 export default function SuppliersIndex({ suppliers, search, geography }) {
     const [showCreate, setShowCreate] = useState(false);
     const [editItem, setEditItem] = useState(null);
+    const [viewItem, setViewItem] = useState(null);
     const [searchVal, setSearchVal] = useState(search ?? '');
 
     function handleSearch(e) {
@@ -425,6 +426,15 @@ export default function SuppliersIndex({ suppliers, search, geography }) {
                                         <button
                                             type="button"
                                             className="btn secondary btn-icon"
+                                            title="Ver proveedor"
+                                            aria-label={`Ver ${supplier.name}`}
+                                            onClick={() => setViewItem(supplier)}
+                                        >
+                                            <IconEye />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn secondary btn-icon"
                                             title="Editar"
                                             onClick={() => setEditItem(supplier)}
                                         >
@@ -469,6 +479,37 @@ export default function SuppliersIndex({ suppliers, search, geography }) {
                     />
                 </Modal>
             )}
+
+            {viewItem && (
+                <Modal title={`Detalle de proveedor — ${viewItem.name}`} onClose={() => setViewItem(null)} maxWidth={760}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+                        <SupplierDetail label="Razón social" value={viewItem.name} />
+                        <SupplierDetail label="Nombre comercial" value={viewItem.trade_name} />
+                        <SupplierDetail label="Tipo de documento" value={DOCUMENT_TYPES[viewItem.document_type] ?? viewItem.document_type} />
+                        <SupplierDetail label="Número de documento" value={viewItem.document_number} />
+                        <SupplierDetail label="NRC" value={viewItem.nrc} />
+                        <SupplierDetail label="Actividad económica" value={viewItem.business_activity} />
+                        <SupplierDetail label="Descripción de actividad" value={viewItem.activity_description} />
+                        <SupplierDetail label="Estado" value={STATUSES[viewItem.status] ?? viewItem.status} />
+                        <SupplierDetail label="Correo" value={viewItem.email} />
+                        <SupplierDetail label="Teléfono" value={viewItem.phone} />
+                        <SupplierDetail label="Correo de facturación" value={viewItem.billing_email} />
+                        <SupplierDetail label="Teléfono de facturación" value={viewItem.billing_phone} />
+                        <SupplierDetail label="Dirección" value={[viewItem.address_department, viewItem.address_municipality, viewItem.address_district, viewItem.address].filter(Boolean).join(' · ')} />
+                        <SupplierDetail label="Facturas de compra" value={viewItem.purchase_invoices_count ?? 0} />
+                        <SupplierDetail label="Notas" value={viewItem.notes} />
+                    </div>
+                </Modal>
+            )}
         </AppLayout>
+    );
+}
+
+function SupplierDetail({ label, value }) {
+    return (
+        <div style={{ padding: 10, background: '#f8fafc', borderRadius: 6 }}>
+            <div className="muted" style={{ fontSize: 11, marginBottom: 4 }}>{label}</div>
+            <div style={{ fontSize: 13, fontWeight: 500, overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}>{value ?? '—'}</div>
+        </div>
     );
 }
