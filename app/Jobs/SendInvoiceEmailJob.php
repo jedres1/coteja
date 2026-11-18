@@ -4,7 +4,7 @@ namespace App\Jobs;
 
 use App\Models\BillingInvoice;
 use App\Models\BillingSetting;
-use App\Services\DteEngine;
+use App\Services\Billing\InvoicePdfService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Mail;
@@ -17,7 +17,7 @@ class SendInvoiceEmailJob implements ShouldQueue
 
     public function __construct(public readonly int $invoiceId, public readonly ?string $recipient = null) {}
 
-    public function handle(DteEngine $engine): void
+    public function handle(InvoicePdfService $pdfService): void
     {
         $invoice = BillingInvoice::with(['customer', 'billingClient'])->find($this->invoiceId);
 
@@ -49,22 +49,7 @@ class SendInvoiceEmailJob implements ShouldQueue
         $codigo   = $invoice->generation_code ?: $invoice->number_control;
         $safeCode = preg_replace('/[^A-Za-z0-9_-]/', '_', $codigo ?: 'DTE');
 
-        $pdfResponse = $engine->pdf(
-            [
-                'numero_control'    => $invoice->number_control,
-                'codigo_generacion' => $invoice->generation_code,
-                'fecha_emision'     => optional($invoice->issued_at)->format('Y-m-d'),
-                'cliente'           => $invoice->customer_name,
-                'subtotal'          => (float) $invoice->subtotal,
-                'iva'               => (float) $invoice->iva,
-                'total'             => (float) $invoice->total,
-                'estado'            => $invoice->status,
-                'sello_recepcion'   => $invoice->reception_stamp,
-            ],
-            $dte,
-            $emisor,
-            "DTE_{$safeCode}.pdf",
-        );
+        $pdfResponse = $pdfService->generate($invoice, $settings);
 
         $jsonAdjunto = [
             'dte' => $dte,

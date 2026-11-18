@@ -19,6 +19,7 @@ use App\Services\Accounting\AccountingPeriodService;
 use App\Services\Billing\CorrelativeService;
 use App\Services\Billing\InvoiceContingenciaService;
 use App\Services\Billing\InvoiceDispatchService;
+use App\Services\Billing\InvoicePdfService;
 use App\Services\Billing\InvoiceEOEService;
 use App\Services\Billing\InvoiceReturnService;
 use App\Services\Billing\InvoiceVoidService;
@@ -200,19 +201,7 @@ class FacturaElectronicaSVController extends Controller
         if (! $dte) abort(404, 'La factura no tiene un DTE disponible para generar el PDF.');
 
         $settings = BillingSetting::allAsArray($invoice->company_id ?? $tenantId);
-        $codigo = preg_replace('/[^A-Za-z0-9_-]/', '_', $invoice->generation_code ?: $invoice->number_control);
-        $filename = 'DTE_'.$codigo.'.pdf';
-        $result = $this->engine->pdf([
-            'numero_control' => $invoice->number_control,
-            'codigo_generacion' => $invoice->generation_code,
-            'fecha_emision' => optional($invoice->issued_at)->format('Y-m-d'),
-            'cliente' => $invoice->customer_name,
-            'subtotal' => (float) $invoice->subtotal,
-            'iva' => (float) $invoice->iva,
-            'total' => $this->totalFactura($invoice),
-            'estado' => $invoice->status,
-            'sello_recepcion' => $invoice->reception_stamp,
-        ], $dte, $settings['emisor'] ?? [], $filename);
+        $result = app(InvoicePdfService::class)->generate($invoice, $settings);
 
         $content = base64_decode($result['base64'] ?? '', true);
         if (! ($result['success'] ?? false) || $content === false) {
@@ -221,7 +210,7 @@ class FacturaElectronicaSVController extends Controller
 
         return response($content, 200, [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+            'Content-Disposition' => 'attachment; filename="'.($result['filename'] ?? 'dte.pdf').'"',
             'Content-Length' => strlen($content),
         ]);
     }
@@ -1315,10 +1304,14 @@ class FacturaElectronicaSVController extends Controller
             'filename' => 'nullable|string',
         ]);
 
-        return response()->json($this->engine->pdf(
+        $tenantId = $this->activeTenantId($request);
+        $settings = BillingSetting::allAsArray($tenantId);
+        $config = array_replace($data['config'], $settings['emisor'] ?? []);
+
+        return response()->json(app(InvoicePdfService::class)->generateDocument(
             $data['factura'] ?? [],
             $data['dte'],
-            $data['config'],
+            ['emisor' => $config],
             $data['filename'] ?? 'dte.pdf',
         ));
     }
