@@ -56,6 +56,11 @@ async function run() {
     const generator = new DTEGenerator();
     const validator = new DTEValidator();
     const dte = buildDte(payload.tipo || '01', generator, payload);
+    const opciones = payload.opciones || {};
+    if (opciones.overrideNumeroControl) dte.identificacion.numeroControl = opciones.overrideNumeroControl;
+    if (opciones.overrideCodigoGeneracion) dte.identificacion.codigoGeneracion = opciones.overrideCodigoGeneracion;
+    if (opciones.overrideFechaEmi) dte.identificacion.fecEmi = opciones.overrideFechaEmi;
+    if (opciones.overrideHoraEmi) dte.identificacion.horEmi = opciones.overrideHoraEmi;
     const validation = validator.validar(dte);
     return { success: validation.valido, dte, validation };
   }

@@ -498,7 +498,7 @@ class FacturaElectronicaSVController extends Controller
             ...$this->buildInvoiceFormData($request, $tenantId),
             'editInvoice' => [
                 'id'            => $invoice->id,
-                'customerId'    => $invoice->customer_id,
+                'customerId'    => $invoice->billing_client_id,
                 'numberControl' => $invoice->number_control,
                 'observations'  => $invoice->observations,
                 'dte'           => $invoice->json_dte,
@@ -578,6 +578,7 @@ class FacturaElectronicaSVController extends Controller
             'resumen'    => 'required|array',
             'opciones'   => 'array',
             'customerId' => 'nullable|integer|exists:billing_clients,id',
+            'correctionInvoiceId' => 'nullable|integer|exists:billing_invoices,id',
             'firma'      => 'nullable|array',
             'hacienda'   => 'nullable|array',
             'correo'     => 'nullable|array',
@@ -586,6 +587,7 @@ class FacturaElectronicaSVController extends Controller
         $steps    = [];
         $tipo     = $data['tipo'] ?? '01';
         $tenantId = $this->activeTenantId($request);
+        $isCorrection = ! empty($data['correctionInvoiceId']);
 
         try {
             app(AccountingPeriodService::class)->validateDateOrFail(now(), $tenantId);
@@ -594,9 +596,32 @@ class FacturaElectronicaSVController extends Controller
         }
 
         [$invoice, $dte, $generated] = DB::transaction(function () use ($data, $tipo, $tenantId) {
-            $correlative = $this->correlatives->reserve($tipo, $data['config'], $tenantId);
+            $original = null;
+            if (! empty($data['correctionInvoiceId'])) {
+                $original = BillingInvoice::whereKey($data['correctionInvoiceId'])->lockForUpdate()->firstOrFail();
+                if ($original->status !== 'RECHAZADO' || ($tenantId !== null && $original->company_id !== $tenantId)) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['correctionInvoiceId' => 'La factura ya no está disponible para corregir.']);
+                }
+                if ($original->updated_at?->lt(now()->subHours(24))) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['correctionInvoiceId' => 'Venció el plazo de 24 horas para retransmitir este DTE con el mismo código de generación. Debe emitirse un nuevo documento.']);
+                }
+                if ($original->document_type !== $tipo) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['tipo' => 'El tipo de documento debe mantenerse al corregir una factura rechazada.']);
+                }
+                $correlative = null;
+            } else {
+                $correlative = $this->correlatives->reserve($tipo, $data['config'], $tenantId);
+            }
             $options     = $data['opciones'] ?? [];
-            $options['correlativo'] = (int) $correlative->next_number;
+            if ($original) {
+                $options['correlativo'] = (int) substr((string) $original->number_control, -15);
+                $options['overrideNumeroControl'] = $original->number_control;
+                $options['overrideCodigoGeneracion'] = $original->generation_code;
+                $options['overrideFechaEmi'] = data_get($original->json_dte, 'identificacion.fecEmi');
+                $options['overrideHoraEmi'] = data_get($original->json_dte, 'identificacion.horEmi');
+            } else {
+                $options['correlativo'] = (int) $correlative->next_number;
+            }
 
             $generated = $this->engine->generate(
                 $tipo,
@@ -631,13 +656,16 @@ class FacturaElectronicaSVController extends Controller
                     'status'             => 'PENDIENTE',
                     'has_error'          => ! ($generated['success'] ?? false),
                     'accepted'           => false,
+                    'signed_dte'         => null,
+                    'reception_stamp'    => null,
+                    'email_sent'         => false,
                     'observations'       => json_encode($generated['validation'] ?? [], JSON_UNESCAPED_UNICODE),
                     'json_dte'           => $dte,
                 ],
             );
 
             $usedNumber = $this->correlatives->extractUsedNumber($dte);
-            if ($usedNumber !== null) {
+            if (! $original && $usedNumber !== null) {
                 $this->correlatives->advance($correlative, $usedNumber);
             }
 
@@ -651,12 +679,16 @@ class FacturaElectronicaSVController extends Controller
         ];
         $steps[] = ['key' => 'save', 'status' => 'done', 'message' => 'Factura guardada localmente.'];
 
-        $this->registrarSalidasInventario($request, $data['items'], $invoice);
+        if (! $isCorrection) {
+            $this->registrarSalidasInventario($request, $data['items'], $invoice);
+        }
 
-        try {
-            app(AccountingEntryService::class)->createFromBilling($invoice->fresh(), $request->user()?->id);
-        } catch (\Throwable) {
-            // No interrumpir el flujo DTE si falla la contabilidad
+        if (! $isCorrection) {
+            try {
+                app(AccountingEntryService::class)->createFromBilling($invoice->fresh(), $request->user()?->id);
+            } catch (\Throwable) {
+                // No interrumpir el flujo DTE si falla la contabilidad
+            }
         }
 
         $tenantSettings = BillingSetting::allAsArray($tenantId);

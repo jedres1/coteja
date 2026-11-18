@@ -21,6 +21,7 @@ class BillingInvoice extends Model
         'document_type',
         'issued_at',
         'customer_id',
+        'billing_client_id',
         'company_id',
         'customer_name',
         'subtotal',

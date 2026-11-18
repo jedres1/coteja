@@ -634,6 +634,7 @@ export default function NuevaFactura({ customers, products, settings, correlativ
             resumen: buildResumen(),
             opciones: buildOpciones(),
             customerId: selectedCustomer?.id || null,
+            ...(editInvoice ? { correctionInvoiceId: editInvoice.id } : {}),
             firma: {
                 tipo: firma.tipo || 'svfe',
                 nit: firma.firmador_usuario || firma.firmadorUsuario || (settings.emisor || {}).nit || '',
@@ -723,7 +724,7 @@ export default function NuevaFactura({ customers, products, settings, correlativ
 
             {editInvoice && !result && (
                 <div className="notice" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                    <span>⚠ <strong>Corrigiendo factura rechazada</strong> {editInvoice.numberControl} — al enviar se creará una nueva factura con número de control siguiente.</span>
+                    <span>⚠ <strong>Corrigiendo factura rechazada</strong> {editInvoice.numberControl} — se regenerará, firmará y enviará el DTE conservando su número de control y código de generación.</span>
                     {editInvoice.observations && (
                         <span style={{ color: '#92400e', fontSize: 12 }}>Motivo de rechazo: {editInvoice.observations}</span>
                     )}
