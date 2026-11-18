@@ -861,24 +861,36 @@ class DTEGenerator {
   }
 
   normalizarDescripcionActividad(codigo, descripcion) {
+    const actividad = this.buscarActividad(codigo);
+    if (actividad?.descripcion) return actividad.descripcion;
+
     const descripcionLimpia = String(descripcion || '').trim();
     if (descripcionLimpia) return descripcionLimpia;
 
-    const actividad = this.buscarActividad(codigo);
+    const valor = String(codigo || '').trim();
+    const descripcionIncluida = valor.match(/^[A-Z0-9]+\s+-\s+(.+)$/i);
 
-    return actividad?.descripcion || '';
+    return descripcionIncluida?.[1]?.trim() || '';
   }
 
   normalizarCodigoActividad(codigo) {
-    return this.buscarActividad(codigo)?.codigo || String(codigo || '').trim();
+    const valor = String(codigo || '').trim();
+    const actividad = this.buscarActividad(valor);
+    if (actividad) return actividad.codigo;
+
+    const codigoIncluido = valor.match(/^([A-Z0-9]+)\s+-\s+.+$/i);
+    return codigoIncluido?.[1] || valor;
   }
 
   buscarActividad(codigo) {
     const codigoLimpio = String(codigo || '').trim();
     if (!codigoLimpio) return null;
 
+    const codigoSeparado = codigoLimpio.match(/^([A-Z0-9]+)\s+-\s+.+$/i)?.[1];
+    const codigoBuscado = codigoSeparado || codigoLimpio;
+
     return actividadesEconomicas.find(act => act.codigo === codigoLimpio) ||
-      actividadesEconomicas.find(act => act.codigo.startsWith(codigoLimpio)) ||
+      actividadesEconomicas.find(act => act.codigo === codigoBuscado) ||
       null;
   }
 

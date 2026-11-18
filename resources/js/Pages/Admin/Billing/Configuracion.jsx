@@ -137,6 +137,7 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
     const [showWarning, setShowWarning] = useState(false);
     const [saving, setSaving]           = useState(false);
     const [activities, setActivities]   = useState([]);
+    const [activitySearch, setActivitySearch] = useState(String(settings.emisor?.actividad_economica ?? ''));
     const [geo, setGeo]                 = useState({ departamentos: [] });
     const [toast, setToast]             = useState(null);
     const [testingHacienda, setTestingHacienda] = useState(false);
@@ -154,7 +155,22 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
     useEffect(() => {
         fetch('/catalogs/actividades-economicas.json')
             .then((r) => r.json())
-            .then((data) => setActivities(Array.isArray(data) ? data : []))
+            .then((data) => {
+                const catalog = Array.isArray(data) ? data : [];
+                setActivities(catalog);
+
+                const value = String(form.data.emisor.actividad_economica || '').trim();
+                const code = value.split(/\s+-\s+/, 1)[0].trim();
+                const activity = catalog.find((item) => item.codigo === value || item.codigo === code);
+                if (activity) {
+                    setActivitySearch(`${activity.codigo} - ${activity.descripcion}`);
+                    form.setData('emisor', {
+                        ...form.data.emisor,
+                        actividad_economica: activity.codigo,
+                        desc_actividad: activity.descripcion,
+                    });
+                }
+            })
             .catch(() => {});
         fetch('/catalogs/division-geografica.json')
             .then((r) => r.json())
@@ -344,6 +360,9 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
         if (!form.data.emisor.nit?.trim())            missing.push('NIT / DUI');
         if (!form.data.emisor.nombre_empresa?.trim()) missing.push('Nombre de la empresa');
         if (!form.data.emisor.direccion?.trim())      missing.push('Dirección complementaria');
+        if (!activities.some((activity) => activity.codigo === form.data.emisor.actividad_economica)) {
+            missing.push('Actividad económica válida del catálogo');
+        }
         if (missing.length) {
             showToast(`Campos requeridos vacíos: ${missing.join(', ')}`, false);
             return;
@@ -494,8 +513,18 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
                             </Field>
                             <Field label="Actividad Económica" full>
                                 <input
-                                    value={form.data.emisor.actividad_economica}
-                                    onChange={(e) => setE('actividad_economica', e.target.value)}
+                                    value={activitySearch}
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        const code = value.trim().split(/\s+-\s+/, 1)[0].trim();
+                                        const activity = activities.find((item) => item.codigo === value.trim() || item.codigo === code);
+                                        setActivitySearch(value);
+                                        form.setData('emisor', {
+                                            ...form.data.emisor,
+                                            actividad_economica: activity?.codigo ?? '',
+                                            desc_actividad: activity?.descripcion ?? '',
+                                        });
+                                    }}
                                     list={activityListId}
                                     placeholder="Buscar por código o descripción…"
                                 />
@@ -504,6 +533,7 @@ export default function Configuracion({ settings, correlativos, currentYear, ava
                                         <option key={a.codigo} value={`${a.codigo} - ${a.descripcion}`} />
                                     ))}
                                 </datalist>
+                                <small className="muted">{form.data.emisor.desc_actividad || 'Seleccione una actividad del catálogo.'}</small>
                             </Field>
                             <Field label="Departamento">
                                 {depts.length > 0 ? (
