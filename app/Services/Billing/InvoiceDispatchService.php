@@ -140,6 +140,8 @@ class InvoiceDispatchService
             'status'           => $accepted ? 'ENVIADO' : 'RECHAZADO',
             'accepted'         => $accepted,
             'has_error'        => ! $accepted,
+            'rejected_at'      => $accepted ? null : now(),
+            'correction_saved_at' => null,
             'reception_stamp'  => $sent['selloRecibido'] ?? null,
             'observations'     => json_encode($sent, JSON_UNESCAPED_UNICODE),
         ]);

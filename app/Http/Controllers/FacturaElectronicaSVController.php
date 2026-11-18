@@ -494,7 +494,7 @@ class FacturaElectronicaSVController extends Controller
 
         $tenantId = $invoice->company_id ?? $tenantId;
 
-        return Inertia::render('Admin/Billing/NuevaFactura', [
+        return Inertia::render('Admin/Billing/EditarFactura', [
             ...$this->buildInvoiceFormData($request, $tenantId),
             'editInvoice' => [
                 'id'            => $invoice->id,
@@ -502,8 +502,47 @@ class FacturaElectronicaSVController extends Controller
                 'numberControl' => $invoice->number_control,
                 'observations'  => $invoice->observations,
                 'dte'           => $invoice->json_dte,
+                'status'        => $invoice->status,
+                'date'          => optional($invoice->issued_at)->format('Y-m-d'),
+                'total'         => (float) $invoice->total,
+                'generationCode' => $invoice->generation_code,
+                'correctionSaved' => $invoice->correction_saved_at !== null,
             ],
         ]);
+    }
+
+    public function guardarCorreccionFactura(Request $request, BillingInvoice $invoice)
+    {
+        if ($invoice->status !== 'RECHAZADO') {
+            return response()->json(['success' => false, 'message' => 'Solo se pueden guardar cambios en facturas RECHAZADAS.'], 422);
+        }
+        $tenantId = $this->activeTenantId($request);
+        if ($tenantId !== null && $invoice->company_id !== $tenantId) abort(403);
+
+        $request->merge(['correctionInvoiceId' => $invoice->id, 'saveCorrectionOnly' => true]);
+
+        return $this->procesarFactura($request);
+    }
+
+    public function reenviarCorreccionFactura(Request $request, BillingInvoice $invoice)
+    {
+        if ($invoice->status !== 'RECHAZADO') {
+            return response()->json(['success' => false, 'message' => 'Solo se pueden reenviar facturas RECHAZADAS.'], 422);
+        }
+        $tenantId = $this->activeTenantId($request);
+        if ($tenantId !== null && $invoice->company_id !== $tenantId) abort(403);
+        if (! $invoice->correction_saved_at || ! $invoice->json_dte || $invoice->signed_dte) {
+            return response()->json(['success' => false, 'message' => 'Guarda primero los cambios de la factura antes de reenviarla.'], 422);
+        }
+        $rejectedAt = $invoice->rejected_at ?? $invoice->updated_at;
+        if ($rejectedAt?->lt(now()->subHours(24))) {
+            return response()->json(['success' => false, 'message' => 'Venció el plazo de 24 horas para retransmitir este DTE con el mismo código de generación.'], 422);
+        }
+
+        // Consume el guardado para impedir reenvíos repetidos sin una nueva revisión.
+        $invoice->update(['correction_saved_at' => null]);
+
+        return $this->enviarFacturaGuardada($request, $invoice->fresh());
     }
 
     // ── Configuración ──────────────────────────────────────────────────────────
@@ -579,6 +618,7 @@ class FacturaElectronicaSVController extends Controller
             'opciones'   => 'array',
             'customerId' => 'nullable|integer|exists:billing_clients,id',
             'correctionInvoiceId' => 'nullable|integer|exists:billing_invoices,id',
+            'saveCorrectionOnly' => 'nullable|boolean',
             'firma'      => 'nullable|array',
             'hacienda'   => 'nullable|array',
             'correo'     => 'nullable|array',
@@ -588,21 +628,30 @@ class FacturaElectronicaSVController extends Controller
         $tipo     = $data['tipo'] ?? '01';
         $tenantId = $this->activeTenantId($request);
         $isCorrection = ! empty($data['correctionInvoiceId']);
-
-        try {
-            app(AccountingPeriodService::class)->validateDateOrFail(now(), $tenantId);
-        } catch (AccountingPeriodException $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        $saveCorrectionOnly = ! empty($data['saveCorrectionOnly']);
+        if ($saveCorrectionOnly && ! $isCorrection) {
+            return response()->json(['success' => false, 'message' => 'La acción guardar corrección requiere una factura rechazada.'], 422);
+        }
+        if ($isCorrection && ! $saveCorrectionOnly) {
+            return response()->json(['success' => false, 'message' => 'Guarda la corrección y usa la opción Reenviar para transmitirla a Hacienda.'], 422);
+        }
+        if (! $isCorrection) {
+            try {
+                app(AccountingPeriodService::class)->validateDateOrFail(now(), $tenantId);
+            } catch (AccountingPeriodException $e) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            }
         }
 
-        [$invoice, $dte, $generated] = DB::transaction(function () use ($data, $tipo, $tenantId) {
+        [$invoice, $dte, $generated] = DB::transaction(function () use ($data, $tipo, $tenantId, $saveCorrectionOnly) {
             $original = null;
             if (! empty($data['correctionInvoiceId'])) {
                 $original = BillingInvoice::whereKey($data['correctionInvoiceId'])->lockForUpdate()->firstOrFail();
                 if ($original->status !== 'RECHAZADO' || ($tenantId !== null && $original->company_id !== $tenantId)) {
                     throw \Illuminate\Validation\ValidationException::withMessages(['correctionInvoiceId' => 'La factura ya no está disponible para corregir.']);
                 }
-                if ($original->updated_at?->lt(now()->subHours(24))) {
+                $rejectedAt = $original->rejected_at ?? $original->updated_at;
+                if ($rejectedAt?->lt(now()->subHours(24))) {
                     throw \Illuminate\Validation\ValidationException::withMessages(['correctionInvoiceId' => 'Venció el plazo de 24 horas para retransmitir este DTE con el mismo código de generación. Debe emitirse un nuevo documento.']);
                 }
                 if ($original->document_type !== $tipo) {
@@ -653,13 +702,15 @@ class FacturaElectronicaSVController extends Controller
                     'subtotal'           => (float) ($data['resumen']['subtotal'] ?? $data['resumen']['subTotal'] ?? 0),
                     'iva'                => (float) ($data['resumen']['iva'] ?? 0),
                     'total'              => (float) ($data['resumen']['total'] ?? $data['resumen']['totalPagar'] ?? 0),
-                    'status'             => 'PENDIENTE',
-                    'has_error'          => ! ($generated['success'] ?? false),
+                    'status'             => $original ? 'RECHAZADO' : 'PENDIENTE',
+                    'has_error'          => $original ? true : ! ($generated['success'] ?? false),
                     'accepted'           => false,
                     'signed_dte'         => null,
                     'reception_stamp'    => null,
                     'email_sent'         => false,
-                    'observations'       => json_encode($generated['validation'] ?? [], JSON_UNESCAPED_UNICODE),
+                    'correction_saved_at' => $original && $saveCorrectionOnly && ($generated['success'] ?? false) ? now() : null,
+                    'rejected_at'        => $original?->rejected_at ?? $original?->updated_at,
+                    'observations'       => $original ? $original->observations : json_encode($generated['validation'] ?? [], JSON_UNESCAPED_UNICODE),
                     'json_dte'           => $dte,
                 ],
             );
@@ -678,6 +729,18 @@ class FacturaElectronicaSVController extends Controller
             'message' => ($generated['success'] ?? false) ? 'DTE generado y validado.' : 'DTE generado con observaciones.',
         ];
         $steps[] = ['key' => 'save', 'status' => 'done', 'message' => 'Factura guardada localmente.'];
+
+        if ($isCorrection && $saveCorrectionOnly) {
+            return response()->json([
+                'success' => true,
+                'message' => ($generated['success'] ?? false)
+                    ? 'Cambios guardados en la factura rechazada. Puedes reenviarla a Hacienda cuando estés listo.'
+                    : 'Cambios guardados, pero el DTE aún tiene errores de validación. Corrígelos antes de reenviar.',
+                'invoice' => $invoice->fresh(),
+                'dte' => $dte,
+                'steps' => $steps,
+            ]);
+        }
 
         if (! $isCorrection) {
             $this->registrarSalidasInventario($request, $data['items'], $invoice);
@@ -727,7 +790,7 @@ class FacturaElectronicaSVController extends Controller
                     $steps[] = ['key' => 'email', 'status' => 'warning', 'message' => 'No se envió correo porque Hacienda no devolvió sello de aprobación.'];
                 }
             } catch (\Throwable $e) {
-                $invoice->update(['status' => 'RECHAZADO', 'has_error' => true, 'observations' => $e->getMessage()]);
+                $invoice->update(['status' => 'RECHAZADO', 'has_error' => true, 'rejected_at' => now(), 'correction_saved_at' => null, 'observations' => $e->getMessage()]);
                 $steps[] = ['key' => 'send', 'status' => 'error', 'message' => 'No se pudo enviar a Hacienda: ' . $e->getMessage()];
                 $steps[] = ['key' => 'response', 'status' => 'error', 'message' => 'No hubo respuesta aprobada de Hacienda.'];
                 $steps[] = ['key' => 'attachments', 'status' => 'warning', 'message' => 'No se crearon adjuntos de correo porque el documento no fue aprobado.'];
@@ -815,7 +878,7 @@ class FacturaElectronicaSVController extends Controller
                 $invoice, $dte, $emisor, $hacienda, $firma['password'] ?? null,
             );
         } catch (\Throwable $e) {
-            $invoice->update(['status' => 'RECHAZADO', 'has_error' => true, 'observations' => $e->getMessage()]);
+            $invoice->update(['status' => 'RECHAZADO', 'has_error' => true, 'rejected_at' => now(), 'correction_saved_at' => null, 'observations' => $e->getMessage()]);
             $steps[] = ['key' => 'send', 'status' => 'error', 'message' => 'No se pudo enviar a Hacienda: ' . $e->getMessage()];
 
             if ($isInertia) return back()->with('error', 'No se pudo enviar a Hacienda: ' . $e->getMessage());

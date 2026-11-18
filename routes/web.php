@@ -211,6 +211,8 @@ Route::middleware(['auth', 'role:admin,inquilino', 'ensure-company', 'module:bil
         Route::get('billing/facturas', 'facturasPage')->name('billing.facturas');
         Route::get('billing/nueva-factura', 'nuevaFacturaPage')->name('billing.nueva-factura');
         Route::get('billing/facturas/{invoice}/corregir', 'editarFactura')->name('billing.editar-factura');
+        Route::post('billing/facturas/{invoice}/corregir/guardar', 'guardarCorreccionFactura')->name('billing.guardar-correccion');
+        Route::post('billing/facturas/{invoice}/corregir/reenviar', 'reenviarCorreccionFactura')->name('billing.reenviar-correccion');
         Route::get('billing/dashboard', 'billingDashboardPage')->name('billing.dashboard');
         Route::get('billing/clientes', 'clientesPage')->name('billing.clientes');
         Route::post('billing/clientes', 'guardarCliente')->name('billing.clientes.store');

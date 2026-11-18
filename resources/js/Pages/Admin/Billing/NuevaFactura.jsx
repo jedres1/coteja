@@ -449,6 +449,13 @@ export default function NuevaFactura({ customers, products, settings, correlativ
     const [formError, setFormError] = useState('');
     const [overlay, setOverlay] = useState({ visible: false, title: '', subtitle: '', badge: 'En proceso', status: '', current: -1, steps: [] });
     const [result, setResult] = useState(null);
+    const [correctionSaved, setCorrectionSaved] = useState(() => Boolean(editInvoice?.correctionSaved));
+    const [correctionStatus, setCorrectionStatus] = useState(() => editInvoice?.status || 'RECHAZADO');
+    const [correctionObservations, setCorrectionObservations] = useState(() => editInvoice?.observations || '');
+    const [correctionTotal, setCorrectionTotal] = useState(() => Number(editInvoice?.total || 0));
+    const [correctionNotice, setCorrectionNotice] = useState('');
+    const [savingCorrection, setSavingCorrection] = useState(false);
+    const [resendingCorrection, setResendingCorrection] = useState(false);
 
     const usesMultipleRelated = ['05', '06'].includes(tipo);
     const needsRelated = ['05', '06', '07'].includes(tipo);
@@ -463,12 +470,14 @@ export default function NuevaFactura({ customers, products, settings, correlativ
 
     // ── Customer handlers ──
     function selectCustomer(customer) {
+        if (editInvoice) setCorrectionSaved(false);
         setSelectedCustomer(customer);
         setCustomerSearch(customer.name);
         setClienteData({ ...EMPTY_CLIENTE, ...(customer.receptor || {}) });
         if (customer.preferredDteType) setTipo(customer.preferredDteType);
     }
     function clearCustomer() {
+        if (editInvoice) setCorrectionSaved(false);
         setSelectedCustomer(null);
         setCustomerSearch('');
         setClienteData({ ...EMPTY_CLIENTE });
@@ -490,6 +499,7 @@ export default function NuevaFactura({ customers, products, settings, correlativ
 
     // ── Related doc handlers ──
     function addRelatedDoc() {
+        if (editInvoice) setCorrectionSaved(false);
         setFormError('');
         const num = String(docRelacionado.numeroDocumento || '').trim().toUpperCase();
         const fecha = docRelacionado.fechaEmision;
@@ -505,12 +515,14 @@ export default function NuevaFactura({ customers, products, settings, correlativ
     }
 
     function removeRelatedDoc(num) {
+        if (editInvoice) setCorrectionSaved(false);
         setDocRelacionados((prev) => prev.filter((d) => d.numeroDocumento !== num));
         setItems((prev) => prev.map((i) => i.numeroDocumentoRelacionado === num ? { ...i, numeroDocumentoRelacionado: null } : i));
     }
 
     // ── Add item ──
     function addItem(item) {
+        if (editInvoice) setCorrectionSaved(false);
         if (usesMultipleRelated && !item.numeroDocumentoRelacionado) {
             setFormError(`Seleccione el CCF al que aplica este ítem.`);
             return;
@@ -645,6 +657,36 @@ export default function NuevaFactura({ customers, products, settings, correlativ
             correo,
         };
 
+        if (editInvoice) {
+            const xsrfCookie = document.cookie.split('; ').find((cookie) => cookie.startsWith('XSRF-TOKEN='))?.slice('XSRF-TOKEN='.length);
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+            setSavingCorrection(true);
+            setCorrectionNotice('');
+            try {
+                const response = await fetch(route('admin.factura-sv.billing.guardar-correccion', editInvoice.id), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        ...(xsrfCookie ? { 'X-XSRF-TOKEN': decodeURIComponent(xsrfCookie) } : { 'X-CSRF-TOKEN': csrfToken }),
+                    },
+                    body: JSON.stringify(payload),
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) throw new Error(data.message || `No se pudieron guardar los cambios (HTTP ${response.status}).`);
+                setCorrectionSaved(Boolean(data.invoice?.correction_saved_at));
+                setCorrectionStatus(data.invoice?.status || 'RECHAZADO');
+                setCorrectionObservations(data.invoice?.observations || correctionObservations);
+                setCorrectionTotal(Number(data.invoice?.total || correctionTotal));
+                setCorrectionNotice(data.message || 'Cambios guardados.');
+            } catch (error) {
+                setFormError(error.message || 'No se pudieron guardar los cambios.');
+            } finally {
+                setSavingCorrection(false);
+            }
+            return;
+        }
+
         const steps = STEP_LABELS.map((label) => ({ label, message: '', status: '' }));
         setOverlay({ visible: true, title: 'Envío de documento a Hacienda', subtitle: 'Preparando documento...', badge: 'En proceso', status: '', current: 0, steps });
 
@@ -700,6 +742,41 @@ export default function NuevaFactura({ customers, products, settings, correlativ
         }
     }
 
+    async function handleResendCorrection() {
+        setFormError('');
+        if (!correctionSaved) {
+            setFormError('Guarda los cambios antes de reenviar la factura a Hacienda.');
+            return;
+        }
+        if (!confirm(`¿Reenviar la factura ${editInvoice.numberControl} a Hacienda para validación?`)) return;
+
+        const xsrfCookie = document.cookie.split('; ').find((cookie) => cookie.startsWith('XSRF-TOKEN='))?.slice('XSRF-TOKEN='.length);
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+        setResendingCorrection(true);
+        setCorrectionNotice('');
+        try {
+            const response = await fetch(route('admin.factura-sv.billing.reenviar-correccion', editInvoice.id), {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    ...(xsrfCookie ? { 'X-XSRF-TOKEN': decodeURIComponent(xsrfCookie) } : { 'X-CSRF-TOKEN': csrfToken }),
+                },
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || `No se pudo reenviar la factura (HTTP ${response.status}).`);
+            setCorrectionStatus(data.invoice?.status || (data.success ? 'ENVIADO' : 'RECHAZADO'));
+            setCorrectionSaved(Boolean(data.invoice?.correction_saved_at));
+            setCorrectionObservations(data.invoice?.observations || correctionObservations);
+            setCorrectionTotal(Number(data.invoice?.total || correctionTotal));
+            setCorrectionNotice(data.message || 'Respuesta recibida de Hacienda.');
+        } catch (error) {
+            setCorrectionSaved(false);
+            setFormError(error.message || 'No se pudo reenviar la factura.');
+        } finally {
+            setResendingCorrection(false);
+        }
+    }
+
     function resetForm() {
         setSelectedCustomer(null); setCustomerSearch(''); setClienteData({ ...EMPTY_CLIENTE });
         setTipo(enabledDteTypes[0]?.codigo || '01');
@@ -714,21 +791,27 @@ export default function NuevaFactura({ customers, products, settings, correlativ
 
     // ── Render ──
     return (
-        <AppLayout title="Nueva Factura">
+        <AppLayout title={editInvoice ? 'Corregir factura rechazada' : 'Nueva Factura'}>
             <div className="section-top">
                 <div>
-                    <h1>Nueva Factura</h1>
-                    <p className="muted">Emisión de documentos tributarios electrónicos</p>
+                    <h1>{editInvoice ? 'Editar factura rechazada' : 'Nueva Factura'}</h1>
+                    <p className="muted">{editInvoice ? 'Edita el documento existente; guardar no lo envía a Hacienda.' : 'Emisión de documentos tributarios electrónicos'}</p>
                 </div>
             </div>
 
             {editInvoice && !result && (
-                <div className="notice" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                    <span>⚠ <strong>Corrigiendo factura rechazada</strong> {editInvoice.numberControl} — se regenerará, firmará y enviará el DTE conservando su número de control y código de generación.</span>
-                    {editInvoice.observations && (
-                        <span style={{ color: '#92400e', fontSize: 12 }}>Motivo de rechazo: {editInvoice.observations}</span>
-                    )}
-                    <a href={route('admin.factura-sv.billing.facturas')} className="btn secondary" style={{ marginLeft: 'auto', textDecoration: 'none', fontSize: 12 }}>← Volver</a>
+                <div className="card" style={{ marginBottom: 16, borderLeft: '4px solid #dc2626' }}>
+                    <h3>Detalle de la factura</h3>
+                    <div className="form-grid">
+                        <div><span className="muted">Estado</span><div><strong style={{ color: correctionStatus === 'RECHAZADO' ? '#b91c1c' : '#15803d' }}>{correctionStatus}</strong></div></div>
+                        <div><span className="muted">Número de control</span><div><strong>{editInvoice.numberControl}</strong></div></div>
+                        <div><span className="muted">Código de generación</span><div><strong>{editInvoice.generationCode}</strong></div></div>
+                        <div><span className="muted">Fecha de emisión</span><div><strong>{editInvoice.date || '—'}</strong></div></div>
+                        <div><span className="muted">Cliente</span><div><strong>{selectedCustomer?.name || clienteData.nombre || '—'}</strong></div></div>
+                        <div><span className="muted">Total actual</span><div><strong>{money(correctionTotal || totals.totalEstimado)}</strong></div></div>
+                    </div>
+                    {correctionObservations && <div className="alert alert-info" style={{ marginTop: 12, overflowWrap: 'anywhere' }}><strong>Respuesta de rechazo:</strong> {correctionObservations}</div>}
+                    {correctionNotice && <div className="notice" style={{ marginTop: 12 }}>{correctionNotice}</div>}
                 </div>
             )}
 
@@ -746,7 +829,7 @@ export default function NuevaFactura({ customers, products, settings, correlativ
                 <div className="errors" style={{ marginBottom: 16 }}>{formError}</div>
             )}
 
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} onChangeCapture={editInvoice ? () => setCorrectionSaved(false) : undefined}>
                 {/* ── Sección cliente ── */}
                 <div className="card" style={{ marginBottom: 16 }}>
                     <h3>Información del Cliente</h3>
@@ -766,7 +849,7 @@ export default function NuevaFactura({ customers, products, settings, correlativ
                             />
                         </div>
                         <label className="form-group">Tipo de Documento
-                            <select value={tipo} onChange={(e) => handleDteTypeChange(e.target.value)}>
+                            <select value={tipo} disabled={Boolean(editInvoice)} onChange={(e) => handleDteTypeChange(e.target.value)}>
                                 {enabledDteTypes.map((t) => (
                                     <option key={t.codigo} value={t.codigo}>{t.codigo} - {t.nombre}</option>
                                 ))}
@@ -966,7 +1049,7 @@ export default function NuevaFactura({ customers, products, settings, correlativ
                                         <td>{money(item.precio_unitario)}</td>
                                         <td>{item.exento ? 'Exento' : money(lineIva(item, tipo))}</td>
                                         <td>{money(lineTotal(item, tipo))}</td>
-                                        <td><button className="btn secondary" type="button" onClick={() => setItems((prev) => prev.filter((_, j) => j !== i))}>Quitar</button></td>
+                                        <td><button className="btn secondary" type="button" onClick={() => { if (editInvoice) setCorrectionSaved(false); setItems((prev) => prev.filter((_, j) => j !== i)); }}>Quitar</button></td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -1040,8 +1123,19 @@ export default function NuevaFactura({ customers, products, settings, correlativ
                         {items.length > 0 ? `${items.length} ítem${items.length !== 1 ? 's' : ''} · Total: ${money(totals.totalEstimado)}` : 'Sin ítems aún'}
                     </span>
                     <div className="actions">
-                        <button className="btn secondary" type="button" onClick={resetForm}>Cancelar</button>
-                        <button className="btn" type="submit" style={{ minWidth: 160 }}>Generar Factura →</button>
+                        {editInvoice ? (
+                            correctionStatus === 'RECHAZADO' && <>
+                                <button className="btn secondary" type="submit" disabled={savingCorrection || resendingCorrection} style={{ minWidth: 140 }}>
+                                    {savingCorrection ? 'Guardando…' : 'Guardar'}
+                                </button>
+                                <button className="btn" type="button" onClick={handleResendCorrection} disabled={!correctionSaved || savingCorrection || resendingCorrection} style={{ minWidth: 160 }}>
+                                    {resendingCorrection ? 'Enviando…' : 'Reenviar a Hacienda'}
+                                </button>
+                            </>
+                        ) : <>
+                            <button className="btn secondary" type="button" onClick={resetForm}>Cancelar</button>
+                            <button className="btn" type="submit" style={{ minWidth: 160 }}>Generar Factura →</button>
+                        </>}
                     </div>
                 </div>
             </form>
