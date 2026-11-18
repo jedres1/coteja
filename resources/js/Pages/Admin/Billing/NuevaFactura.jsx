@@ -60,7 +60,10 @@ function roundMoney(v) { return Math.round((Number(v || 0) + Number.EPSILON) * 1
 function money(v) { return `$${roundMoney(v).toFixed(2)}`; }
 
 function lineGross(item) { return Number(item.cantidad || 0) * Number(item.precio_unitario || 0); }
-function lineBase(item) { return Math.max(0, roundMoney(lineGross(item) - Number(item.descuento || 0))); }
+function lineDiscount(item) {
+    return roundMoney(Math.min(lineGross(item), Math.max(0, Number(item.descuento || 0))));
+}
+function lineBase(item) { return Math.max(0, roundMoney(lineGross(item) - lineDiscount(item))); }
 function lineIva(item, tipo) {
     return item.exento || ['07', '11', '14', '15'].includes(tipo) ? 0 : roundMoney(lineBase(item) * 0.13);
 }
@@ -68,6 +71,7 @@ function lineTotal(item, tipo) { return roundMoney(lineBase(item) + lineIva(item
 
 function computeTotals(items, factura, tipo, retencion, opciones) {
     const subtotalBruto = items.reduce((s, i) => s + lineGross(i), 0);
+    const descuentoItemsAplicado = roundMoney(items.reduce((s, i) => s + lineDiscount(i), 0));
     const descuentoGeneralAplicado = (() => {
         const val = Number(factura.descuentoGeneral || 0);
         if (factura.descuentoTipo === 'porcentaje') return roundMoney(subtotalBruto * (val / 100));
@@ -90,8 +94,11 @@ function computeTotals(items, factura, tipo, retencion, opciones) {
     const totalEstimado = tipo === '07' ? retencionCalculada
         : roundMoney(Math.max(0, subtotalTotal + ivaEstimado + exportExtras + Number(factura.ivaPerci1 || 0) - Number(factura.ivaRete1 || 0) - Number(factura.reteRenta || 0)));
 
+    const descuentoTotalAplicado = roundMoney(descuentoItemsAplicado + descuentoGeneralAplicado);
+
     return { subtotalBruto, subtotalGravado, subtotalExento, subtotalTotal, ivaEstimado,
-        descuentoGeneralAplicado, retencionCalculada, totalEstimado };
+        descuentoItemsAplicado, descuentoGeneralAplicado, descuentoTotalAplicado,
+        retencionCalculada, totalEstimado };
 }
 
 function discountForItemForm(form) {
@@ -554,7 +561,7 @@ export default function NuevaFactura({ customers, products, settings, correlativ
 
     function buildItems() {
         if (tipo === '07') return [];
-        return items.map((i) => ({ ...i, precio_unitario: Number(i.precio_unitario), cantidad: Number(i.cantidad), descuento: Number(i.descuento || 0), montoDescu: Number(i.descuento || 0), numero_documento: i.numeroDocumentoRelacionado || undefined }));
+        return items.map((i) => ({ ...i, precio_unitario: Number(i.precio_unitario), cantidad: Number(i.cantidad), descuento: lineDiscount(i), montoDescu: lineDiscount(i), numero_documento: i.numeroDocumentoRelacionado || undefined }));
     }
 
     function buildResumen() {
@@ -571,7 +578,7 @@ export default function NuevaFactura({ customers, products, settings, correlativ
             totalExenta: totals.subtotalExento,
             subTotalVentas: totals.subtotalTotal,
             subTotal: totals.subtotalTotal,
-            totalDescu: totals.descuentoGeneralAplicado + items.reduce((s, i) => s + Number(i.descuento || 0), 0),
+            totalDescu: totals.descuentoTotalAplicado,
             ivaRete1: Number(factura.ivaRete1 || 0),
             ivaPerci1: Number(factura.ivaPerci1 || 0),
             reteRenta: Number(factura.reteRenta || 0),
@@ -968,7 +975,9 @@ export default function NuevaFactura({ customers, products, settings, correlativ
                                     <input type="number" min="0" step="0.01" value={factura.descuentoGeneral} className="summary-input" onChange={(e) => setFactura((f) => ({ ...f, descuentoGeneral: e.target.value }))} />
                                 </span>
                             </div>
-                            <div className="resumen-row"><span>Descuento Aplicado:</span><strong>{money(totals.descuentoGeneralAplicado)}</strong></div>
+                            <div className="resumen-row"><span>Descuento en ítems:</span><strong>{money(totals.descuentoItemsAplicado)}</strong></div>
+                            <div className="resumen-row"><span>Descuento general aplicado:</span><strong>{money(totals.descuentoGeneralAplicado)}</strong></div>
+                            <div className="resumen-row"><span>Total descuentos:</span><strong>{money(totals.descuentoTotalAplicado)}</strong></div>
                             <div className="resumen-row"><span>IVA (13%):</span><strong>{money(totals.ivaEstimado)}</strong></div>
                             {['03','05','06'].includes(tipo) && (
                                 <div className="resumen-row"><span>IVA Retenido:</span>
