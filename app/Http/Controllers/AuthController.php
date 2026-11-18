@@ -34,9 +34,12 @@ class AuthController extends Controller
             return redirect($intended);
         }
 
-        // Route by role: admins go to dashboard, inquilinos to company selection
+        // Facturación es la página de inicio por defecto; tenants sin acceso
+        // al módulo deben seleccionar una empresa y entrar por un módulo habilitado.
         return redirect()->route(
-            $user->isAdmin() ? 'admin.dashboard' : 'admin.seleccionar-empresa'
+            $user->isAdmin() || $user->hasModuleAccess('billing')
+                ? 'admin.factura-sv.billing.dashboard'
+                : 'admin.seleccionar-empresa'
         );
     }
 

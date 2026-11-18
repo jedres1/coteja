@@ -733,7 +733,7 @@ export default function NuevaFactura({ customers, products, settings, correlativ
 
             setTimeout(() => {
                 setOverlay((o) => ({ ...o, visible: false }));
-                setResult(data);
+                router.visit(route('admin.factura-sv.billing.facturas'));
             }, data.success ? 1200 : 2000);
 
         } catch (err) {

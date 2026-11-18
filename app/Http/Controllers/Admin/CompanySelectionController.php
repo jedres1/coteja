@@ -35,8 +35,8 @@ class CompanySelectionController extends Controller
         $modules = $company?->module_accesses ?? [];
 
         $moduleRoutes = [
+            'billing'    => 'admin.factura-sv.billing.dashboard',
             'purchases'  => 'admin.purchase-invoices.index',
-            'billing'    => 'admin.factura-sv.billing.facturas',
             'accounting' => 'admin.accounting.diario.index',
             'banking'    => 'admin.bank-transactions.index',
             'inventory'  => 'admin.inventory.movements',
